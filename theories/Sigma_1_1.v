@@ -9,6 +9,7 @@ From mathcomp Require Import falgebra fieldext separable galois.
 From mathcomp Require ssrnum ssrint.
 
 From Coq Require Import FunctionalExtensionality.
+From Coq Require Import Relation_Definitions RelationClasses.
 
 Definition drop_index {T} (m : nat) (s : seq T) : seq T := 
   take m s ++ behead (drop m s).
@@ -22,6 +23,10 @@ Proof.
   simpl; rewrite IH; auto.
   destruct (length l);[fcrush|sauto q: on].
 Qed.
+
+Theorem drop_index_step {T} (m : nat) (t : T) (s : seq T) : 
+  drop_index (m.+1) (t :: s) = t :: drop_index m s.
+Proof. reflexivity. Qed.
 
 Theorem drop_index_nth_low {T} : forall i j (s : seq T) d,
   j < i ->
@@ -43,6 +48,11 @@ Proof.
   destruct j;[fcrush|].
   by replace (j.+1 - 1) with j;[|sauto q:on].
 Qed.
+
+Theorem tnth_tuple_index {T} {s : seq T} (x : T) {i} (lti : i < length s) :
+  tnth (in_tuple (x :: s)) (Ordinal (n:=length (x :: s)) (m:=i.+1) lti) = 
+  tnth (in_tuple s) (Ordinal lti).
+Proof. by do 2 rewrite (tnth_nth x). Qed.
 
 Section Sigma_1_1_Internal.
 
@@ -78,16 +88,23 @@ Definition RingTermFOQuote {soctx} {foctx} {n} :
   - exact (RingTimes IHr1 IHr2).
 Defined.
 
+Theorem RingTermFOQuote_Fun_Step {soctx} {foctx} {n}
+  (i : 'I_(length soctx))
+  (t : 'I_(length (snd (tnth (in_tuple soctx) i))) -> RingTerm (foctx := foctx)) :
+  RingTermFOQuote (n := n) (RingFun i t) =
+  RingFun i (fun x => RingTermFOQuote (t x)).
+Proof. reflexivity. Qed.
+
 Definition RingTermSOQuote {soctx} {foctx} {n} {l} : 
   RingTerm (soctx := soctx) (foctx := foctx) ->
   RingTerm (soctx := (n, l) :: soctx) (foctx := foctx).
   elim.
   - apply RingVar.
-  - move=>[i lti] X0 X.
+  - move=>[i lti] _ IH.
     assert (i.+1 < length ((n, l) :: soctx));[auto|].
     apply (RingFun (Ordinal (m := i.+1) H)).
     move=>[j ltj].
-    apply: X.
+    apply: IH.
     apply (Ordinal (m := j)).
     by do 2 rewrite (tnth_nth (0, nil)) in ltj *.
   - exact RingMinusOne.
@@ -98,6 +115,24 @@ Definition RingTermSOQuote {soctx} {foctx} {n} {l} :
   - intros r1 IHr1 r2 IHr2.
     exact (RingTimes IHr1 IHr2).
 Defined.
+
+Theorem RingTermSOQuote_Fun_Step {soctx} {foctx} {n} {l}
+  (i : nat) (lti : i < length soctx)
+  (t : 'I_(length (snd (tnth (in_tuple soctx) (Ordinal lti)))) -> RingTerm (foctx := foctx)) :
+  RingTermSOQuote (RingFun (Ordinal lti) t) = 
+  RingFun (Ordinal (n:=length ((n, l) :: soctx)) (m:=i.+1) lti) 
+          (fun x => RingTermSOQuote (t (eq_rect _ (fun x => 'I_(length x.2)) x _ (tnth_tuple_index (n, l) lti)))).
+Proof.
+  unfold RingTermSOQuote at 1.
+  unfold RingTerm_rect.
+  f_equal.
+  apply functional_extensionality.
+  move=>[x ltx].
+  unfold RingTermSOQuote, RingTerm_rect.
+  do 2 f_equal.
+  apply ord_inj.
+  destruct (tnth_tuple_index _ _); reflexivity.
+Qed.
 
 Definition RingTermFOSubst {soctx : SOctx} {foctx : FOctx} :
   forall (i : 'I_(length foctx)),
@@ -137,6 +172,15 @@ Definition RingTermFOSubst {soctx : SOctx} {foctx : FOctx} :
   - exact (RingTimes IHs1 IHs2).
 Defined.
 
+Theorem RingTermFOSubst_Fun_Step {soctx} {foctx}
+  (i : 'I_(length foctx))
+  (j : 'I_(length soctx))
+  (r : RingTerm (soctx := soctx) (foctx := drop_index i foctx))
+  (t : 'I_(length (snd (tnth (in_tuple soctx) j))) -> RingTerm (foctx := foctx)) :
+  RingTermFOSubst i r (RingFun j t) =
+  RingFun j (fun x => RingTermFOSubst i r (t x)).
+Proof. destruct i; reflexivity. Qed.
+
 Theorem FOsubsts_unquote {soctx : SOctx} {foctx : FOctx} :
   forall n
          (x : RingTerm (soctx := soctx) (foctx := foctx))
@@ -153,11 +197,10 @@ Proof.
     rewrite (eq_irrelevance (drop_index_length _ _ _) H3).
     hauto.
   - move=> [i lti] t rH triv.
-    unfold RingTermFOQuote, RingTermFOSubst, RingTerm_rect.
+    rewrite RingTermFOQuote_Fun_Step RingTermFOSubst_Fun_Step.
     f_equal.
     apply functional_extensionality; move=> [j ltj].
-    rewrite <- (rH (Ordinal ltj)) at 2.
-    reflexivity.
+    by rewrite rH.
 Qed.
 
 Definition RingTermSOSubst {soctx : SOctx} {foctx : FOctx} :
@@ -211,6 +254,164 @@ Definition RingTermSOSubst {soctx : SOctx} {foctx : FOctx} :
   - intros r1 IHr1 r2 IHr2.
     exact (RingTimes IHr1 IHr2).
 Defined.
+
+Theorem Lt_Compare_match {i} {j} {Q : comparison -> Type} 
+  {a : Q Eq} {b : Q Lt} {c : Q Gt} 
+  (comp : Lt = Nat.compare i j) :
+  (match Nat.compare i j as c return (Q c) with
+  | Eq => a
+  | Lt => b
+  | Gt => c
+  end) = eq_rect _ Q b _ comp.
+Proof. destruct comp; reflexivity. Qed.
+
+Theorem RingTermSOSubst_Fun_Step_Lt {soctx : SOctx} {foctx : FOctx}
+  (i : nat) (lti : i < length soctx)
+  (f : ('I_(length (snd (tnth (in_tuple soctx) (Ordinal lti)))) -> 
+        RingTerm (soctx := drop_index i soctx) (foctx := foctx)) -> 
+        RingTerm (soctx := drop_index i soctx) (foctx := foctx))
+  (j : nat) (ltj : j < length soctx)
+  (t : 'I_(length (snd (tnth (in_tuple soctx) (Ordinal ltj)))) -> 
+        RingTerm  (soctx := soctx) (foctx := foctx))
+  (H : (j - 1 < length (drop_index (Ordinal lti) soctx)))
+  (e : tnth (in_tuple (drop_index (Ordinal lti) soctx)) (Ordinal H) =
+       tnth (in_tuple soctx) (Ordinal ltj))
+  (ltij : i < j) :
+  RingTermSOSubst (Ordinal lti) f (RingFun (Ordinal ltj) t) =
+  RingFun (Ordinal (n:=length (drop_index (Ordinal (n:=length soctx) (m:=i) lti) soctx)) (m:=j - 1) H)
+          (fun x => RingTermSOSubst (Ordinal lti) f 
+                      (t (eq_rect _ (fun x => 'I_(length x.2)) x _ e))).
+Proof.
+  unfold RingTermSOSubst at 1.
+  unfold RingTerm_rect.
+
+  assert (Lt = Nat.compare i j) as comp_eq.
+  { symmetry. rewrite <- Compare_dec.nat_compare_lt.
+    apply (elimT (b := i < j) ltP); exact ltij. }
+
+
+  rewrite (Lt_Compare_match comp_eq).
+
+
+  
+  rewrite (rew_map (fun x => x -> _ -> _ -> RingTerm) (fun x => Nat.compare i j = x)).
+  destruct (f_equal [eta eq (Nat.compare i j)] comp_eq).
+  rewrite (rew_map (fun x => _ = x -> _ -> _ -> RingTerm) (fun x => x)).
+  rewrite (rew_map (fun x => _ = x -> _ -> _ -> RingTerm) (fun x => x)).
+  do 5 
+  rewrite (rew_map (fun x => _ = x -> _ -> _ -> RingTerm) (fun x => x)).
+  Search (eq_rect _ (fun _ => _)).
+  assert (1 = 1).
+  destruct comp_eq.
+  Search (Nat.compare).
+  destruct (Nat.compare i j).
+  pattern (Nat.compare i j).
+  replace (Nat.compare i j) with Lt.
+
+
+  destruct j;[fcrush|].
+  Search "match".
+  remember (Nat.compare i j) as cij.
+  rewrite (eq_refl j).
+  destruct (Nat.compare i j).
+
+ Nat.compare.
+
+
+
+Theorem SOsubsts_unquote {soctx : SOctx} {foctx : FOctx} :
+  forall n l
+         (e : RingTerm (soctx := soctx) (foctx := foctx))
+         (H : 0 < length ((n, l) :: soctx)) f,
+  RingTermSOSubst (Ordinal H) f (RingTermSOQuote (n := n) (l := l) e) = e.
+Proof.
+  move=> n l; elim.
+  - hauto.
+  - move=> [i lti] t IHe H f.
+    assert (forall i, i.+1 - 1 = i) as ipm;[hauto use: subn1, pred_Sn|].
+    rewrite RingTermSOQuote_Fun_Step.
+    unfold RingTermSOSubst, RingTerm_rect, Nat.compare.
+    remember (eq_ind_r _ _ _) as H1 eqn:He1; clear He1.
+    simpl in H1.
+    assert (Ordinal (n:=length soctx) (m:=i) lti =
+            Ordinal (n:=length soctx) (m:=i.+1 - 1) H1);[apply ord_inj;hauto|].
+    transitivity 
+      (RingFun (Ordinal (n:=length soctx) (m:=i.+1 - 1) H1) 
+      (@eq_rect _ _ (fun x => 'I_(length (tnth _ x).2) -> _) t _ H0)).
+    f_equal.
+    apply functional_extensionality.
+    move=> x.
+    change (drop_index 0 ((n, l) :: soctx)) with soctx in x.
+    move:x=>[x ltx].
+    assert (x < length (tnth (in_tuple soctx) (Ordinal (n:=length soctx) (m:=i) lti)).2) as ltxi;
+    [rewrite H0; assumption|].
+    transitivity (t (Ordinal ltxi)).
+    cbn.
+
+    rewrite <- (IHe (Ordinal ltxi) H f); clear IHe.
+    cbn.
+    hauto.
+    unfold RingTermSOQuote, RingTermSOSubst, RingTerm_rect, Nat.compare.
+    reflexivity.   
+
+    replace (Ordinal
+     (n:=length
+           (tnth (in_tuple soctx)
+              (Ordinal (n:=length soctx) (m:=i.+1 - 1) H1)).2) (m:=x) ltx)
+      with (Ordinal
+     (n:=length
+           (tnth (in_tuple soctx)
+              (Ordinal (n:=length soctx) (m:=i) lti)).2) (m:=x) ltxi).
+
+    Check (Ordinal (n:=length soctx) (m:=i.+1 - 1) H1).
+    transitivity 
+      (@eq_rect _ _ (fun x => 'I_(length (tnth _ x).2)) 
+      (t (@eq_rect _ _ (fun x => 'I_(length (tnth _ (Ordinal (m:=x) H1)).2)) x _ (ipm _)))
+       _ H0)
+      .
+    destruct x.
+    rewrite ipm in i0.
+
+    transitivity 
+      (eq_rect (Ordinal (n:=length soctx) (m:=i) lti)
+        (fun x0 : 'I_(size soctx) => 'I_(length (tnth (in_tuple soctx) x0).2) -> RingTerm)
+        (t x) (Ordinal (n:=length soctx) (m:=i.+1 - 1) H1) H0).
+
+      (eq_rect (Ordinal (n:=length soctx) (m:=i) lti)
+  (fun x : 'I_(size soctx) => 'I_(length (tnth _ x).2))
+  t (Ordinal (n:=length soctx) (m:=i.+1 - 1) H1) H0
+  (Ordinal
+     (n:=length
+           (tnth (in_tuple (drop_index 0 ((n, l) :: soctx)))
+              (Ordinal (n:=length (drop_index 0 ((n, l) :: soctx))) (m:=i.+1 - 1) H1)).2)
+     (m:=x) ltx))
+    (*use: map_subst*)
+    Search (eq_rect _ _).
+    unfold RingTermSOQuote, RingTermSOSubst, RingTerm_rect.
+    change (Nat.compare 0 i.+1) with Lt.
+    unfold match.
+    Search (Nat.compare 0 _).
+    replace (Nat.compare 0 i.+1) with Lt.
+    simpl (Nat.compare).
+    f_equal.
+    apply functional_extensionality
+    ssimpl; f_equal.
+ hauto.
+  try hauto q:on.
+  - move=>[o lto] H.
+    ssimpl; f_equal.
+    apply ord_inj.
+    assert (forall x, x.+1 - 1 = x);[hauto use: subn1, pred_Sn|].
+    assert (length (drop_index 0 (n :: foctx)) = length (n :: foctx) - 1) as H3;[hauto|].
+    rewrite (eq_irrelevance (drop_index_length _ _ _) H3).
+    hauto.
+  - move=> [i lti] t rH triv.
+    unfold RingTermFOQuote, RingTermFOSubst, RingTerm_rect.
+    f_equal.
+    apply functional_extensionality; move=> [j ltj].
+    rewrite <- (rH (Ordinal ltj)) at 2.
+    reflexivity.
+Qed.
 
 Inductive FirstOrderFormula {soctx : SOctx} {foctx : FOctx} : Type :=
 | FOTrue : FirstOrderFormula
@@ -291,14 +492,40 @@ Definition FirstOrderFormulaSOSubst {soctx : SOctx} {foctx : FOctx} :
     exact (fun x => (RingTermFOSubst (Ordinal H) RingZero (t x))).
 Defined.
 
-
-
 Inductive Sigma11 : SOctx -> Type :=
 | S11Exists : forall {ctx : SOctx} (y : nat) (bs : seq nat), 
             Sigma11 ((y, bs) :: ctx) ->
             Sigma11 ctx
 | FO : forall {ctx : SOctx}, FirstOrderFormula (soctx := ctx) (foctx := nil) -> 
                              Sigma11 ctx.
+
+Definition SecondOrderFormulaSOSubst {soctx : SOctx} :
+  forall (i : 'I_(length soctx)),
+  (('I_(length (snd (tnth (in_tuple soctx) i))) -> 
+   RingTerm (soctx := drop_index i soctx) (foctx := nil)) -> 
+   RingTerm (soctx := drop_index i soctx) (foctx := nil)) ->
+  Sigma11 soctx ->
+  Sigma11 (drop_index i soctx).
+  move=> i f X;move: i f.
+  induction X; move=>[i lti] f2.
+  - apply (S11Exists y bs).
+    assert (i.+1 < length ((y, bs) :: ctx)) as H;[auto|].
+    apply (IHX (Ordinal (m := i.+1) H)).
+    move=> t.
+    apply RingTermSOQuote.
+    apply: f2.
+    move=> jo.
+    replace (tnth (in_tuple ((y, bs) :: ctx))
+             (Ordinal (n:=length ((y, bs) :: ctx)) (m:=i.+1) H))
+       with (tnth (in_tuple ctx)
+             (Ordinal (n:=length ctx) (m:=i) lti)) in t;
+    [|by do 2 rewrite (tnth_nth (0, nil))].
+    apply t in jo; clear t.
+    assert (forall ctx, 0 < length ((y, bs) :: ctx)) as H0;[fcrush|].
+    apply (RingTermSOSubst (Ordinal (H0 _)) (fun _ => RingZero)).
+    exact jo.
+  - exact (FO (FirstOrderFormulaSOSubst _ f2 f)).
+Defined.
 
 Example sigma11_1 : Sigma11 nil.
   apply (S11Exists 5 [::2;3;4]).
@@ -360,9 +587,19 @@ Example sigma11_2 : Sigma11 nil :=
 Record Sigma11Model {soctx : SOctx} {foctx : FOctx} : Type :=
     mkSigma11Model {
         R : ringType;
-        (*lt : stricttotalordering R;*)
-
+        (*lt should be a strict, total order with a least element*)
+        lt : relation R;
+        so : StrictOrder lt;
+        lt_total : forall x y, lt x y \/ x==y \/ lt y x;
+        min : R;
+        least_elem : forall x, lt min x
       }.
 
+Search (int_Ring -> _).
+
+Print int_Ring.
+
+
+Search (int -> _).
 
 End Sigma_1_1_Internal.
