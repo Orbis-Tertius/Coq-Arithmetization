@@ -24,6 +24,15 @@ Proof.
   destruct (length l);[fcrush|sauto q: on].
 Qed.
 
+Theorem drop_index_length_high {T} : forall (s : seq T) (m : nat),
+  length s <= m -> length (drop_index m s) = length s.
+Proof.
+  elim;[auto|].
+  unfold drop_index.
+  simpl; move=> a l IH [|m] mlt;[fcrush|].
+  simpl; by rewrite IH.
+Qed.
+
 Theorem drop_index_head {T} (t : T) (s : seq T) : 
   drop_index 0 (t :: s) = s.
 Proof. reflexivity. Qed.
@@ -86,6 +95,41 @@ Proof.
   rewrite IHs; sauto.
 Qed.
 
+Theorem low_index_bound {i} {j} {T} {s : seq T} :
+  j < length s -> j < i -> j < length (drop_index i s).
+Proof.
+  move=> ltj ltji.
+  destruct (i < length s) eqn:lti.
+  - rewrite drop_index_length;[|sauto].
+    apply (leq_ltn_trans (n := i-1));sauto.
+  - rewrite drop_index_length_high;[auto|].
+    rewrite leqNgt; hauto.
+Qed.
+
+Theorem low_index_const {i} {j} {T} {s : seq T}
+  (ltj : j < length s) (ltjm : j < length (drop_index i s)) : 
+  j < i -> 
+  tnth (in_tuple (drop_index i s)) (Ordinal ltjm) =
+  tnth (in_tuple s) (Ordinal ltj).
+Proof.
+  move=>ltij.
+  destruct s as [|a s];[fcrush|].
+  do 2 rewrite (tnth_nth a).
+  move: s a j i ltj ltij ltjm.
+  elim;[fcrush|].
+  move=> b s IHs a j i ltj ltij ltjm.
+  simpl; simpl in IHs.
+  destruct i as [|i];[fcrush|].
+  simpl.
+  destruct j as [|j];[auto|].
+  rewrite drop_index_step.
+  simpl.
+  destruct i as [|i];[fcrush|].
+  destruct j as [|j];[fcrush|].
+  change (nth a (drop_index i.+1 (b :: s)) j.+1)
+    with (nth a (drop_index i.+1 (a :: s)) j.+1).
+  rewrite IHs; sauto.
+Qed.
 
 Theorem tnth_tuple_index {T} {s : seq T} (x : T) {i} (lti : i < length s) :
   tnth (in_tuple (x :: s)) (Ordinal (n:=length (x :: s)) (m:=i.+1) lti) = 
@@ -345,6 +389,59 @@ Proof.
             x < length (tnth (in_tuple soctx) (Ordinal (n:=length soctx) (m:=j) ltj)).2)
            _ _ _) as ltx2 eqn:dx; clear dx.
   destruct (decr_index_const _ _ _); by apply ord_inj.
+Qed.
+
+Theorem Gt_Compare_match {i} {j} {Q : comparison -> Type} 
+  {a : Q Eq} {b : Q Lt} {c : Q Gt} 
+  (comp : Gt = Nat.compare i j) :
+  (match Nat.compare i j as c return (Q c) with
+  | Eq => a
+  | Lt => b
+  | Gt => c
+  end) = eq_rect _ Q c _ comp.
+Proof. destruct comp; reflexivity. Qed.
+
+Theorem Gt_Compare_match_fun {i} {j} {Q : comparison -> Type} {R : Type}
+  {a : Q Eq -> R} {b : Q Lt -> R} {c : Q Gt -> R} 
+  (v : Q (Nat.compare i j))
+  (comp : Nat.compare i j = Gt) :
+  match Nat.compare i j as c return (Q c -> R) with
+  | Eq => a
+  | Lt => b
+  | Gt => c
+  end v = c (eq_rect _ Q v _ comp).
+Proof.
+  rewrite (Gt_Compare_match (esym comp)).
+  destruct comp; reflexivity.
+Qed.
+
+Theorem RingTermSOSubst_Fun_Step_Gt {soctx : SOctx} {foctx : FOctx}
+  (i : nat) (lti : i < length soctx)
+  (f : ('I_(length (snd (tnth (in_tuple soctx) (Ordinal lti)))) -> 
+        RingTerm (soctx := drop_index i soctx) (foctx := foctx)) -> 
+        RingTerm (soctx := drop_index i soctx) (foctx := foctx))
+  (j : nat) (ltj : j < length soctx)
+  (t : 'I_(length (snd (tnth (in_tuple soctx) (Ordinal ltj)))) -> 
+        RingTerm  (soctx := soctx) (foctx := foctx))
+  (ltij : j < i) :
+  RingTermSOSubst (Ordinal lti) f (RingFun (Ordinal ltj) t) =
+  RingFun (Ordinal (low_index_bound ltj ltij))
+          (fun x => RingTermSOSubst (Ordinal lti) f 
+                      (t (eq_rect _ (fun x => 'I_(length x.2)) x _ 
+                         (low_index_const ltj (low_index_bound ltj ltij) ltij)))).
+Proof.
+  assert (PeanoNat.Nat.compare i j = Gt) as comp_gt;[exact 
+    (iffLR (Compare_dec.nat_compare_gt i j) (elimT (b := j < i) ltP ltij))|].
+  unfold RingTermSOSubst at 1; unfold RingTerm_rect; rewrite (Gt_Compare_match_fun _ comp_gt);
+  rewrite (eq_irrelevance (eq_ind_r (fun pv : nat => j < pv) _ _) (low_index_bound ltj ltij)).
+  f_equal.
+  apply functional_extensionality;move=>[x ltx].
+  unfold RingTermSOSubst, RingTerm_rect; do 2 f_equal.
+  apply ord_inj.
+  unfold eq_rect_r.
+  rewrite (rew_map (fun x => x -> _) (fun v => x < length v.2)).
+  destruct (low_index_const _ _ _); simpl.
+  by destruct (f_equal _ _), (Logic.eq_sym _), (Logic.eq_sym _).
 Qed.
 
 Lemma eq_rect_f_ap {T} {B} {Q : T -> Type} {a b : T} {e : a = b}
