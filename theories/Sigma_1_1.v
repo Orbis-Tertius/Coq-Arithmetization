@@ -24,6 +24,10 @@ Proof.
   destruct (length l);[fcrush|sauto q: on].
 Qed.
 
+Theorem drop_index_head {T} (t : T) (s : seq T) : 
+  drop_index 0 (t :: s) = s.
+Proof. reflexivity. Qed.
+
 Theorem drop_index_step {T} (m : nat) (t : T) (s : seq T) : 
   drop_index (m.+1) (t :: s) = t :: drop_index m s.
 Proof. reflexivity. Qed.
@@ -48,6 +52,40 @@ Proof.
   destruct j;[fcrush|].
   by replace (j.+1 - 1) with j;[|sauto q:on].
 Qed.
+
+Theorem index_low_decr {i} {j} {T} {s : seq T} :
+  i < j -> j < length s -> j - 1 < length (drop_index i s).
+Proof.
+  move=> ltij ltj.
+  rewrite drop_index_length;[sauto lq: on|hauto use: ltn_trans].
+Qed.
+
+Theorem decr_index_const  {i} {j} {T} {s : seq T}
+  (ltj : j < length s) (ltjm : j - 1 < length (drop_index i s)) : 
+  i < j -> 
+  tnth (in_tuple (drop_index i s)) (Ordinal ltjm) =
+  tnth (in_tuple s) (Ordinal ltj).
+Proof.
+  move=>ltij.
+  destruct s as [|a s];[fcrush|].
+  do 2 rewrite (tnth_nth a).
+  move: s a j i ltj ltij ltjm.
+  elim;[fcrush|].
+  move=> b s IHs a j i ltj ltij ltjm.
+  simpl; simpl in IHs.
+  destruct j as [|j];[fcrush|].
+  replace (j.+1 - 1) with j;[|sauto lq:on].
+  destruct j, i; try fcrush.
+  rewrite drop_index_step.
+  simpl.
+  destruct i;[fcrush|].
+  destruct j;[fcrush|].
+  change (nth a (drop_index i.+1 (b :: s)) j.+1)
+    with (nth a (drop_index i.+1 (a :: s)) j.+1).
+  replace (j.+1) with (j.+2 - 1) at 1;[|sauto lq:on].
+  rewrite IHs; sauto.
+Qed.
+
 
 Theorem tnth_tuple_index {T} {s : seq T} (x : T) {i} (lti : i < length s) :
   tnth (in_tuple (x :: s)) (Ordinal (n:=length (x :: s)) (m:=i.+1) lti) = 
@@ -265,6 +303,20 @@ Theorem Lt_Compare_match {i} {j} {Q : comparison -> Type}
   end) = eq_rect _ Q b _ comp.
 Proof. destruct comp; reflexivity. Qed.
 
+Theorem Lt_Compare_match_fun {i} {j} {Q : comparison -> Type} {R : Type}
+  {a : Q Eq -> R} {b : Q Lt -> R} {c : Q Gt -> R} 
+  (v : Q (Nat.compare i j))
+  (comp : Nat.compare i j = Lt) :
+  match Nat.compare i j as c return (Q c -> R) with
+  | Eq => a
+  | Lt => b
+  | Gt => c
+  end v = b (eq_rect _ Q v _ comp).
+Proof.
+  rewrite (Lt_Compare_match (esym comp)).
+  destruct comp; reflexivity.
+Qed.
+
 Theorem RingTermSOSubst_Fun_Step_Lt {soctx : SOctx} {foctx : FOctx}
   (i : nat) (lti : i < length soctx)
   (f : ('I_(length (snd (tnth (in_tuple soctx) (Ordinal lti)))) -> 
@@ -273,51 +325,33 @@ Theorem RingTermSOSubst_Fun_Step_Lt {soctx : SOctx} {foctx : FOctx}
   (j : nat) (ltj : j < length soctx)
   (t : 'I_(length (snd (tnth (in_tuple soctx) (Ordinal ltj)))) -> 
         RingTerm  (soctx := soctx) (foctx := foctx))
-  (H : (j - 1 < length (drop_index (Ordinal lti) soctx)))
-  (e : tnth (in_tuple (drop_index (Ordinal lti) soctx)) (Ordinal H) =
-       tnth (in_tuple soctx) (Ordinal ltj))
   (ltij : i < j) :
   RingTermSOSubst (Ordinal lti) f (RingFun (Ordinal ltj) t) =
-  RingFun (Ordinal (n:=length (drop_index (Ordinal (n:=length soctx) (m:=i) lti) soctx)) (m:=j - 1) H)
-          (fun x => RingTermSOSubst (Ordinal lti) f 
-                      (t (eq_rect _ (fun x => 'I_(length x.2)) x _ e))).
+  RingFun (Ordinal (n:=length (drop_index (Ordinal lti) soctx)) (m:=j - 1) (index_low_decr ltij ltj))
+          (fun x => RingTermSOSubst (Ordinal lti) f
+                      (t (eq_rect _ (fun x => 'I_(length x.2)) x _ 
+                         (decr_index_const ltj (index_low_decr ltij ltj) ltij)))).
 Proof.
-  unfold RingTermSOSubst at 1.
-  unfold RingTerm_rect.
+  assert (PeanoNat.Nat.compare i j = Lt) as comp_lt;[exact 
+    (iffLR (Compare_dec.nat_compare_lt i j) (elimT (b := i < j) ltP ltij))|].
+  unfold RingTermSOSubst at 1; unfold RingTerm_rect; rewrite (Lt_Compare_match_fun _ comp_lt);
+  rewrite (eq_irrelevance (eq_ind_r (fun pv : nat => j - 1 < pv) _ _) (index_low_decr ltij ltj)).
+  f_equal.
+  apply functional_extensionality;move=>[x ltx].
+  unfold RingTermSOSubst, RingTerm_rect; do 2 f_equal.
+  remember (eq_ind_r
+           (fun pv : nat * seq nat =>
+            x < length pv.2 ->
+            x < length (tnth (in_tuple soctx) (Ordinal (n:=length soctx) (m:=j) ltj)).2)
+           _ _ _) as ltx2 eqn:dx; clear dx.
+  destruct (decr_index_const _ _ _); by apply ord_inj.
+Qed.
 
-  assert (Lt = Nat.compare i j) as comp_eq.
-  { symmetry. rewrite <- Compare_dec.nat_compare_lt.
-    apply (elimT (b := i < j) ltP); exact ltij. }
-
-
-  rewrite (Lt_Compare_match comp_eq).
-
-
-  
-  rewrite (rew_map (fun x => x -> _ -> _ -> RingTerm) (fun x => Nat.compare i j = x)).
-  destruct (f_equal [eta eq (Nat.compare i j)] comp_eq).
-  rewrite (rew_map (fun x => _ = x -> _ -> _ -> RingTerm) (fun x => x)).
-  rewrite (rew_map (fun x => _ = x -> _ -> _ -> RingTerm) (fun x => x)).
-  do 5 
-  rewrite (rew_map (fun x => _ = x -> _ -> _ -> RingTerm) (fun x => x)).
-  Search (eq_rect _ (fun _ => _)).
-  assert (1 = 1).
-  destruct comp_eq.
-  Search (Nat.compare).
-  destruct (Nat.compare i j).
-  pattern (Nat.compare i j).
-  replace (Nat.compare i j) with Lt.
-
-
-  destruct j;[fcrush|].
-  Search "match".
-  remember (Nat.compare i j) as cij.
-  rewrite (eq_refl j).
-  destruct (Nat.compare i j).
-
- Nat.compare.
-
-
+Lemma eq_rect_f_ap {T} {B} {Q : T -> Type} {a b : T} {e : a = b}
+  (f : Q a -> B) :
+  eq_rect _ (fun x => Q x -> B) f _ e
+  = fun x => f (eq_rect _ Q x _ (esym e)).
+Proof. by destruct e. Qed.
 
 Theorem SOsubsts_unquote {soctx : SOctx} {foctx : FOctx} :
   forall n l
@@ -330,87 +364,31 @@ Proof.
   - move=> [i lti] t IHe H f.
     assert (forall i, i.+1 - 1 = i) as ipm;[hauto use: subn1, pred_Sn|].
     rewrite RingTermSOQuote_Fun_Step.
-    unfold RingTermSOSubst, RingTerm_rect, Nat.compare.
-    remember (eq_ind_r _ _ _) as H1 eqn:He1; clear He1.
-    simpl in H1.
+    rewrite RingTermSOSubst_Fun_Step_Lt.
+    change (drop_index _ (_ :: soctx)) with soctx.
     assert (Ordinal (n:=length soctx) (m:=i) lti =
-            Ordinal (n:=length soctx) (m:=i.+1 - 1) H1);[apply ord_inj;hauto|].
+            Ordinal (n:=length soctx) (m:=i.+1 - 1)
+                    (@index_low_decr 0 i.+1 _ ((n, l) :: soctx) H lti)) as H0;[apply ord_inj;hauto|].
     transitivity 
-      (RingFun (Ordinal (n:=length soctx) (m:=i.+1 - 1) H1) 
-      (@eq_rect _ _ (fun x => 'I_(length (tnth _ x).2) -> _) t _ H0)).
+      (RingFun (Ordinal (n:=length soctx) (m:=i.+1 - 1) (@index_low_decr 0 i.+1 _ ((n, l) :: soctx) H lti)) 
+      (eq_rect _ (fun x => 'I_(length (tnth _ x).2) -> _) t _ H0));[|destruct H0;reflexivity].
     f_equal.
     apply functional_extensionality.
-    move=> x.
-    change (drop_index 0 ((n, l) :: soctx)) with soctx in x.
-    move:x=>[x ltx].
-    assert (x < length (tnth (in_tuple soctx) (Ordinal (n:=length soctx) (m:=i) lti)).2) as ltxi;
-    [rewrite H0; assumption|].
-    transitivity (t (Ordinal ltxi)).
-    cbn.
-
-    rewrite <- (IHe (Ordinal ltxi) H f); clear IHe.
-    cbn.
-    hauto.
-    unfold RingTermSOQuote, RingTermSOSubst, RingTerm_rect, Nat.compare.
-    reflexivity.   
-
-    replace (Ordinal
-     (n:=length
-           (tnth (in_tuple soctx)
-              (Ordinal (n:=length soctx) (m:=i.+1 - 1) H1)).2) (m:=x) ltx)
-      with (Ordinal
-     (n:=length
-           (tnth (in_tuple soctx)
-              (Ordinal (n:=length soctx) (m:=i) lti)).2) (m:=x) ltxi).
-
-    Check (Ordinal (n:=length soctx) (m:=i.+1 - 1) H1).
-    transitivity 
-      (@eq_rect _ _ (fun x => 'I_(length (tnth _ x).2)) 
-      (t (@eq_rect _ _ (fun x => 'I_(length (tnth _ (Ordinal (m:=x) H1)).2)) x _ (ipm _)))
-       _ H0)
-      .
-    destruct x.
-    rewrite ipm in i0.
-
-    transitivity 
-      (eq_rect (Ordinal (n:=length soctx) (m:=i) lti)
-        (fun x0 : 'I_(size soctx) => 'I_(length (tnth (in_tuple soctx) x0).2) -> RingTerm)
-        (t x) (Ordinal (n:=length soctx) (m:=i.+1 - 1) H1) H0).
-
-      (eq_rect (Ordinal (n:=length soctx) (m:=i) lti)
-  (fun x : 'I_(size soctx) => 'I_(length (tnth _ x).2))
-  t (Ordinal (n:=length soctx) (m:=i.+1 - 1) H1) H0
-  (Ordinal
-     (n:=length
-           (tnth (in_tuple (drop_index 0 ((n, l) :: soctx)))
-              (Ordinal (n:=length (drop_index 0 ((n, l) :: soctx))) (m:=i.+1 - 1) H1)).2)
-     (m:=x) ltx))
-    (*use: map_subst*)
-    Search (eq_rect _ _).
-    unfold RingTermSOQuote, RingTermSOSubst, RingTerm_rect.
-    change (Nat.compare 0 i.+1) with Lt.
-    unfold match.
-    Search (Nat.compare 0 _).
-    replace (Nat.compare 0 i.+1) with Lt.
-    simpl (Nat.compare).
+    move=>[x ltx].
+    rewrite IHe; clear IHe.
+    rewrite eq_rect_f_ap.
     f_equal.
-    apply functional_extensionality
-    ssimpl; f_equal.
- hauto.
-  try hauto q:on.
-  - move=>[o lto] H.
-    ssimpl; f_equal.
     apply ord_inj.
-    assert (forall x, x.+1 - 1 = x);[hauto use: subn1, pred_Sn|].
-    assert (length (drop_index 0 (n :: foctx)) = length (n :: foctx) - 1) as H3;[hauto|].
-    rewrite (eq_irrelevance (drop_index_length _ _ _) H3).
-    hauto.
-  - move=> [i lti] t rH triv.
-    unfold RingTermFOQuote, RingTermFOSubst, RingTerm_rect.
-    f_equal.
-    apply functional_extensionality; move=> [j ltj].
-    rewrite <- (rH (Ordinal ltj)) at 2.
-    reflexivity.
+    rewrite (rew_map (fun x => 'I_(length x.2)) (tnth (in_tuple soctx))).
+    do 3 rewrite <- (map_subst (P := (fun x => 'I_(length x.2))) (fun _ p => nat_of_ord p)).
+    by do 3 rewrite rew_const.
+  - hauto.
+  - hauto.
+  - hauto.
+  - move=> r1 IHr1 r2 IHr2 h f.
+    by rewrite <- IHr1 at 2; rewrite <- IHr2 at 2.
+  - move=> r1 IHr1 r2 IHr2 h f.
+    by rewrite <- IHr1 at 2; rewrite <- IHr2 at 2.
 Qed.
 
 Inductive FirstOrderFormula {soctx : SOctx} {foctx : FOctx} : Type :=
