@@ -759,7 +759,7 @@ Definition RingTerm_Denotation (M : Sigma11Model) (r : @RingTerm nil nil) : R M.
   - exact 1%R.
   - exact 0%R.
   - move=> _ r1 _ r2; exact (r1 + r2)%R.
-  - move=> _ r1 _ r2; exact (r1 - r2)%R.
+  - move=> _ r1 _ r2; exact (r1 * r2)%R.
 Defined.
 
 Fixpoint FirstOrder_Measure {soctx} {foctx} (f : @FirstOrderFormula soctx foctx) : nat :=
