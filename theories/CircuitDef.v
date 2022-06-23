@@ -42,8 +42,7 @@ Record Circuit : Type :=
     (* called "p" of length "m" *)
     polynomials : seq (PolyLim degree ('I_ColNum * int));
     (* called "l" of length k × q *)
-    q : nat;
-    lookup : seq (q.-tuple (PolyLim degree ('I_ColNum * int) * 'I_ColNum));
+    lookup : seq {q : nat & q.-tuple (PolyLim degree ('I_ColNum * int) * 'I_ColNum)};
     RowNum' : nat; (* Note: must be positive to take modulus in Polynomial Constraint. *)
     RowNum := RowNum'.+1; (* called "r" *)
     (* called "e" of length "t" *)
@@ -69,7 +68,8 @@ Definition PolynomialConstraint (C : Circuit) (M : 'M[F]_(ColNum C, RowNum C)) :
     ) (polynomials C).
 
 Definition LookupConstraint (C : Circuit) (M : 'M[F]_(ColNum C, RowNum C)) : Prop :=
-  List.Forall (fun l : (q C).-tuple _ =>
+  List.Forall (fun l' : {q : nat & q.-tuple _} =>
+  let (q, l) := l' in
   let p := List.split l
   in List.Forall (fun rho => 
     let y := map (fun xj => 
