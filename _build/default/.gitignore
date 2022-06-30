@@ -1,0 +1,7 @@
+_build
+dist
+dist-newstyle
+.lia.cache
+result
+.direnv
+.ghc.*
