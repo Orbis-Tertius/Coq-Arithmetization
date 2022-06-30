@@ -1,0 +1,29 @@
+opam-version: "2.0"
+name: "coq-tinyram"
+version: "dev"
+maintainer: "Anthony Hart <anthony.hart@platonic.systems>"
+synopsis: "https://eprint.iacr.org/2022/777.pdf"
+
+homepage: "https://github.com/Orb-Labs/coq-arithmetization"
+dev-repo: "git+https://github.com/Orb-Labs/coq-arithmetization"
+bug-reports: "https://github.com/Orb-Labs/coq-arithmetization/issues"
+
+build: [
+  ["dune" "subst"] {pinned}
+  ["dune" "build" "-p" name "-j" jobs]
+  ["dune" "build" "--root=." "-j" jobs] {with-test}
+  ["dune" "runtest" "--root=." "-j" jobs] {with-test}
+]
+
+depends: [
+  "ocaml"
+  "coq" {>= "8.12"}
+  "coq-hammer"
+  "coq-mathcomp"
+  "dune" {>= "2.6"}
+]
+authors: [
+  "Anthony Hart <anthony.hart@platonic.systems>"
+]
+
+tags: "org:orbis"
