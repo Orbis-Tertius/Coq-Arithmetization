@@ -800,6 +800,12 @@ Definition IList_Max_Map {A B} {i} (f : forall x, A x -> x < i -> B x) (l : ILis
   exact (ITail la).
 Defined.
 
+Definition IList_Gen {A} (f : forall i, A i) : forall i, IList A i.
+  elim;[apply INil|].
+  move=>n l.
+  apply (ICons _);[exact (f n)|exact l].
+Defined.
+
 (*Check IList_rect.*)
 
 Definition FullFOSubst {soctx : SOctx} {foctx : FOctx} :
@@ -826,6 +832,32 @@ Definition FullFOSubst {soctx : SOctx} {foctx : FOctx} :
       replace (drop 0 foctx) with foctx in hl;[|symmetry; apply drop0].
       assert (0 < length (st :: foctx));[sauto|].
       exact (SecondOrderFormulaFOSubst (Ordinal H) hl s).
+Defined.
+
+Definition RingTermFullFOSubst {soctx : SOctx} {foctx : FOctx} :
+  IList (fun i => @RingTerm soctx (drop (length foctx - i) foctx)) (length foctx) ->
+  @RingTerm soctx foctx ->
+  @RingTerm soctx nil.
+  move: foctx.
+  elim.
+  - move=> l; exact (fun x => x).
+  - move=> st foctx IHf l s.
+    simpl in l.
+    apply IHf; clear IHf.
+    + remember (ITail l) as tl; simpl in tl; clear Heqtl l s.
+      assert (forall i, 
+        @RingTerm soctx (drop ((length foctx).+1 - i) (st :: foctx)) -> i < length foctx -> 
+        @RingTerm soctx (drop ((length foctx - i).+1) (st :: foctx))) as f.
+      move=> i r lt.
+      replace (((length foctx).+1 - i))
+         with ((length foctx - i).+1) in r;[exact r|hauto use: subSn].
+      exact (IList_Max_Map f tl).
+    + remember (IHead l) as hl; simpl in hl; clear Heqhl.
+      replace ((length foctx).+1 - length foctx) with 1 in hl;[|hauto use: subSnn].
+      simpl in hl.
+      replace (drop 0 foctx) with foctx in hl;[|symmetry; apply drop0].
+      assert (0 < length (st :: foctx));[sauto|].
+      exact (RingTermFOSubst (Ordinal H) hl s).
 Defined.
 
 Definition FullSOSubst {soctx : SOctx} {foctx : FOctx} :
@@ -868,5 +900,137 @@ Definition FullSOSubst {soctx : SOctx} {foctx : FOctx} :
       assert (0 < length ((y, bs) :: soctx)) as H;[sauto|].
       exact (SecondOrderFormulaSOSubst (Ordinal H) hl s).
 Defined.
+
+Definition RingTermFullSOSubst {soctx : SOctx} {foctx : FOctx} :
+  IList (fun i =>
+    ('I_(length (snd (nth (0, [::]) soctx (length soctx - i - 1)))) -> 
+     @RingTerm (drop (length soctx - i) soctx) foctx) -> 
+     @RingTerm (drop (length soctx - i) soctx) foctx 
+  ) (length soctx) ->
+  @RingTerm soctx foctx ->
+  @RingTerm nil foctx.
+  move: soctx.
+  elim.
+  - move=> l; exact (fun x => x).
+  - move=> [y bs] soctx IHf l s.
+    apply IHf; clear IHf.
+    + remember (ITail l) as tl; simpl in tl; clear Heqtl l s.
+      fold (@length (nat * seq nat)) in tl.
+      assert (forall i, (('I_(@length nat
+               (nth (0, [::]) ((y, bs) :: soctx)
+                  ((length soctx).+1 - i - 1)).2) ->
+              @RingTerm (drop ((length soctx).+1 - i) ((y, bs) :: soctx)) foctx) ->
+              @RingTerm (drop ((length soctx).+1 - i) ((y, bs) :: soctx)) foctx) -> 
+              i < length soctx -> 
+              (('I_(length (nth (0, [::]) soctx (length soctx - i - 1)).2) ->
+              @RingTerm (drop (length soctx - i) soctx) foctx) ->
+              @RingTerm (drop (length soctx - i) soctx) foctx) ) as f.
+      move=> i f lt t.
+      replace ((length soctx).+1 - i) with ((length soctx - i).+1) in f;[|hauto use: subSn].
+      replace ((length soctx - i).+1 - 1) with (length soctx - i) in f;[|hauto use: subn1, pred_Sn].
+      apply: f.
+      assert (((length soctx - i)) = (((length soctx - i) - 1).+1)) as E.
+      destruct (length soctx);[fcrush|hauto lq: on drew: off use: subn1, subSn].
+      rewrite E; simpl; rewrite <- E; exact t.
+      exact (IList_Max_Map f tl).
+    + remember (IHead l) as hl; simpl in hl; clear Heqhl l.
+      fold (@length (nat * seq nat)) in hl.
+      replace ((length soctx).+1 - length soctx) with 1 in hl;[|hauto use: subSnn].
+      simpl in hl.
+      replace (drop 0 soctx) with soctx in hl;[|symmetry; apply drop0].
+      assert (0 < length ((y, bs) :: soctx)) as H;[sauto|].
+      exact (RingTermSOSubst (Ordinal H) hl s).
+Defined.
+
+Definition FullFOQuote {soctx : SOctx} {foctx : FOctx} :
+  @RingTerm soctx nil ->
+  @RingTerm soctx foctx.
+  move: foctx; elim;[exact (fun x => x)|].
+  move=> a l IH s.
+  apply RingTermFOQuote, IH, s.
+Defined.
+
+Definition FullSOQuote {soctx : SOctx} {foctx : FOctx} :
+  @RingTerm nil foctx ->
+  @RingTerm soctx foctx.
+  move: soctx; elim;[exact (fun x => x)|].
+  move=> [y bs] l IH s.
+  apply RingTermSOQuote, IH, s.
+Defined.
+
+Definition FullQuote {soctx : SOctx} {foctx : FOctx} :
+  @RingTerm nil nil ->
+  @RingTerm soctx foctx.
+  move=> s.
+  apply FullFOQuote, FullSOQuote, s.
+Defined.
+
+(*Substituting terms with no free vars.*)
+Definition FullFOSubstNil {soctx : SOctx} {foctx : FOctx} :
+  IList (fun i => @RingTerm nil nil) (length foctx) ->
+  @SecondOrderFormula soctx foctx ->
+  @SecondOrderFormula soctx nil.
+  move: foctx.
+  elim.
+  - move=> l; exact (fun x => x).
+  - move=> st foctx IHf l s.
+    simpl in l.
+    apply IHf; clear IHf.
+    + exact (ITail l).
+    + remember (IHead l) as hl; simpl in hl; clear Heqhl.
+      assert (0 < length (st :: foctx)) as H;[sauto|].
+      apply (@FullQuote soctx (drop_index (Ordinal H) (st :: foctx))) in hl.
+      exact (SecondOrderFormulaFOSubst (Ordinal H) hl s).
+Defined.
+
+Definition FullSOSubstNil {soctx : SOctx} {foctx : FOctx} :
+  IList (fun i =>
+    ('I_(length (snd (nth (0, [::]) soctx (length soctx - i - 1)))) -> 
+     @RingTerm nil nil) -> 
+     @RingTerm nil nil
+  ) (length soctx) ->
+  @SecondOrderFormula soctx foctx ->
+  @SecondOrderFormula nil foctx.
+  move: soctx.
+  elim.
+  - move=> l; exact (fun x => x).
+  - move=> [y bs] soctx IHf l s.
+    apply IHf; clear IHf.
+    + remember (ITail l) as tl; simpl in tl; clear Heqtl l s.
+      fold (@length (nat * seq nat)) in tl.
+      assert (forall i, (('I_(@length nat
+               (nth (0, [::]) ((y, bs) :: soctx)
+                  ((length soctx).+1 - i - 1)).2) ->
+              @RingTerm nil nil) ->
+              @RingTerm nil nil) -> 
+              i < length soctx -> 
+              (('I_(length (nth (0, [::]) soctx (length soctx - i - 1)).2) ->
+              @RingTerm nil nil) ->
+              @RingTerm nil nil) ) as f.
+      move=> i f lt t.
+      replace ((length soctx).+1 - i) with ((length soctx - i).+1) in f;[|hauto use: subSn].
+      replace ((length soctx - i).+1 - 1) with (length soctx - i) in f;[|hauto use: subn1, pred_Sn].
+      apply: f.
+      assert (((length soctx - i)) = (((length soctx - i) - 1).+1)) as E.
+      destruct (length soctx);[fcrush|hauto lq: on drew: off use: subn1, subSn].
+      rewrite E; simpl; exact t.
+      exact (IList_Max_Map f tl).
+    + remember (IHead l) as hl; simpl in hl; clear Heqhl l.
+      fold (@length (nat * seq nat)) in hl.
+      replace ((length soctx).+1 - length soctx) with 1 in hl;[|hauto use: subSnn].
+      simpl in hl.
+      assert (0 < length ((y, bs) :: soctx)) as H;[sauto|].
+      apply (fun x => SecondOrderFormulaSOSubst (Ordinal H) x s).
+      unfold drop_index; simpl; clear H s y.
+      move=> t.
+      apply FullQuote; apply: hl.
+      move=> i; apply t in i; clear t.
+      apply (RingTermFullFOSubst (IList_Gen (fun i => RingZero : @RingTerm [::] (drop (length foctx - i) foctx)) _)).
+      apply (RingTermFullSOSubst (IList_Gen (fun i => (fun _ => RingZero) : 
+              ('I_(length (snd (nth (0, [::]) soctx (length soctx - i - 1)))) -> RingTerm) -> RingTerm) _)).
+      exact i.
+Defined.
+
+
 
 End Sigma_1_1_Denotation.
