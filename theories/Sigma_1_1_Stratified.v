@@ -766,4 +766,77 @@ Next Obligation.
   hauto.
 Qed.
 
+Inductive IList (A : nat -> Type) : nat -> Type :=
+| INil : IList A 0
+| ICons : forall {i}, A i -> IList A i -> IList A (i.+1).
+
+Definition IHead {A} {i} (l : IList A (i.+1)) : A i :=
+  match l with
+  | ICons _ a _ => a
+  end.
+
+Definition ITail {A} {i} (l : IList A (i.+1)) : IList A i :=
+  match l with
+  | ICons _ _ x => x
+  end.
+
+Definition IList_Map {A B} {i} (f : forall i, A i -> B i) (l : IList A i) : IList B i.
+  elim l;[apply INil|].
+  move=> i0 a la IHlb.
+  apply (ICons _ (f _ a) IHlb).
+Defined.
+
+(*Map, but strengthened with the assumption that each index is less than the length*)
+Definition IList_Max_Map {A B} {i} (f : forall x, A x -> x < i -> B x) (l : IList A i) : IList B i.
+  move:i f l; elim;[intros; apply INil|].
+  move=> i IH f la.
+  apply (ICons _).
+  apply f.
+  exact (IHead la).
+  auto.
+  apply IH.
+  move=> x ax ltxi.
+  apply f;[exact ax|auto].
+  exact (ITail la).
+Defined.
+
+(*Check IList_rect.*)
+
+Definition FullFOSubst {soctx : SOctx} {foctx : FOctx} :
+  IList (fun i => @RingTerm soctx (drop (length foctx - i) foctx)) (length foctx) ->
+  @SecondOrderFormula soctx foctx ->
+  @SecondOrderFormula soctx nil.
+  move: foctx.
+  elim.
+  - move=> l; exact (fun x => x).
+  - move=> st foctx IHf l s.
+    simpl in l.
+    apply IHf; clear IHf.
+    + remember (ITail l) as tl; simpl in tl; clear Heqtl l s.
+      assert (forall i, 
+        @RingTerm soctx (@drop nat ((@length nat foctx).+1 - i) (st :: foctx)) -> i < length foctx -> 
+        @RingTerm soctx (@drop nat ((@length nat foctx - i).+1) (st :: foctx))) as f.
+      move=> i r lt.
+      replace (((length foctx).+1 - i))
+         with ((length foctx - i).+1) in r;[exact r|hauto use: subSn].
+      exact (IList_Max_Map f tl).
+    + remember (IHead l) as hl; simpl in hl; clear Heqhl.
+      replace ((@length nat foctx).+1 - @length nat foctx) with 1 in hl;[|hauto use: subSnn].
+      simpl in hl.
+      replace (@drop nat 0 foctx) with foctx in hl;[|symmetry; apply drop0].
+      assert (0 < length (st :: foctx));[sauto|].
+      exact (SecondOrderFormulaFOSubst (Ordinal H) hl s).
+Defined.
+
+(*forall (i : 'I_(length soctx)),
+  (('I_(length (snd (tnth (in_tuple soctx) i))) -> 
+   RingTerm  (soctx := drop_index i soctx) (foctx := foctx)) -> 
+   RingTerm (soctx := drop_index i soctx) (foctx := foctx)) ->*)
+
+Definition FullSOSubst {soctx : SOctx} {foctx : FOctx} :
+  IList (fun i => @RingTerm soctx (drop (length foctx - i) foctx)) (length foctx) ->
+  @SecondOrderFormula soctx foctx ->
+  @SecondOrderFormula nil foctx.
+Admitted.
+
 End Sigma_1_1_Denotation.
