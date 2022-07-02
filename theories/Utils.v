@@ -7,7 +7,7 @@ Definition drop_index {T} (m : nat) (s : seq T) : seq T :=
   take m s ++ behead (drop m s).
 
 Theorem drop_index_length {T} : forall (s : seq T) (m : nat),
-  m < length s -> length (drop_index m s) = length s - 1.
+  m < length s -> length (drop_index m s) = (length s).-1.
 Proof.
   elim;[auto|].
   unfold drop_index.
@@ -43,26 +43,25 @@ Qed.
 
 Theorem drop_index_nth_high {T} : forall i j (s : seq T) d,
   i < j ->
-  nth d (drop_index i s) (j - 1) = nth d s j.
+  nth d (drop_index i s) (j.-1) = nth d s j.
 Proof.
   elim;destruct j;try fcrush.
   move=> [|x s] d jg;[sauto use: nth_nil|].
-  replace (j.+1 - 1) with j;[|sauto q:on].
   simpl.
   symmetry; rewrite <- H; [|auto].
   destruct j;[fcrush|].
-  by replace (j.+1 - 1) with j;[|sauto q:on].
+  sauto q:on.
 Qed.
 
 Theorem index_low_decr {i} {j} {T} {s : seq T} :
-  i < j -> j < length s -> j - 1 < length (drop_index i s).
+  i < j -> j < length s -> j.-1 < length (drop_index i s).
 Proof.
   move=> ltij ltj.
   rewrite drop_index_length;[sauto lq: on|hauto use: ltn_trans].
 Qed.
 
 Theorem decr_index_const  {i} {j} {T} {s : seq T}
-  (ltj : j < length s) (ltjm : j - 1 < length (drop_index i s)) : 
+  (ltj : j < length s) (ltjm : j.-1 < length (drop_index i s)) : 
   i < j -> 
   tnth (in_tuple (drop_index i s)) (Ordinal ltjm) =
   tnth (in_tuple s) (Ordinal ltj).
@@ -75,7 +74,6 @@ Proof.
   move=> b s IHs a j i ltj ltij ltjm.
   simpl; simpl in IHs.
   destruct j as [|j];[fcrush|].
-  replace (j.+1 - 1) with j;[|sauto lq:on].
   destruct j, i; try fcrush.
   rewrite drop_index_step.
   simpl.
@@ -83,7 +81,7 @@ Proof.
   destruct j;[fcrush|].
   change (nth a (drop_index i.+1 (b :: s)) j.+1)
     with (nth a (drop_index i.+1 (a :: s)) j.+1).
-  replace (j.+1) with (j.+2 - 1) at 1;[|sauto lq:on].
+  replace (j.+1) with (j.+2.-1) at 1;[|sauto lq:on].
   rewrite IHs; sauto.
 Qed.
 
