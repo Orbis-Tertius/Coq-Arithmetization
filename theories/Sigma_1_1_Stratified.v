@@ -148,7 +148,7 @@ Qed.
 Definition RingTermSOSubst {soctx : SOctx} {foctx : FOctx} :
   forall (i : 'I_(length soctx)),
   (('I_(tnth (in_tuple soctx) i) -> 
-   RingTerm  (soctx := drop_index i soctx) (foctx := foctx)) -> 
+   RingTerm (soctx := drop_index i soctx) (foctx := foctx)) -> 
    RingTerm (soctx := drop_index i soctx) (foctx := foctx)) ->
   @RingTerm soctx foctx ->
   RingTerm (soctx := drop_index i soctx) (foctx := foctx).
@@ -932,13 +932,49 @@ Definition FullFOSubstNil {soctx : SOctx} {foctx : FOctx} :
   elim.
   - move=> l; exact (fun x => x).
   - move=> foctx IHf l s.
-    simpl in l.
     apply IHf; clear IHf.
     + exact (ITail l).
     + remember (IHead l) as hl; simpl in hl; clear Heqhl.
       assert (0 < foctx.+1) as H;[sauto|].
       apply (@FullQuote soctx foctx) in hl.
       exact (SecondOrderFormulaFOSubst (Ordinal H) hl s).
+Defined.
+
+Definition ttail {T} {i} : (i.+1).-tuple T -> i.-tuple T.
+  move=> [s e].
+  apply (elimT eqP) in e.
+  destruct s;[fcrush|].
+  simpl in e; injection e=> e'.
+  rewrite <- e'.
+  apply in_tuple.
+Qed.
+
+Definition FullFOSubstNil_Tup {soctx : SOctx} {foctx : FOctx} :
+  foctx.-tuple (@RingTerm nil 0)  ->
+  @SecondOrderFormula soctx foctx ->
+  @SecondOrderFormula soctx 0.
+  move: foctx.
+  elim.
+  - move=> l; exact (fun x => x).
+  - move=> foctx IHf l s.
+    apply IHf; clear IHf.
+    + exact (ttail l).
+    + remember (thead l) as hl; simpl in hl; clear Heqhl.
+      assert (0 < foctx.+1) as H;[sauto|].
+      apply (@FullQuote soctx foctx) in hl.
+      exact (SecondOrderFormulaFOSubst (Ordinal H) hl s).
+Defined.
+
+Definition FullFOSubstNil_Seq {soctx : SOctx} :
+  forall (s : seq (@RingTerm nil 0)),
+  @SecondOrderFormula soctx (size s) ->
+  @SecondOrderFormula soctx 0.
+  elim;[exact (fun x => x)|].
+  move=> x xs IHf s.
+  apply: IHf.
+  assert (0 < (size xs).+1) as H;[sauto|].
+  simpl in s; apply (@FullQuote soctx (size xs)) in x.
+  exact (SecondOrderFormulaFOSubst (Ordinal H) x s).
 Defined.
 
 Definition FullSOSubstNil {soctx : SOctx} {foctx : FOctx} :
@@ -981,14 +1017,118 @@ Definition FullSOSubstNil {soctx : SOctx} {foctx : FOctx} :
       replace (length soctx - length soctx) with 0 in hl;[simpl in hl|hauto use: PeanoNat.Nat.sub_diag].
       apply FullQuote; apply: hl.
       move=> i; apply t in i; clear t.
-      apply (RingTermFullFOSubst (foctx := foctx) (IList_Gen (fun i => RingZero : @RingTerm [::] i) _)).
-      exact (RingTermFullSOSubst (soctx := soctx) 
-              (IList_Gen (fun i => (fun _ => RingZero) : 
-                ('I_(nth 0 soctx ((length soctx) - i).-1) -> @RingTerm (drop (length soctx - i) soctx) _) -> 
-                @RingTerm (drop (length soctx - i) soctx) _) 
-              (length soctx)) i).
+      apply (RingTermFullFOSubst (foctx := foctx) (IList_Gen (fun i => RingZero) _)).
+      exact (RingTermFullSOSubst (IList_Gen (fun i => (fun _ => RingZero)) _) i).
 Defined.
 
+Definition RingTermFullSOSubstNil_Seq :
+  forall (t : seq {n : nat & (('I_n -> @RingTerm nil 0) -> @RingTerm nil 0)}),
+  @RingTerm [seq projT1 i | i <- t] 0 ->
+  @RingTerm nil 0.
+  elim;[exact (fun x => x)|].
+  move=> [n f] l IHf s.
+  apply IHf; simpl in s.
+  apply (fun f' : ('I_(tnth (in_tuple (_ :: _)) (Ordinal (ltn0Sn _))) -> _) -> _ => RingTermSOSubst _ f' s).
+  rewrite (tnth_nth 0); simpl=> t.
+  exact (FullSOQuote (f (fun o => IHf (t o)))).
+Defined.
 
+Definition SecondOrderFullSOSubstNil_Seq :
+  forall (t : seq {n : nat & (('I_n -> @RingTerm nil 0) -> @RingTerm nil 0)}),
+  @SecondOrderFormula [seq projT1 i | i <- t] 0 ->
+  @SecondOrderFormula nil 0.
+  elim;[exact (fun x => x)|].
+  move=> [n f] l IHf s.
+  apply IHf; simpl in s.
+  apply (fun f' : ('I_(tnth (in_tuple (_ :: _)) (Ordinal (ltn0Sn _))) -> _) -> _ => SecondOrderFormulaSOSubst _ f' s).
+  rewrite (tnth_nth 0); simpl=> t.
+  exact (FullSOQuote (f (fun o => RingTermFullSOSubstNil_Seq _ (t o)))).
+Defined.
+
+Theorem map_length {A B} (f : A -> B) (s : seq A) : length [seq f i | i <- s] = length s.
+Proof. move: s; elim; hauto q:on. Qed.
+
+Theorem Ordinal_Rect n n2 m (i : m < n) (e : n = n2) :
+  (eq_rect _ _ (Ordinal (n:=n) (m:=m) i) _ e) = Ordinal (eq_rect _ (fun x => m < x) i _ e).
+Proof. by destruct e. Qed.
+
+Theorem map_nth {A B} (f : A -> B) (s : seq A) (o : 'I_(length [seq f i | i <- s])) :
+  tnth (in_tuple [seq f i | i <- s]) o = 
+  f (tnth (in_tuple s) (eq_rect _ _ o _ (map_length _ _))).
+Proof.
+  move: s o; elim;[move=> [x xlt]; fcrush|].
+  simpl.
+  move=> a l IH o.
+  destruct o.
+  rewrite Ordinal_Rect.
+  rewrite (tnth_nth (f a)).
+  rewrite (tnth_nth a).
+  destruct m;[reflexivity|].
+  simpl.
+  assert (m < length [seq f i | i <- l]) as H;[hauto|].
+  transitivity (tnth (in_tuple [seq f i0 | i0 <- l]) (Ordinal H));[
+  by rewrite (tnth_nth (f a))|].
+  rewrite IH.
+  rewrite Ordinal_Rect.
+  by rewrite (tnth_nth a).
+Qed.
+
+(*Interpreting a ring term with free variables as a function from ring elems. and functions. *)
+Definition Ring_Denote (M : SecondOrderFormulaModel)
+  (v1 : seq (R M))
+  (v2 : seq {n : nat & 
+            {y : (R M) & 
+            {bs : n.-tuple (R M) & 
+            {f : ('I_n -> R M) -> R M | 
+            (forall (t : 'I_n -> R M), (forall x : 'I_n, lt M (t x) (tnth bs x)) -> lt M (f t) y)
+            }}}})
+  (s : @RingTerm [seq projT1 i | i <- v2] (length v1)) :
+  R M.
+  move:s; elim.
+  - move=> idx; exact (tnth (in_tuple v1) idx).
+  - move=> idx _ IH.
+    rewrite map_nth in IH.
+    destruct (tnth _ _) as [n[y[bs[f p]]]].
+    exact (f IH).
+  - exact (-1)%R.
+  - exact 1%R.
+  - exact 0%R.
+  - move=> _ r1 _ r2; exact (r1 + r2)%R.
+  - move=> _ r1 _ r2; exact (r1 * r2)%R.
+
+(*Interpreting a ring term with free variables as a function from ring elems. and functions. *)
+(*
+Note: This is impossible. Consider if one of the bs bounds is 0; then it's impossible
+      for any applied argument to type check. Bounds should be part of the proposition,
+      not enforced on the type level.
+
+Definition Sigma11_Pred (M : SecondOrderFormulaModel)
+  (v1 : seq (R M))
+  (v2 : seq {n : nat & 
+            {y : (R M) & 
+            {bs : n.-tuple (R M) & 
+            ((forall o : 'I_n, {r : (R M) | lt M r (tnth bs o)}) -> {r : R M | lt M r y})}}})
+  (s : @RingTerm [seq projT1 i | i <- v2] (length v1)) :
+  R M := ...
+*)
+
+(*Interpreting a sigma_11 formula with free variables as a prediate over ring elems. and functions. *)
+Definition Sigma11_Pred (M : SecondOrderFormulaModel)
+  (v1 : seq (R M))
+  (v2 : seq {n : nat & 
+            {y : (R M) & 
+            {bs : n.-tuple (R M) & 
+            ((forall o : 'I_n, {r : (R M) | lt M r (tnth bs o)}) -> {r : R M | lt M r y})}}})
+  (s : @SecondOrderFormula [seq projT1 i | i <- v2] (length v1)) :
+  Prop.
+
+
+
+  (t : seq {n : nat & (('I_n -> @RingTerm nil 0) -> @RingTerm nil 0)})
+
+
+Program Fixpoint SecondOrder_Denotation
+  (M : SecondOrderFormulaModel) (f : @SecondOrderFormula nil 0) 
+  {measure (SecondOrder_Measure f)} : Prop :=
 
 End Sigma_1_1_Denotation.
