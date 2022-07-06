@@ -1073,6 +1073,46 @@ Proof.
   by rewrite (tnth_nth a).
 Qed.
 
+Theorem map_nth_2 {A B} (f : A -> B) (s : seq A) (o : 'I_(length s)) :
+  f (tnth (in_tuple s) o) 
+  = tnth (in_tuple [seq f i | i <- s]) (eq_rect _ _ o _ (esym (map_length f _))).
+Proof.
+  move: s o; elim;[move=> [x xlt]; fcrush|].
+  simpl.
+  move=> a l IH o.
+  destruct o.
+  rewrite Ordinal_Rect.
+  rewrite (tnth_nth (f a)).
+  rewrite (tnth_nth a).
+  destruct m;[reflexivity|].
+  simpl.
+  assert (m < length l) as H;[hauto|].
+  transitivity (f (tnth (in_tuple l) (Ordinal H)));[
+  by rewrite (tnth_nth a)|].
+  rewrite IH.
+  rewrite Ordinal_Rect.
+  by rewrite (tnth_nth (f a)).
+Qed.
+
+Check tnth.
+
+Lemma map_nth_3_lem 
+  {A T} {a b} (P Q : A -> Type) (tt : forall a, P a -> Q a -> T)
+  (e : a = b) (pa : P a) (qb : Q b) :
+  tt _ (eq_rect _ _ pa _ e) qb =
+  tt _ pa (eq_rect _ _ qb _ (esym e)).
+Proof. by destruct e. Qed.
+
+Theorem map_nth_3 {A B} (f : A -> B) (s : seq A) (o : 'I_(length s)) :
+  f (tnth (in_tuple s) o) 
+  = tnth (eq_rect _ (fun i => i.-tuple B) (in_tuple [seq f i | i <- s])
+         _ 
+         (map_length f _)) o.
+Proof.
+  rewrite map_nth_2.
+  by rewrite (map_nth_3_lem _ _ (fun x => @tnth x B) _ _ _).
+Qed.
+
 (*Interpreting a ring term with free variables as a function from ring elems. and functions. *)
 Definition Ring_Denote (M : SecondOrderFormulaModel)
   (v1 : seq (R M))
@@ -1161,7 +1201,14 @@ Program Fixpoint SecondOrder_Denote (M : SecondOrderFormulaModel)
       (existT _ (in_tuple (map naturalRingElement bs))
       (exist _ rf p))) :: v2) f
   end.
-
+Next Obligation.
+  by rewrite <- (map_length (@naturalRingElement (R M))).
+Qed.
+Next Obligation.
+  rewrite map_nth_3.
+  do 2 f_equal.
+  apply proof_irrelevance.
+Qed.
 
 (*
 Note: This is impossible. Consider if one of the bs bounds is 0; then it's impossible
@@ -1179,3 +1226,5 @@ Definition Sigma11_Pred (M : SecondOrderFormulaModel)
 *)
 
 End Sigma_1_1_Denotation.
+
+Next Obligation.
