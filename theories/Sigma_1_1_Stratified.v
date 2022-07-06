@@ -1095,8 +1095,74 @@ Definition Ring_Denote (M : SecondOrderFormulaModel)
   - exact 0%R.
   - move=> _ r1 _ r2; exact (r1 + r2)%R.
   - move=> _ r1 _ r2; exact (r1 * r2)%R.
+Defined.
+
+Fixpoint ZerothOrder_Denote (M : SecondOrderFormulaModel) 
+  (v1 : seq (R M))
+  (v2 : seq {n : nat & 
+            {y : (R M) & 
+            {bs : n.-tuple (R M) & 
+            {f : ('I_n -> R M) -> R M | 
+            (forall (t : 'I_n -> R M), (forall x : 'I_n, lt M (t x) (tnth bs x)) -> lt M (f t) y)
+            }}}})
+  (f : @ZerothOrderFormula [seq projT1 i | i <- v2] (length v1)) : Prop :=
+  match f with
+  | ZOTrue => true
+  | ZOFalse => false
+  | ZONot f => not (ZerothOrder_Denote M v1 v2 f)
+  | ZOAnd f1 f2 => (ZerothOrder_Denote M v1 v2 f1) /\ (ZerothOrder_Denote M v1 v2 f2)
+  | ZOOr f1 f2 => (ZerothOrder_Denote M v1 v2 f1) \/ (ZerothOrder_Denote M v1 v2 f2)
+  | ZOImp f1 f2 => (ZerothOrder_Denote M v1 v2 f1) -> (ZerothOrder_Denote M v1 v2 f2)
+  | ZOEq r1 r2 => Ring_Denote M v1 v2 r1 = Ring_Denote M v1 v2 r2
+  end.
+
+Fixpoint FirstOrder_Denote (M : SecondOrderFormulaModel) 
+  (v1 : seq (R M))
+  (v2 : seq {n : nat & 
+            {y : (R M) & 
+            {bs : n.-tuple (R M) & 
+            {f : ('I_n -> R M) -> R M | 
+            (forall (t : 'I_n -> R M), (forall x : 'I_n, lt M (t x) (tnth bs x)) -> lt M (f t) y)
+            }}}})
+  (f : @FirstOrderFormula [seq projT1 i | i <- v2] (length v1)) : Prop :=
+  match f with
+  | ZO z => ZerothOrder_Denote M v1 v2 z
+  | FOExists n f => 
+    exists (r : R M), 
+      lt M r (naturalRingElement n) /\
+      FirstOrder_Denote M (r :: v1) v2 f
+  | FOForall n f =>
+    forall (r : R M), 
+      lt M r (naturalRingElement n) ->
+      FirstOrder_Denote M (r :: v1) v2 f
+  end.
 
 (*Interpreting a ring term with free variables as a function from ring elems. and functions. *)
+Program Fixpoint SecondOrder_Denote (M : SecondOrderFormulaModel) 
+  (v1 : seq (R M))
+  (v2 : seq {n : nat & 
+            {y : (R M) & 
+            {bs : n.-tuple (R M) & 
+            {f : ('I_n -> R M) -> R M | 
+            (forall (t : 'I_n -> R M), (forall x : 'I_n, lt M (t x) (tnth bs x)) -> lt M (f t) y)
+            }}}})
+  (f : @SecondOrderFormula [seq projT1 i | i <- v2] (length v1)) : Prop :=
+  match f with
+  | FO f => FirstOrder_Denote M v1 v2 f
+  | SOExists y bs f => 
+    exists (rf : ('I_(length bs) -> R M) -> R M)
+    (p : forall (t : 'I_(length bs) -> R M),
+          (forall x : 'I_(length bs), 
+            lt M (t x) (naturalRingElement (tnth (in_tuple bs) x))) ->
+            lt M (rf t) (naturalRingElement y)),
+    SecondOrder_Denote M v1 
+      (existT _ (length bs) 
+      (existT _ (naturalRingElement y) 
+      (existT _ (in_tuple (map naturalRingElement bs))
+      (exist _ rf p))) :: v2) f
+  end.
+
+
 (*
 Note: This is impossible. Consider if one of the bs bounds is 0; then it's impossible
       for any applied argument to type check. Bounds should be part of the proposition,
@@ -1111,24 +1177,5 @@ Definition Sigma11_Pred (M : SecondOrderFormulaModel)
   (s : @RingTerm [seq projT1 i | i <- v2] (length v1)) :
   R M := ...
 *)
-
-(*Interpreting a sigma_11 formula with free variables as a prediate over ring elems. and functions. *)
-Definition Sigma11_Pred (M : SecondOrderFormulaModel)
-  (v1 : seq (R M))
-  (v2 : seq {n : nat & 
-            {y : (R M) & 
-            {bs : n.-tuple (R M) & 
-            ((forall o : 'I_n, {r : (R M) | lt M r (tnth bs o)}) -> {r : R M | lt M r y})}}})
-  (s : @SecondOrderFormula [seq projT1 i | i <- v2] (length v1)) :
-  Prop.
-
-
-
-  (t : seq {n : nat & (('I_n -> @RingTerm nil 0) -> @RingTerm nil 0)})
-
-
-Program Fixpoint SecondOrder_Denotation
-  (M : SecondOrderFormulaModel) (f : @SecondOrderFormula nil 0) 
-  {measure (SecondOrder_Measure f)} : Prop :=
 
 End Sigma_1_1_Denotation.
