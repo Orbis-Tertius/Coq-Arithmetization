@@ -11,13 +11,6 @@ Require Import CoqArith.Sigma_1_1_Stratified.
 
 Section SemicircuitDef.
 
-(*Convert a sequence of bounds for universally quantified vars
-  into the input type of a skolem function. *)
-Fixpoint QuantBoundType (M : SecondOrderFormulaModel) (l : seq nat) : Type :=
-  match l with 
-  | [::] => unit
-  | x :: xs => { r : R M | lt M r (naturalRingElement x) } * QuantBoundType M xs
-  end.
 
 (* Some theorems justifying skolemization. *)
 Theorem Cannon (phi : nat -> nat -> Prop) : 
@@ -42,44 +35,35 @@ Proof.
 Qed.
 
 
+(*Convert a sequence of bounds for universally quantified vars
+  into the input type of a skolem function. *)
+Definition QuantBoundType (M : SecondOrderFormulaModel) (l : seq nat) : Type :=
+  forall (i : 'I_(length l)), { r : R M | lt M r (naturalRingElement (tnth (in_tuple l) i)) }.
 
+Inductive RingConstraint {funs unis exis : nat} : Type :=
+| RingConsFun : 'I_funs -> RingConstraint
+| RingConsUni : 'I_unis -> RingConstraint
+| RingConsExi : 'I_exis -> RingConstraint
+| RingConsMinusOne : RingConstraint
+| RingConsPlusOne : RingConstraint
+| RingConsZero : RingConstraint
+| RingConsPlus : RingConstraint -> RingConstraint -> RingConstraint
+| RingConsTimes : RingConstraint -> RingConstraint -> RingConstraint.
 
-(*
-Inductive RingTerm {soctx : SOctx} {foctx : FOctx} : Type :=
-| RingVar : 'I_foctx -> RingTerm
-| RingFun : forall (i : 'I_(length soctx)),
-            ('I_(tnth (in_tuple soctx) i) -> RingTerm) ->
-            RingTerm
-| RingMinusOne : RingTerm
-| RingPlusOne : RingTerm
-| RingZero : RingTerm
-| RingPlus : RingTerm -> RingTerm -> RingTerm
-| RingTimes : RingTerm -> RingTerm -> RingTerm.
-*)
-
-(*
-Record SemiCircuit (M : SecondOrderFormulaModel) : Type :=
-  mkSemiCircuit {
-    FreeFO : seq (R M);
-    FreeSO : seq {n : nat & 
-                 {y : (R M) & 
-                 {bs : n.-tuple (R M) & 
-                 (forall i : 'I_n, {r : R M | lt M r (tnth bs i)}) -> {r : R M | lt M r y}}}};
-
-    QuantSO : seq {n : nat & 
-                  {y : (R M) & 
-                  {bs : n.-tuple (R M) & 
-                  (forall i : 'I_n, {r : R M | lt M r (tnth bs i)}) -> {r : R M | lt M r y}}}};
-    
-    UniQuantBnds : seq nat;
-
-    (* States how many universal quantifiers appear prior to each existential quantifier *)
-    QuantFO : seq {i : 'I_(length UniQuantBnds) & QuantBoundType M (take i UniQuantBnds) -> R M }
-
-
-  }.
-*)
-
+Inductive ZerothOrderConstraint {eqidx : nat} : Type :=
+| ZOConsTrue : ZerothOrderConstraint
+| ZOConsFalse : ZerothOrderConstraint
+| ZOConsNot : ZerothOrderConstraint -> ZerothOrderConstraint
+| ZOConsAnd : ZerothOrderConstraint ->
+          ZerothOrderConstraint ->
+          ZerothOrderConstraint
+| ZOConsOr : ZerothOrderConstraint ->
+         ZerothOrderConstraint ->
+         ZerothOrderConstraint
+| ZOConsImp : ZerothOrderConstraint ->
+          ZerothOrderConstraint ->
+          ZerothOrderConstraint
+| ZOConsEq : 'I_eqidx -> 'I_eqidx -> ZerothOrderConstraint.
 
 Record SemiCircuit (M : SecondOrderFormulaModel) : Type :=
   mkSemiCircuit {
@@ -89,7 +73,7 @@ Record SemiCircuit (M : SecondOrderFormulaModel) : Type :=
                      {bs : n.-tuple (R M) & 
                      (forall i : 'I_n, {r : R M | lt M r (tnth bs i)}) -> {r : R M | lt M r y}}}};
 
-    QuantSO : seq {n : nat & 
+    ExQuantSO : seq {n : nat & 
                   {y : (R M) & 
                   {bs : n.-tuple (R M) & 
                   (forall i : 'I_n, {r : R M | lt M r (tnth bs i)}) -> {r : R M | lt M r y}}}};
@@ -97,14 +81,32 @@ Record SemiCircuit (M : SecondOrderFormulaModel) : Type :=
     UniQuantBnds : seq nat;
 
     (* States how many universal quantifiers appear prior to each existential quantifier *)
-    QuantFO : seq (QuantBoundType M UniQuantBnds -> R M);
+    ExQuantFO : seq (QuantBoundType M UniQuantBnds -> R M);
 
-    (*Function calls with their inputs an outputs. *)
+    (*Function calls with their inputs and outputs. *)
     FunCalls : seq (QuantBoundType M UniQuantBnds -> 
                     (R M * 
-                    {i : 'I_(length (InstanceSO ++ QuantSO)) & 
-                      (projT1 (tnth (in_tuple (InstanceSO ++ QuantSO)) i)).-tuple (R M)
+                    {i : 'I_(length (InstanceSO ++ ExQuantSO)) & 
+                         (projT1 (tnth (in_tuple (InstanceSO ++ ExQuantSO)) i)).-tuple (R M)
                     }));
+
+    (*The constraints defining the values at each function call. *)
+    FunConst : forall (c : 'I_(length FunCalls))
+                (unVals : QuantBoundType M UniQuantBnds),
+                (projT1 (tnth (in_tuple (InstanceSO ++ ExQuantSO)) (projT1 (tnth (in_tuple FunCalls) c unVals).2))).-tuple
+                (@RingConstraint (length FunCalls) (length UniQuantBnds) (length ExQuantFO));
+
+    (*Equation value pairs*)
+    Equs : seq (R M * R M);
+
+    (*The constraints defininf the values at each equation entry.*)
+    EquConst : 'I_(length Equs) -> QuantBoundType M UniQuantBnds ->
+              (@RingConstraint (length FunCalls) (length UniQuantBnds) (length ExQuantFO))
+              * (@RingConstraint (length FunCalls) (length UniQuantBnds) (length ExQuantFO));
+
+    FormulaConst : QuantBoundType M UniQuantBnds -> @ZerothOrderConstraint (length Equs);
+
   }.
+
 
 End SemicircuitDef.
