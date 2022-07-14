@@ -80,7 +80,6 @@ Record SemiCircuit (M : SecondOrderFormulaModel) : Type :=
     
     UniQuantBnds : seq nat;
 
-    (* States how many universal quantifiers appear prior to each existential quantifier *)
     ExQuantFO : seq (QuantBoundType M UniQuantBnds -> R M);
 
     (*Function calls with their inputs and outputs. *)
@@ -107,6 +106,37 @@ Record SemiCircuit (M : SecondOrderFormulaModel) : Type :=
     FormulaConst : QuantBoundType M UniQuantBnds -> @ZerothOrderConstraint (length Equs);
 
   }.
+
+Program Fixpoint Skolemize
+
+(*
+Definition CircuitGenRingCont (M : SecondOrderFormulaModel) (c : SemiCircuit M)
+
+  (s : @RingTerm [seq projT1 i | i <- ExQuantSO M c ++ InstanceSO M c] (length (InstanceFO M c))) :
+  RingConstraint M.
+Admitted.
+*)
+
+Definition CircuitGenRing (M : SecondOrderFormulaModel) (c : SemiCircuit M)
+  (s : @RingTerm [seq projT1 i | i <- ExQuantSO M c ++ InstanceSO M c] (length (InstanceFO M c))) :
+  SemiCircuit M.
+Admitted.
+
+Definition CircuitGenZO (M : SecondOrderFormulaModel) (c : SemiCircuit M)
+  (s : @ZerothOrderFormula [seq projT1 i | i <- ExQuantSO M c ++ InstanceSO M c] (length (InstanceFO M c))) :
+  SemiCircuit M.
+Admitted.
+
+Definition CircuitGenFO (M : SecondOrderFormulaModel) (c : SemiCircuit M)
+  (s : @FirstOrderFormula [seq projT1 i | i <- ExQuantSO M c ++ InstanceSO M c] (length (InstanceFO M c))) :
+  SemiCircuit M.
+Admitted.
+
+Definition CircuitGenSO (M : SecondOrderFormulaModel) (c : SemiCircuit M)
+  (s : @SecondOrderFormula [seq projT1 i | i <- ExQuantSO M c ++ InstanceSO M c] (length (InstanceFO M c))) :
+  SemiCircuit M.
+Admitted.
+
 
 
 End SemicircuitDef.
