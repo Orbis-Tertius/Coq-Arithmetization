@@ -46,6 +46,20 @@ Proof.
   by rewrite (tnth_nth a).
 Qed.
 
+Theorem map_lnth {A B} (f : A -> B) (s : seq A) (o : {m | m < length [seq f i | i <- s]}) :
+  lnth [seq f i | i <- s] o = 
+  f (lnth (in_tuple s) (eq_rect _ (fun x => {m : nat | m < x}) o _ (map_length _ _))).
+Proof.
+  unfold lnth.
+  rewrite map_nth.
+  do 2 f_equal.
+  destruct o; simpl.
+  apply ord_inj.
+  by transitivity (Ordinal 
+     (proj2_sig (eq_rect _ (fun x0 : nat => {m : nat | m < x0}) (exist _ x i) 
+     (length s) (map_length f s))));[destruct (map_length f s)|destruct (eq_rect _ _ _ _)].
+Qed.
+
 Theorem map_nth_2 {A B} (f : A -> B) (s : seq A) (o : 'I_(length s)) :
   f (tnth (in_tuple s) o) 
   = tnth (in_tuple [seq f i | i <- s]) (eq_rect _ _ o _ (esym (map_length f _))).
@@ -309,66 +323,49 @@ Inductive ZerothOrderFormula {soctx : SOctx} {foctx : FOctx} : Type :=
          @RingTerm soctx foctx ->
          ZerothOrderFormula.
 
-
-(*
-Program Fixpoint ZerothOrderFormulaFOSubst_pro {soctx : SOctx} {foctx : FOctx} 
+Program Fixpoint ZerothOrderFormulaFOSubst {soctx : SOctx} {foctx : FOctx} 
   (i : {n : nat | n < foctx}) (t : @RingTerm soctx foctx.-1)
   (s : @ZerothOrderFormula soctx foctx) : @ZerothOrderFormula soctx foctx.-1 :=
   match s with
   | ZOTrue => ZOTrue
   | ZOFalse => ZOFalse
-  | ZONot s => ZONot (ZerothOrderFormulaFOSubst_pro i t s)
-  | ZOAnd s1 s2 => ZOAnd (ZerothOrderFormulaFOSubst_pro i t s1)
-                         (ZerothOrderFormulaFOSubst_pro i t s2)
-  | ZOOr s1 s2 => ZOOr (ZerothOrderFormulaFOSubst_pro i t s1)
-                       (ZerothOrderFormulaFOSubst_pro i t s2)
-  | ZOImp s1 s2 => ZOImp (ZerothOrderFormulaFOSubst_pro i t s1)
-                         (ZerothOrderFormulaFOSubst_pro i t s2)
-  | ZOEq r1 r2 => ZOEq (RingTermFOSubst_pro i t s1)
-                       (RingTermFOSubst_pro i t s2)
+  | ZONot s => ZONot (ZerothOrderFormulaFOSubst i t s)
+  | ZOAnd s1 s2 => ZOAnd (ZerothOrderFormulaFOSubst i t s1)
+                         (ZerothOrderFormulaFOSubst i t s2)
+  | ZOOr s1 s2 => ZOOr (ZerothOrderFormulaFOSubst i t s1)
+                       (ZerothOrderFormulaFOSubst i t s2)
+  | ZOImp s1 s2 => ZOImp (ZerothOrderFormulaFOSubst i t s1)
+                         (ZerothOrderFormulaFOSubst i t s2)
+  | ZOEq r1 r2 => ZOEq (RingTermFOSubst i t r1)
+                       (RingTermFOSubst i t r2)
   end.
-*)
 
-Definition ZerothOrderFormulaFOSubst {soctx : SOctx} {foctx : FOctx} :
-  forall (i : 'I_foctx),
-  @RingTerm soctx foctx.-1 ->
-  @ZerothOrderFormula soctx foctx ->
-  @ZerothOrderFormula soctx foctx.-1.
-  intros i t s.
-  induction s.
-  - exact ZOTrue.
-  - exact ZOFalse.
-  - exact (ZONot IHs).
-  - exact (ZOAnd IHs1 IHs2).
-  - exact (ZOOr IHs1 IHs2).
-  - exact (ZOImp IHs1 IHs2).
-  - exact (ZOEq (RingTermFOSubst i t r) (RingTermFOSubst i t r0)).
-Defined.
 
-Definition ZerothOrderFormulaSOSubst {soctx : SOctx} {foctx : FOctx} :
-  forall (i : 'I_(length soctx)),
-  (('I_(tnth (in_tuple soctx) i) -> 
-   @RingTerm (drop_index i soctx) foctx) -> 
-   @RingTerm (drop_index i soctx) foctx) ->
-  @ZerothOrderFormula soctx foctx ->
-  @ZerothOrderFormula (drop_index i soctx) foctx.
-  intros i f s.
-  induction s.
-  - exact ZOTrue.
-  - exact ZOFalse.
-  - exact (ZONot IHs).
-  - exact (ZOAnd IHs1 IHs2).
-  - exact (ZOOr IHs1 IHs2).
-  - exact (ZOImp IHs1 IHs2).
-  - exact (ZOEq (RingTermSOSubst i f r) (RingTermSOSubst i f r0)).
-Defined.
+Program Fixpoint ZerothOrderFormulaSOSubst {soctx : SOctx} {foctx : FOctx} 
+  (i : {n : nat | n < length soctx}) 
+  (f : ({m | m < lnth soctx i} -> 
+       @RingTerm (drop_index i soctx) foctx) -> 
+       @RingTerm (drop_index i soctx) foctx)
+  (s : @ZerothOrderFormula soctx foctx) : @ZerothOrderFormula (drop_index i soctx) foctx :=
+  match s with
+  | ZOTrue => ZOTrue
+  | ZOFalse => ZOFalse
+  | ZONot s => ZONot (ZerothOrderFormulaSOSubst i f s)
+  | ZOAnd s1 s2 => ZOAnd (ZerothOrderFormulaSOSubst i f s1)
+                         (ZerothOrderFormulaSOSubst i f s2)
+  | ZOOr s1 s2 => ZOOr (ZerothOrderFormulaSOSubst i f s1)
+                       (ZerothOrderFormulaSOSubst i f s2)
+  | ZOImp s1 s2 => ZOImp (ZerothOrderFormulaSOSubst i f s1)
+                         (ZerothOrderFormulaSOSubst i f s2)
+  | ZOEq r1 r2 => ZOEq (RingTermSOSubst i f r1)
+                       (RingTermSOSubst i f r2)
+  end.
 
 Inductive FirstOrderFormula {soctx : SOctx} {foctx : FOctx} : Type :=
 | ZO : @ZerothOrderFormula soctx foctx -> FirstOrderFormula
 | FOExists : @RingTerm soctx foctx -> FirstOrderFormula (foctx := foctx.+1) -> FirstOrderFormula
 | FOForall : @RingTerm soctx foctx -> FirstOrderFormula (foctx := foctx.+1) -> FirstOrderFormula. 
 
-(*
 Program Fixpoint FirstOrderFormulaFOSubst {soctx : SOctx} {foctx : FOctx}
   (i : {n : nat | n < foctx}) (t : @RingTerm soctx foctx.-1)
   (s : @FirstOrderFormula soctx foctx) : @FirstOrderFormula soctx foctx.-1 :=
@@ -379,55 +376,33 @@ Program Fixpoint FirstOrderFormulaFOSubst {soctx : SOctx} {foctx : FOctx}
   | FOForall b f => FOForall (RingTermFOSubst i t b)
                              (FirstOrderFormulaFOSubst (i.+1) (RingTermFOQuote t) f)
   end.
-*)
+Next Obligation.
+  by destruct foctx.
+Qed.
+Next Obligation.
+  by destruct foctx.
+Qed.
+Next Obligation.
+  by destruct foctx.
+Qed.
+Next Obligation.
+  by destruct foctx.
+Qed.
 
-Definition FirstOrderFormulaFOSubst {soctx : SOctx} {foctx : FOctx} :
-  forall (i : 'I_foctx),
-  @RingTerm soctx foctx.-1 ->
-  @FirstOrderFormula soctx foctx ->
-  @FirstOrderFormula soctx foctx.-1.
-  intros i t s.
-  induction s.
-  - exact (ZO (ZerothOrderFormulaFOSubst i t z)).
-  - apply (FOExists (RingTermFOSubst i t r)).
-    destruct i as [i lti].
-    assert (i.+1 < foctx.+1) as H;[auto|].
-    destruct foctx;[fcrush|].
-    apply (IHs (Ordinal (m := i.+1) H)).
-    apply RingTermFOQuote.
-    exact t.
-  - apply (FOForall (RingTermFOSubst i t r)).
-    destruct i as [i lti].
-    assert (i.+1 < foctx.+1) as H;[auto|].
-    destruct foctx;[fcrush|].
-    apply (IHs (Ordinal (m := i.+1) H)).
-    apply RingTermFOQuote.
-    exact t.
-Defined.
-
-Definition FirstOrderFormulaSOSubst {soctx : SOctx} {foctx : FOctx} :
-  forall (i : 'I_(length soctx)),
-  (('I_(tnth (in_tuple soctx) i) -> 
-   @RingTerm (drop_index i soctx) foctx) -> 
-   @RingTerm (drop_index i soctx) foctx) ->
-  @FirstOrderFormula soctx foctx ->
-  @FirstOrderFormula (drop_index i soctx) foctx.
-  intros i f s.
-  induction s.
-  - exact (ZO (ZerothOrderFormulaSOSubst i f z)).
-  - apply (FOExists (RingTermSOSubst i f r)).
-    apply IHs.
-    intro t.
-    assert (0 < foctx.+1) as H;[auto|].
-    apply (fun x => RingTermFOQuote (f x)).
-    exact (fun x => (RingTermFOSubst (Ordinal H) RingZero (t x))).
-  - apply (FOForall (RingTermSOSubst i f r)).
-    apply IHs.
-    intro t.
-    assert (0 < foctx.+1) as H;[auto|].
-    apply (fun x => RingTermFOQuote (f x)).
-    exact (fun x => (RingTermFOSubst (Ordinal H) RingZero (t x))).
-Defined.
+(*Is this correct? Substitution should occure after quoting so things aren't deleted.*)
+Program Fixpoint FirstOrderFormulaSOSubst {soctx : SOctx} {foctx : FOctx}
+  (i : {n : nat | n < length soctx})
+  (f : ({m | m < lnth soctx i} -> 
+       @RingTerm (drop_index i soctx) foctx) -> 
+       @RingTerm (drop_index i soctx) foctx)
+  (s : @FirstOrderFormula soctx foctx) : @FirstOrderFormula (drop_index i soctx) foctx :=
+  match s with
+  | ZO z => ZO (ZerothOrderFormulaSOSubst i f z)
+  | FOExists b o => FOExists (RingTermSOSubst i f b)
+                             (FirstOrderFormulaSOSubst i (fun t => RingTermFOQuote (f (fun x => RingTermFOSubst 0 RingZero (t x)))) o)
+  | FOForall b o => FOForall (RingTermSOSubst i f b)
+                             (FirstOrderFormulaSOSubst i (fun t => RingTermFOQuote (f (fun x => RingTermFOSubst 0 RingZero (t x)))) o)
+  end.
 
 Inductive SecondOrderFormula {soctx : SOctx} {foctx : FOctx} : Type :=
 | FO : @FirstOrderFormula soctx foctx -> 
@@ -437,7 +412,7 @@ Inductive SecondOrderFormula {soctx : SOctx} {foctx : FOctx} : Type :=
               SecondOrderFormula.
 
 Program Fixpoint SecondOrderFormulaFOSubst {soctx : SOctx} {foctx : FOctx}
-  (i : 'I_foctx) (t : @RingTerm soctx foctx.-1)
+  (i : {n : nat | n < foctx}) (t : @RingTerm soctx foctx.-1)
   (s : @SecondOrderFormula soctx foctx) : @SecondOrderFormula soctx foctx.-1 :=
   match s with
   | FO f => FO (FirstOrderFormulaFOSubst i t f)
@@ -452,33 +427,30 @@ Next Obligation.
   move: bs; elim; hauto.
 Qed.
 
-Definition SecondOrderFormulaSOSubst {soctx : SOctx} {foctx : FOctx} :
-  forall (i : 'I_(length soctx)),
-  (('I_(tnth (in_tuple soctx) i) -> 
-   @RingTerm (drop_index i soctx) foctx) -> 
-   @RingTerm (drop_index i soctx) foctx) ->
-  @SecondOrderFormula soctx foctx ->
-  @SecondOrderFormula (drop_index i soctx) foctx.
-  move=> i f X;move: i f.
-  induction X; move=>i f2.
-  - exact (FO (FirstOrderFormulaSOSubst _ f2 f)).
-  - apply (SOExists (RingTermSOSubst i f2 y) [ seq (RingTermSOSubst i f2 r) | r <- bs ]).
-    assert (i.+1 < length (length bs :: soctx)) as H;[destruct i; auto|].
-    rewrite map_length.
-    apply (IHX (Ordinal (m := i.+1) H)).
-    move=> t.
-    apply RingTermSOQuote.
-    apply: f2.
-    move=> jo.
-    replace (tnth (in_tuple (length bs :: soctx))
-             (Ordinal (n:=length (length bs :: soctx)) (m:=i.+1) H))
-       with (tnth (in_tuple soctx) i) in t;
-    [|by do 2 rewrite (tnth_nth 0)].
-    apply t in jo; clear t.
-    assert (forall ctx, 0 < length (length bs :: ctx)) as H0;[fcrush|].
-    apply (RingTermSOSubst (Ordinal (H0 _)) (fun _ => RingZero)).
-    exact jo.
-Defined.
+(*Is this correct? Substitution should occure after quoting so things aren't deleted.*)
+Program Fixpoint SecondOrderFormulaSOSubst {soctx : SOctx} {foctx : FOctx}
+  (i : {n : nat | n < length soctx})
+  (f : ({m | m < lnth soctx i} -> 
+       @RingTerm (drop_index i soctx) foctx) -> 
+       @RingTerm (drop_index i soctx) foctx)
+  (s : @SecondOrderFormula soctx foctx) :
+  @SecondOrderFormula (drop_index i soctx) foctx :=
+  match s with
+  | FO o => FO (FirstOrderFormulaSOSubst i f o)
+  | SOExists y bs o => 
+    SOExists (RingTermSOSubst i f y)
+             [seq RingTermSOSubst i f r | r <- bs]
+             (SecondOrderFormulaSOSubst (i.+1 : {m | m < length (length bs :: soctx)})
+                (fun t => RingTermSOQuote (f (fun x => RingTermSOSubst 0 (fun=> RingZero) (t x))))
+                o)
+  end.
+Next Obligation.
+  unfold lnth;   unfold lnth in H.
+  by do 2 rewrite (tnth_nth 0) in H *.
+Qed.
+Next Obligation.
+  by rewrite map_length.
+Qed.
 
 (*
 Example sigma11_1 : @SecondOrderFormula nil 0.
@@ -552,12 +524,12 @@ Record SecondOrderFormulaModel : Type :=
         (*lt should be a strict, total order with a least element*)
         lt : relation R;
         so : StrictOrder lt;
-        lt_total : forall x y, lt x y \/ x==y \/ lt y x;
+        lt_total : forall x y, (lt x y) + ((x==y) + (lt y x));
         min : R;
         least_elem : forall x, lt min x
       }.
 
-Program Definition Subargs {n B} (f : {m : nat | m < n.+1} -> B) (i : {i : nat | i < n}) : B := f i.
+Program Definition Subargs {n B} (f : forall i : {m : nat | m < n.+1}, B i) (i : {i : nat | i < n}) : B i := f i.
 
 Program Definition ArgExtend {n B} (b : B) (f : {m : nat | m < n} -> B) (i : {m : nat | m < n.+1}) :=
   match i < n with
@@ -565,22 +537,169 @@ Program Definition ArgExtend {n B} (b : B) (f : {m : nat | m < n} -> B) (i : {m 
   | false => b
   end.
 
-Lemma OptionArgs_Lem {B} (i : {m : nat | m < 0}) : B.
+Lemma OptionArgs_Lem {B} (i : {m : nat | m < 0}) : B i.
 Proof. fcrush. Qed.
 
-(*Propagated options up to function argument*)
-Program Fixpoint OptionArgs {n B} (f : {m : nat | m < n} -> option B) :
-  option ({m : nat | m < n} -> B) :=
+Definition idx_ord_iso {n} : {m : nat | m < n} -> 'I_n.
+  move=> [i lti].
+  by exists i.
+Defined.
+
+Definition ord_idx_iso {n} : 'I_n -> {m : nat | m < n}.
+  move=> [i lti].
+  by exists i.
+Defined.
+
+Theorem idx_ord_iso_canc {n} : forall i : {m : nat | m < n}, ord_idx_iso (idx_ord_iso i) = i.
+  by move=> [i lti].
+Qed.
+
+Theorem ord_idx_iso_canc {n} : forall i : 'I_n, idx_ord_iso (ord_idx_iso i) = i.
+  by move=> [i lti].
+Qed.
+
+Definition mktuple_idx {n} {T} : ({m : nat | m < n} -> T) -> n.-tuple T.
+  move=> f.
+  apply mktuple=> o.
+  apply f, ord_idx_iso, o.
+Defined.
+
+Definition tnth_idx {n} {T} : n.-tuple T -> ({m : nat | m < n} -> T).
+  move=> f i.
+  apply idx_ord_iso in i.
+  move: i.
+  by apply tnth.
+Defined.
+
+Theorem mktuple_idx_canc {n} {T} : forall f : {m : nat | m < n} -> T, tnth_idx (mktuple_idx f) = f.
+  move=> f.
+  apply functional_extensionality.
+  move=> [x ltx].
+  unfold tnth_idx, mktuple_idx.
+  by rewrite tnth_mktuple.
+Qed.
+
+Theorem mktuple_tnth : 
+  forall [n : nat] [T' : Type] (t : n.-tuple T'),
+  mktuple (tnth t) = t.
+Proof.
+  move=> n T t.
+  symmetry; apply (tuple_map_ord t).
+Qed.
+
+Theorem tnth_idx_canc {n} {T} : forall t : n.-tuple T, mktuple_idx (tnth_idx t) = t.
+  move=> t.
+  unfold tnth_idx, mktuple_idx.
+  transitivity [tuple tnth t o | o < n].
+  f_equal; apply functional_extensionality=> x.
+  by rewrite ord_idx_iso_canc.
+  apply mktuple_tnth.
+Qed.
+
+(*Propagated options up to function application *)
+Program Fixpoint OptionArgs {n} {B : nat -> Type} (f : forall i : {m : nat | m < n}, option (B i)) :
+  option (forall i : {m : nat | m < n}, B i) :=
   match n with
   | 0 => Some OptionArgs_Lem
   | n.+1 => 
-    Option.bind
-      (fun f' => 
-        Option.bind
-          (fun b => Some (ArgExtend b f'))
-          (f n) )
-      (OptionArgs (Subargs f))
+    obind (fun fn : B n =>
+      obind (fun f : forall i : {m : nat | m < n}, B (` i) =>
+        Some (fun j : {m : nat | m < n.+1} =>
+          (if Nat.eqb j n as b0 return (Nat.eqb j n = b0 -> B j)
+            then fun jn0 : Nat.eqb (` j) n = true => 
+              fn
+            else fun jn1 : Nat.eqb j n = false => 
+              f j
+          ) (erefl (Nat.eqb j n)))) 
+        (OptionArgs (Subargs f))) 
+      (f n)
   end.
+Next Obligation.
+  by apply (elimT (PeanoNat.Nat.eqb_spec _ _)) in jn0.
+Qed.
+Next Obligation.
+  apply EqNat.beq_nat_false, Compare_dec.not_eq in jn1.
+  assert ((j < n) \/ (n < j));[by destruct jn1;[left|right];apply (introT ltP)|clear jn1].
+  hauto use: contra_ltn_leq.
+Qed.
+
+(*Interpreting a ring term with free variables as a function from ring elems. and functions. *)
+Program Fixpoint Ring_Denote (M : SecondOrderFormulaModel)
+  (v1 : seq (R M))
+  (v2 : seq {y : (R M) & 
+            {bs : seq (R M) & 
+            (forall i : {m | m < length bs}, { r : R M | lt M r (lnth bs i) }) -> { r : R M | lt M r y }
+            }})
+  (r : @RingTerm [seq length (projT1 (projT2 i)) | i <- v2] (length v1)) :
+  option (R M) :=
+  match r with
+  | RingVar m => Some (lnth v1 m)
+  | RingFun i t =>
+    obind (fun t : {m : nat | m < lnth [seq length (projT1 (projT2 i)) | i <- v2] i} -> RingTerm =>
+
+      )
+      (OptionArgs (fun x => Ring_Denote M v1 v2 t x))
+  | RingMinusOne => Some (-1)%R
+  | RingPlusOne => Some 1%R
+  | RingZero => Some 0%R
+  | RingPlus r1 r2 => (Ring_Denote M v1 v2 r1) + (Ring_Denote M v1 v2 r2)
+  | RingTimes r1 r2 => (Ring_Denote M v1 v2 r1) * (Ring_Denote M v1 v2 r2)
+  end.
+
+
+(*Interpreting a ring term with free variables as a function from ring elems. and functions. *)
+Definition Ring_Denote (M : SecondOrderFormulaModel)
+  (v1 : seq (R M))
+  (v2 : seq {y : (R M) & 
+            {bs : seq (R M) & 
+            (forall i : {m | m < length bs}, { r : R M | lt M r (lnth bs i) }) -> { r : R M | lt M r y }
+            }})
+  (s : @RingTerm [seq length (projT1 (projT2 i)) | i <- v2] (length v1)) :
+  option (R M).
+  move:s; elim.
+  - move=> idx; exact (Some (lnth (in_tuple v1) idx)).
+  - move=> idx _ IH.
+    rewrite map_lnth in IH.
+    destruct (lnth _ _) as [y[bs f]]; simpl in IH.
+    assert (forall i : {m : nat | m < length bs}, option {r : R M | lt M r (lnth bs i)}).
+    * move=> i.
+      apply (fun x => obind x (IH i)).
+      intro r.
+      destruct (lt_total M r (lnth bs i)).
+      + apply Some; exists r; assumption.
+      + exact None.
+    clear IH.
+    apply OptionArgs in X.
+    apply (fun x => obind x X); clear X.
+    move=> x.
+    apply f in x.
+    exact (Some (` x)).
+  - exact (Some (-1)%R).
+  - exact (Some 1%R).
+  - exact (Some 0%R).
+  - move=> _ r1 _ r2; exact (obind (fun r1 => obind (fun r2 => Some (r1 + r2)%R) r2) r1).
+  - move=> _ r1 _ r2; exact (obind (fun r1 => obind (fun r2 => Some (r1 * r2)%R) r2) r1).
+Defined.
+
+(*
+Definition Ring_Denote (M : SecondOrderFormulaModel)
+  (v1 : seq (R M))
+  (v2 : seq {y : (R M) & 
+            {bs : seq (R M) & 
+            (forall i : {m | m < length bs}, { r : R M | lt M r (lnth bs i) }) -> { r : R M | lt M r y }
+            }})
+  (s : @RingTerm [seq length (projT1 (projT2 i)) | i <- v2] (length v1)) :
+  option (R M) :=
+  match r with
+  | RingVar m => Some (lnth v1 m)
+  | RingFun i f => RingFun (i.+1) (fun x => RingTermSOQuote (f x))
+  | RingMinusOne => Some (-1)%R
+  | RingPlusOne => Some 1%R
+  | RingZero => Some 0%R
+  | RingPlus r1 r2 => (Ring_Denote M v1 v2 r1) + (Ring_Denote M v1 v2 r2)
+  | RingTimes r1 r2 => (Ring_Denote M v1 v2 r1) * (Ring_Denote M v1 v2 r2)
+  end.
+*)
 
 (*Interpreting a ring term with free variables as a function from ring elems. and functions. *)
 Definition Ring_Denote (M : SecondOrderFormulaModel)
