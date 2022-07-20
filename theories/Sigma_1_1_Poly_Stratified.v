@@ -623,6 +623,52 @@ Next Obligation.
   hauto use: contra_ltn_leq.
 Qed.
 
+(*How to write this nicer?*)
+Definition Rin_Denot_con (M : SecondOrderFormulaModel)
+  (v1 : seq (R M))
+  (v2 : seq {y : (R M) & 
+            {bs : seq (R M) & 
+            (forall i : {m | m < length bs}, { r : R M | lt M r (lnth bs i) }) -> { r : R M | lt M r y }
+            }}) : 
+  forall i : {m : nat | m < length [seq length (projT1 (projT2 i)) | i <- v2]},
+  ({m : nat | m < lnth [seq length (projT1 (projT2 i0)) | i0 <- v2] i} -> option (R M))
+  -> option (R M).
+    move=> idx IH.
+    rewrite map_lnth in IH.
+    destruct (lnth _ _) as [y[bs f]]; simpl in IH.
+    assert (forall i : {m : nat | m < length bs}, option {r : R M | lt M r (lnth bs i)}).
+    * move=> i.
+      apply (fun x => obind x (IH i)).
+      intro r.
+      destruct (lt_total M r (lnth bs i)).
+      + apply Some; exists r; assumption.
+      + exact None.
+    clear IH.
+    assert (forall i : {m : nat | m < length bs},
+    option {r : R M | lt M r (nth 0%R bs (` i))}) as X'.
+    move=>i.
+    replace {r : R M | lt M r (nth 0%R bs (` i))}
+       with {r : R M | lt M r (lnth bs i)}.
+    apply X.
+    f_equal.
+    apply functional_extensionality=> x.
+    f_equal.
+    unfold lnth; rewrite (tnth_nth 0%R).
+    by destruct i. 
+    clear X.
+    apply (OptionArgs (B := fun x => {r : R M | lt M r (nth 0%R bs x)})) in X'.
+    apply (fun x => obind x X'); clear X'.
+    move=> x.
+    assert (forall i : {m : nat | m < length bs}, {r : R M | lt M r (lnth bs i)}) as x'.
+    move=> i.
+    replace {r : R M | lt M r (lnth bs i)} with {r : R M | lt M r (nth 0%R bs (` i))}.
+    apply x.
+    f_equal; apply functional_extensionality=> x0; f_equal.
+    unfold lnth; rewrite (tnth_nth 0%R); by destruct i. clear x.
+    apply f in x'.
+    exact (Some (` x')).
+Defined.
+
 (*Interpreting a ring term with free variables as a function from ring elems. and functions. *)
 Program Fixpoint Ring_Denote (M : SecondOrderFormulaModel)
   (v1 : seq (R M))
@@ -634,105 +680,23 @@ Program Fixpoint Ring_Denote (M : SecondOrderFormulaModel)
   option (R M) :=
   match r with
   | RingVar m => Some (lnth v1 m)
-  | RingFun i t =>
-    obind (fun t : {m : nat | m < lnth [seq length (projT1 (projT2 i)) | i <- v2] i} -> RingTerm =>
-
-      )
-      (OptionArgs (fun x => Ring_Denote M v1 v2 t x))
+  | RingFun i t => Rin_Denot_con M v1 v2 i (fun x => Ring_Denote M v1 v2 (t x))
   | RingMinusOne => Some (-1)%R
   | RingPlusOne => Some 1%R
   | RingZero => Some 0%R
-  | RingPlus r1 r2 => (Ring_Denote M v1 v2 r1) + (Ring_Denote M v1 v2 r2)
-  | RingTimes r1 r2 => (Ring_Denote M v1 v2 r1) * (Ring_Denote M v1 v2 r2)
+  | RingPlus r1 r2 => 
+    (obind (fun r1 => obind (fun r2 => Some (r1 + r2)%R) (Ring_Denote M v1 v2 r2)) (Ring_Denote M v1 v2 r1))
+  | RingTimes r1 r2 => 
+    (obind (fun r1 => obind (fun r2 => Some (r1 * r2)%R) (Ring_Denote M v1 v2 r2)) (Ring_Denote M v1 v2 r1))
   end.
-
-
-(*Interpreting a ring term with free variables as a function from ring elems. and functions. *)
-Definition Ring_Denote (M : SecondOrderFormulaModel)
-  (v1 : seq (R M))
-  (v2 : seq {y : (R M) & 
-            {bs : seq (R M) & 
-            (forall i : {m | m < length bs}, { r : R M | lt M r (lnth bs i) }) -> { r : R M | lt M r y }
-            }})
-  (s : @RingTerm [seq length (projT1 (projT2 i)) | i <- v2] (length v1)) :
-  option (R M).
-  move:s; elim.
-  - move=> idx; exact (Some (lnth (in_tuple v1) idx)).
-  - move=> idx _ IH.
-    rewrite map_lnth in IH.
-    destruct (lnth _ _) as [y[bs f]]; simpl in IH.
-    assert (forall i : {m : nat | m < length bs}, option {r : R M | lt M r (lnth bs i)}).
-    * move=> i.
-      apply (fun x => obind x (IH i)).
-      intro r.
-      destruct (lt_total M r (lnth bs i)).
-      + apply Some; exists r; assumption.
-      + exact None.
-    clear IH.
-    apply OptionArgs in X.
-    apply (fun x => obind x X); clear X.
-    move=> x.
-    apply f in x.
-    exact (Some (` x)).
-  - exact (Some (-1)%R).
-  - exact (Some 1%R).
-  - exact (Some 0%R).
-  - move=> _ r1 _ r2; exact (obind (fun r1 => obind (fun r2 => Some (r1 + r2)%R) r2) r1).
-  - move=> _ r1 _ r2; exact (obind (fun r1 => obind (fun r2 => Some (r1 * r2)%R) r2) r1).
-Defined.
-
-(*
-Definition Ring_Denote (M : SecondOrderFormulaModel)
-  (v1 : seq (R M))
-  (v2 : seq {y : (R M) & 
-            {bs : seq (R M) & 
-            (forall i : {m | m < length bs}, { r : R M | lt M r (lnth bs i) }) -> { r : R M | lt M r y }
-            }})
-  (s : @RingTerm [seq length (projT1 (projT2 i)) | i <- v2] (length v1)) :
-  option (R M) :=
-  match r with
-  | RingVar m => Some (lnth v1 m)
-  | RingFun i f => RingFun (i.+1) (fun x => RingTermSOQuote (f x))
-  | RingMinusOne => Some (-1)%R
-  | RingPlusOne => Some 1%R
-  | RingZero => Some 0%R
-  | RingPlus r1 r2 => (Ring_Denote M v1 v2 r1) + (Ring_Denote M v1 v2 r2)
-  | RingTimes r1 r2 => (Ring_Denote M v1 v2 r1) * (Ring_Denote M v1 v2 r2)
-  end.
-*)
-
-(*Interpreting a ring term with free variables as a function from ring elems. and functions. *)
-Definition Ring_Denote (M : SecondOrderFormulaModel)
-  (v1 : seq (R M))
-  (v2 : seq {n : nat & 
-            {y : (R M) & 
-            {bs : n.-tuple (R M) & 
-            (forall i : 'I_n, { r : R M | lt M r (tnth bs i) }) -> { r : R M | lt M r y }
-            }}})
-  (s : @RingTerm [seq projT1 i | i <- v2] (length v1)) :
-  option (R M).
-  move:s; elim.
-  - move=> idx; exact (Some (tnth (in_tuple v1) idx)).
-  - move=> idx _ IH.
-    rewrite map_nth in IH.
-    destruct (tnth _ _) as [n[y[bs f]]]; simpl in IH.
-    exact (f IH).
-  - exact (Some (-1)%R).
-  - exact (Some 1%R).
-  - exact (Some 0%R).
-  - move=> _ r1 _ r2; exact (r1 + r2)%R.
-  - move=> _ r1 _ r2; exact (r1 * r2)%R.
-Defined.
 
 Fixpoint ZerothOrder_Denote (M : SecondOrderFormulaModel) 
   (v1 : seq (R M))
-  (v2 : seq {n : nat & 
-            {y : (R M) & 
-            {bs : n.-tuple (R M) & 
-            {f : ('I_n -> R M) -> R M | 
-            (forall (t : 'I_n -> R M), (forall x : 'I_n, lt M (t x) (tnth bs x)) -> lt M (f t) y)
-            }}}})
-  (f : @ZerothOrderFormula [seq projT1 i | i <- v2] (length v1)) : Prop :=
+  (v2 : seq {y : (R M) & 
+            {bs : seq (R M) & 
+            (forall i : {m | m < length bs}, { r : R M | lt M r (lnth bs i) }) -> { r : R M | lt M r y }
+            }})
+  (f : @ZerothOrderFormula [seq length (projT1 (projT2 i)) | i <- v2] (length v1)) : Prop :=
   match f with
   | ZOTrue => true
   | ZOFalse => false
@@ -745,71 +709,80 @@ Fixpoint ZerothOrder_Denote (M : SecondOrderFormulaModel)
 
 Fixpoint FirstOrder_Denote (M : SecondOrderFormulaModel) 
   (v1 : seq (R M))
-  (v2 : seq {n : nat & 
-            {y : (R M) & 
-            {bs : n.-tuple (R M) & 
-            {f : ('I_n -> R M) -> R M | 
-            (forall (t : 'I_n -> R M), (forall x : 'I_n, lt M (t x) (tnth bs x)) -> lt M (f t) y)
-            }}}})
-  (f : @FirstOrderFormula [seq projT1 i | i <- v2] (length v1)) : Prop :=
+  (v2 : seq {y : (R M) & 
+            {bs : seq (R M) & 
+            (forall i : {m | m < length bs}, { r : R M | lt M r (lnth bs i) }) -> { r : R M | lt M r y }
+            }})
+  (f : @FirstOrderFormula [seq length (projT1 (projT2 i)) | i <- v2] (length v1)) : Prop :=
   match f with
   | ZO z => ZerothOrder_Denote M v1 v2 z
-  | FOExists n f => 
-    exists (r : R M), 
-      lt M r (naturalRingElement n) /\
-      FirstOrder_Denote M (r :: v1) v2 f
-  | FOForall n f =>
-    forall (r : R M), 
-      lt M r (naturalRingElement n) ->
-      FirstOrder_Denote M (r :: v1) v2 f
+  | FOExists p f => 
+    match Ring_Denote M v1 v2 p with
+    | None => false
+    | Some a =>
+      exists (r : R M), 
+        lt M r a /\
+        FirstOrder_Denote M (r :: v1) v2 f
+    end
+  | FOForall p f =>
+    match Ring_Denote M v1 v2 p with
+    | None => false
+    | Some a =>
+      forall (r : R M), 
+        lt M r a ->
+        FirstOrder_Denote M (r :: v1) v2 f
+    end
+  end.
+
+Fixpoint otraverse {T} (s : seq (option T)) : option (seq T) :=
+  match s with
+  | [::] => Some [::]
+  | (x :: xs) =>
+    obind (fun x => obind (fun xs => Some (x :: xs)) (otraverse xs)) x
   end.
 
 (*Interpreting a ring term with free variables as a function from ring elems. and functions. *)
 Program Fixpoint SecondOrder_Denote (M : SecondOrderFormulaModel) 
   (v1 : seq (R M))
-  (v2 : seq {n : nat & 
-            {y : (R M) & 
-            {bs : n.-tuple (R M) & 
-            {f : ('I_n -> R M) -> R M | 
-            (forall (t : 'I_n -> R M), (forall x : 'I_n, lt M (t x) (tnth bs x)) -> lt M (f t) y)
-            }}}})
-  (f : @SecondOrderFormula [seq projT1 i | i <- v2] (length v1)) : Prop :=
+  (v2 : seq {y : (R M) & 
+            {bs : seq (R M) & 
+            (forall i : {m | m < length bs}, { r : R M | lt M r (lnth bs i) }) -> { r : R M | lt M r y }
+            }})
+  (f : @SecondOrderFormula [seq length (projT1 (projT2 i)) | i <- v2] (length v1)) : Prop :=
   match f with
   | FO f => FirstOrder_Denote M v1 v2 f
-  | SOExists y bs f => 
-    exists (rf : ('I_(length bs) -> R M) -> R M)
-    (p : forall (t : 'I_(length bs) -> R M),
-          (forall x : 'I_(length bs), 
-            lt M (t x) (naturalRingElement (tnth (in_tuple bs) x))) ->
-            lt M (rf t) (naturalRingElement y)),
-    SecondOrder_Denote M v1 
-      (existT _ (length bs) 
-      (existT _ (naturalRingElement y) 
-      (existT _ (in_tuple (map naturalRingElement bs))
-      (exist _ rf p))) :: v2) f
+  | SOExists p ps f =>
+    let p' := Ring_Denote M v1 v2 p in
+    let ps' := otraverse (map (Ring_Denote M v1 v2) ps) in
+    match obind (fun y => obind (fun bs => Some (y, bs)) ps') p' with
+    | None => false
+    | Some (y, bs) =>
+      exists rf : (forall i : {m | m < length bs}, { r : R M | lt M r (lnth bs i) }) 
+               -> { r : R M | lt M r y },
+      SecondOrder_Denote M v1 
+        (existT _ y
+        (existT _ bs
+        rf) :: v2) f
+    end
   end.
 Next Obligation.
-  by rewrite <- (map_length (@naturalRingElement (R M))).
+  f_equal.
+  remember (Ring_Denote M v1 v2) as F; clear HeqF.
+  clear rf f.
+  destruct (F p);[|fcrush].
+  simpl in Heq_anonymous.
+  move: ps bs Heq_anonymous.
+  elim.
+  move=> [|x bs] H;[auto|fcrush].
+  move=> z ps IH bs H.
+  simpl in H.
+  destruct (F z);[|hauto].
+  simpl in H.
+  destruct bs;[destruct (otraverse _);[fcrush|hauto]|].
+  simpl.
+  assert (length ps = length bs);[|auto].
+  apply: IH.
+  destruct (otraverse [seq F i | i <- ps]);[hauto|fcrush].
 Qed.
-Next Obligation.
-  rewrite map_nth_3.
-  do 2 f_equal.
-  apply proof_irrelevance.
-Qed.
-
-(*
-Note: This is impossible. Consider if one of the bs bounds is 0; then it's impossible
-      for any applied argument to type check. Bounds should be part of the proposition,
-      not enforced on the type level.
-
-Definition Sigma11_Pred (M : SecondOrderFormulaModel)
-  (v1 : seq (R M))
-  (v2 : seq {n : nat & 
-            {y : (R M) & 
-            {bs : n.-tuple (R M) & 
-            ((forall o : 'I_n, {r : (R M) | lt M r (tnth bs o)}) -> {r : R M | lt M r y})}}})
-  (s : @RingTerm [seq projT1 i | i <- v2] (length v1)) :
-  R M := ...
-*)
 
 End Sigma_1_1_Denotation.
