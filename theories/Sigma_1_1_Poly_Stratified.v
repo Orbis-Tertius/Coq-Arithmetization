@@ -113,10 +113,30 @@ Inductive RingTerm {soctx : SOctx} {foctx : FOctx} : Type :=
 | RingPlusOne : RingTerm
 | RingZero : RingTerm
 | RingPlus : RingTerm -> RingTerm -> RingTerm
-| RingTimes : RingTerm -> RingTerm -> RingTerm.
+| RingTimes : RingTerm -> RingTerm -> RingTerm
+| RingInd : RingTerm -> RingTerm -> RingTerm.
+
+Inductive PolyTerm {foctx : FOctx} : Type :=
+| PolyVar : {m : nat | m < foctx} -> PolyTerm
+| PolyMinusOne : PolyTerm
+| PolyPlusOne : PolyTerm
+| PolyZero : PolyTerm
+| PolyPlus : PolyTerm -> PolyTerm -> PolyTerm
+| PolyTimes : PolyTerm -> PolyTerm -> PolyTerm.
+
+Fixpoint Poly_Ring {soctx : SOctx} {foctx : FOctx} 
+  (r : @PolyTerm foctx) : @RingTerm soctx foctx :=
+  match r with
+  | PolyVar m => RingVar m
+  | PolyMinusOne => RingMinusOne
+  | PolyPlusOne => RingPlusOne
+  | PolyZero => RingZero
+  | PolyPlus r1 r2 => RingPlus (Poly_Ring r1) (Poly_Ring r2)
+  | PolyTimes r1 r2 => RingTimes (Poly_Ring r1) (Poly_Ring r2)
+  end.
 
 Program Fixpoint RingTermFOQuote {soctx} {foctx}
-  (r : @RingTerm soctx foctx) : RingTerm (soctx := soctx) (foctx := foctx.+1) :=
+  (r : @RingTerm soctx foctx) : @RingTerm soctx (foctx.+1) :=
   match r with
   | RingVar m => RingVar (m.+1)
   | RingFun i f => RingFun i (fun x => RingTermFOQuote (f x))
@@ -125,6 +145,18 @@ Program Fixpoint RingTermFOQuote {soctx} {foctx}
   | RingZero => RingZero
   | RingPlus r1 r2 => RingPlus (RingTermFOQuote r1) (RingTermFOQuote r2)
   | RingTimes r1 r2 => RingTimes (RingTermFOQuote r1) (RingTermFOQuote r2)
+  | RingInd r1 r2 => RingInd (RingTermFOQuote r1) (RingTermFOQuote r2)
+  end.
+
+Program Fixpoint PolyTermFOQuote {foctx}
+  (r : @PolyTerm foctx) : @PolyTerm (foctx.+1) :=
+  match r with
+  | PolyVar m => PolyVar (m.+1)
+  | PolyMinusOne => PolyMinusOne
+  | PolyPlusOne => PolyPlusOne
+  | PolyZero => PolyZero
+  | PolyPlus r1 r2 => PolyPlus (PolyTermFOQuote r1) (PolyTermFOQuote r2)
+  | PolyTimes r1 r2 => PolyTimes (PolyTermFOQuote r1) (PolyTermFOQuote r2)
   end.
 
 Program Fixpoint RingTermSOQuote {soctx} {foctx} {bs}
@@ -137,6 +169,7 @@ Program Fixpoint RingTermSOQuote {soctx} {foctx} {bs}
   | RingZero => RingZero
   | RingPlus r1 r2 => RingPlus (RingTermSOQuote r1) (RingTermSOQuote r2)
   | RingTimes r1 r2 => RingTimes (RingTermSOQuote r1) (RingTermSOQuote r2)
+  | RingInd r1 r2 => RingInd (RingTermSOQuote r1) (RingTermSOQuote r2)
   end.
 Next Obligation.
   simpl in H.
@@ -161,6 +194,37 @@ Program Fixpoint RingTermFOSubst {soctx : SOctx} {foctx : FOctx}
   | RingZero => RingZero
   | RingPlus r1 r2 => RingPlus (RingTermFOSubst i t r1) (RingTermFOSubst i t r2)
   | RingTimes r1 r2 => RingTimes (RingTermFOSubst i t r1) (RingTermFOSubst i t r2)
+  | RingInd r1 r2 => RingInd (RingTermFOSubst i t r1) (RingTermFOSubst i t r2)
+  end.
+Next Obligation.
+  symmetry in Heq_anonymous.
+  rewrite <- Compare_dec.nat_compare_lt in Heq_anonymous.
+  apply (introT (b := i < m) ltP) in Heq_anonymous.
+  sauto lq: on.
+Qed.
+Next Obligation.
+  symmetry in Heq_anonymous.
+  rewrite <- Compare_dec.nat_compare_gt in Heq_anonymous.
+  apply (introT (b := m < i) ltP) in Heq_anonymous.
+  hauto lq: on use: leq_ltn_trans unfold: Nat.pred.
+Qed.
+
+Program Fixpoint PolyTermFOSubst {foctx : FOctx}
+  (i : {m : nat | m < foctx})
+  (t : @PolyTerm (foctx.-1)) (r : @PolyTerm foctx) :
+  @PolyTerm (foctx.-1) :=
+  match r with
+  | PolyVar m => 
+    match (Nat.compare i m) with
+    | Eq => t
+    | Lt => PolyVar (m.-1)
+    | Gt => PolyVar m
+    end
+  | PolyMinusOne => PolyMinusOne
+  | PolyPlusOne => PolyPlusOne
+  | PolyZero => PolyZero
+  | PolyPlus r1 r2 => PolyPlus (PolyTermFOSubst i t r1) (PolyTermFOSubst i t r2)
+  | PolyTimes r1 r2 => PolyTimes (PolyTermFOSubst i t r1) (PolyTermFOSubst i t r2)
   end.
 Next Obligation.
   symmetry in Heq_anonymous.
@@ -176,7 +240,7 @@ Next Obligation.
 Qed.
 
 (*Substitution acts as an unquote when applied after quoting.*)
-Theorem FOsubsts_unquote {soctx : SOctx} {foctx : FOctx} :
+Theorem Ring_FO_Unquote {soctx : SOctx} {foctx : FOctx} :
   forall (x : @RingTerm soctx foctx)
          (e : @RingTerm soctx foctx)
          (H : 0 < foctx.+1),
@@ -191,6 +255,18 @@ Proof.
     apply functional_extensionality.
     move => [m ltm].
     by rewrite rH.
+Qed.
+
+(*Substitution acts as an unquote when applied after quoting.*)
+Theorem Poly_FO_Unquote {foctx : FOctx} :
+  forall (x : @PolyTerm foctx)
+         (e : @PolyTerm foctx)
+         (H : 0 < foctx.+1),
+  PolyTermFOSubst (exist _ 0 H) x (PolyTermFOQuote e) = e.
+Proof.
+  move=> x; elim; try hauto q:on.
+  - move=> [i lti] H.
+    cbn; do 2 f_equal; apply proof_irrelevance.
 Qed.
 
 Program Fixpoint RingTermSOSubst {soctx : SOctx} {foctx : FOctx}
@@ -211,6 +287,7 @@ Program Fixpoint RingTermSOSubst {soctx : SOctx} {foctx : FOctx}
   | RingZero => RingZero
   | RingPlus r1 r2 => RingPlus (RingTermSOSubst i f r1) (RingTermSOSubst i f r2)
   | RingTimes r1 r2 => RingTimes (RingTermSOSubst i f r1) (RingTermSOSubst i f r2)
+  | RingInd r1 r2 => RingInd (RingTermSOSubst i f r1) (RingTermSOSubst i f r2)
   end.
 Next Obligation.
   symmetry in Heq_anonymous.
@@ -363,18 +440,18 @@ Program Fixpoint ZerothOrderFormulaSOSubst {soctx : SOctx} {foctx : FOctx}
 
 Inductive FirstOrderFormula {soctx : SOctx} {foctx : FOctx} : Type :=
 | ZO : @ZerothOrderFormula soctx foctx -> FirstOrderFormula
-| FOExists : @RingTerm soctx foctx -> FirstOrderFormula (foctx := foctx.+1) -> FirstOrderFormula
-| FOForall : @RingTerm soctx foctx -> FirstOrderFormula (foctx := foctx.+1) -> FirstOrderFormula. 
+| FOExists : @PolyTerm foctx -> FirstOrderFormula (foctx := foctx.+1) -> FirstOrderFormula
+| FOForall : @PolyTerm foctx -> FirstOrderFormula (foctx := foctx.+1) -> FirstOrderFormula. 
 
 Program Fixpoint FirstOrderFormulaFOSubst {soctx : SOctx} {foctx : FOctx}
-  (i : {n : nat | n < foctx}) (t : @RingTerm soctx foctx.-1)
+  (i : {n : nat | n < foctx}) (t : @PolyTerm foctx.-1)
   (s : @FirstOrderFormula soctx foctx) : @FirstOrderFormula soctx foctx.-1 :=
   match s with
-  | ZO z => ZO (ZerothOrderFormulaFOSubst i t z)
-  | FOExists b f => FOExists (RingTermFOSubst i t b)
-                             (FirstOrderFormulaFOSubst (i.+1) (RingTermFOQuote t) f)
-  | FOForall b f => FOForall (RingTermFOSubst i t b)
-                             (FirstOrderFormulaFOSubst (i.+1) (RingTermFOQuote t) f)
+  | ZO z => ZO (ZerothOrderFormulaFOSubst i (Poly_Ring t) z)
+  | FOExists b f => FOExists (PolyTermFOSubst i t b)
+                             (FirstOrderFormulaFOSubst (i.+1) (PolyTermFOQuote t) f)
+  | FOForall b f => FOForall (PolyTermFOSubst i t b)
+                             (FirstOrderFormulaFOSubst (i.+1) (PolyTermFOQuote t) f)
   end.
 Next Obligation.
   by destruct foctx.
@@ -398,28 +475,28 @@ Program Fixpoint FirstOrderFormulaSOSubst {soctx : SOctx} {foctx : FOctx}
   (s : @FirstOrderFormula soctx foctx) : @FirstOrderFormula (drop_index i soctx) foctx :=
   match s with
   | ZO z => ZO (ZerothOrderFormulaSOSubst i f z)
-  | FOExists b o => FOExists (RingTermSOSubst i f b)
+  | FOExists b o => FOExists b
                              (FirstOrderFormulaSOSubst i (fun t => RingTermFOQuote (f (fun x => RingTermFOSubst 0 RingZero (t x)))) o)
-  | FOForall b o => FOForall (RingTermSOSubst i f b)
+  | FOForall b o => FOForall b
                              (FirstOrderFormulaSOSubst i (fun t => RingTermFOQuote (f (fun x => RingTermFOSubst 0 RingZero (t x)))) o)
   end.
 
 Inductive SecondOrderFormula {soctx : SOctx} {foctx : FOctx} : Type :=
 | FO : @FirstOrderFormula soctx foctx -> 
        SecondOrderFormula
-| SOExists : forall (y : @RingTerm soctx foctx) (bs : seq (@RingTerm soctx foctx)), 
+| SOExists : forall (y : @PolyTerm foctx) (bs : seq (@PolyTerm foctx)), 
               SecondOrderFormula (soctx := length bs :: soctx) ->
               SecondOrderFormula.
 
 Program Fixpoint SecondOrderFormulaFOSubst {soctx : SOctx} {foctx : FOctx}
-  (i : {n : nat | n < foctx}) (t : @RingTerm soctx foctx.-1)
+  (i : {n : nat | n < foctx}) (t : @PolyTerm foctx.-1)
   (s : @SecondOrderFormula soctx foctx) : @SecondOrderFormula soctx foctx.-1 :=
   match s with
   | FO f => FO (FirstOrderFormulaFOSubst i t f)
   | SOExists y bs f => 
-    SOExists (RingTermFOSubst i t y) 
-             [ seq (RingTermFOSubst i t r) | r <- bs ]
-             (SecondOrderFormulaFOSubst i (RingTermSOQuote (bs := length bs) t) f)
+    SOExists (PolyTermFOSubst i t y) 
+             [ seq (PolyTermFOSubst i t r) | r <- bs ]
+             (SecondOrderFormulaFOSubst i t f)
   end.
 Next Obligation.
   clear f.
@@ -438,18 +515,14 @@ Program Fixpoint SecondOrderFormulaSOSubst {soctx : SOctx} {foctx : FOctx}
   match s with
   | FO o => FO (FirstOrderFormulaSOSubst i f o)
   | SOExists y bs o => 
-    SOExists (RingTermSOSubst i f y)
-             [seq RingTermSOSubst i f r | r <- bs]
-             (SecondOrderFormulaSOSubst (i.+1 : {m | m < length (length bs :: soctx)})
-                (fun t => RingTermSOQuote (f (fun x => RingTermSOSubst 0 (fun=> RingZero) (t x))))
-                o)
+    SOExists y bs
+      (SecondOrderFormulaSOSubst (i.+1 : {m | m < length (length bs :: soctx)})
+        (fun t => RingTermSOQuote (f (fun x => RingTermSOSubst 0 (fun=> RingZero) (t x))))
+        o)
   end.
 Next Obligation.
-  unfold lnth;   unfold lnth in H.
+  unfold lnth; unfold lnth in H.
   by do 2 rewrite (tnth_nth 0) in H *.
-Qed.
-Next Obligation.
-  by rewrite map_length.
 Qed.
 
 (*
@@ -688,6 +761,25 @@ Program Fixpoint Ring_Denote (M : SecondOrderFormulaModel)
     (obind (fun r1 => obind (fun r2 => Some (r1 + r2)%R) (Ring_Denote M v1 v2 r2)) (Ring_Denote M v1 v2 r1))
   | RingTimes r1 r2 => 
     (obind (fun r1 => obind (fun r2 => Some (r1 * r2)%R) (Ring_Denote M v1 v2 r2)) (Ring_Denote M v1 v2 r1))
+  | RingInd r1 r2 => 
+    (obind (fun r1 => obind (fun r2 => 
+      match lt_total M r1 r2 with
+      | inl _ => Some 1%R
+      | inr _ => Some 0%R
+      end) (Ring_Denote M v1 v2 r2)) (Ring_Denote M v1 v2 r1))
+  end.
+
+(*Interpreting a ring term with free variables as a function from ring elems. and functions. *)
+Program Fixpoint Poly_Denote (M : SecondOrderFormulaModel)
+  (v1 : seq (R M))
+  (r : @PolyTerm (length v1)) : R M :=
+  match r with
+  | PolyVar m => lnth v1 m
+  | PolyMinusOne => (-1)%R
+  | PolyPlusOne => 1%R
+  | PolyZero => 0%R
+  | PolyPlus r1 r2 => Poly_Denote M v1 r2 + Poly_Denote M v1 r1
+  | PolyTimes r1 r2 => Poly_Denote M v1 r2 * Poly_Denote M v1 r1
   end.
 
 Fixpoint ZerothOrder_Denote (M : SecondOrderFormulaModel) 
@@ -704,7 +796,15 @@ Fixpoint ZerothOrder_Denote (M : SecondOrderFormulaModel)
   | ZOAnd f1 f2 => (ZerothOrder_Denote M v1 v2 f1) /\ (ZerothOrder_Denote M v1 v2 f2)
   | ZOOr f1 f2 => (ZerothOrder_Denote M v1 v2 f1) \/ (ZerothOrder_Denote M v1 v2 f2)
   | ZOImp f1 f2 => (ZerothOrder_Denote M v1 v2 f1) -> (ZerothOrder_Denote M v1 v2 f2)
-  | ZOEq r1 r2 => Ring_Denote M v1 v2 r1 = Ring_Denote M v1 v2 r2
+  | ZOEq r1 r2 => 
+    match Ring_Denote M v1 v2 r1 with
+    | None => false
+    | Some r1 =>
+      match Ring_Denote M v1 v2 r2 with
+      | None => false
+      | Some r2 => r1 = r2
+      end
+    end
   end.
 
 Fixpoint FirstOrder_Denote (M : SecondOrderFormulaModel) 
@@ -717,21 +817,13 @@ Fixpoint FirstOrder_Denote (M : SecondOrderFormulaModel)
   match f with
   | ZO z => ZerothOrder_Denote M v1 v2 z
   | FOExists p f => 
-    match Ring_Denote M v1 v2 p with
-    | None => false
-    | Some a =>
-      exists (r : R M), 
-        lt M r a /\
-        FirstOrder_Denote M (r :: v1) v2 f
-    end
+    exists (r : R M), 
+      lt M r (Poly_Denote M v1 p) /\
+      FirstOrder_Denote M (r :: v1) v2 f
   | FOForall p f =>
-    match Ring_Denote M v1 v2 p with
-    | None => false
-    | Some a =>
-      forall (r : R M), 
-        lt M r a ->
-        FirstOrder_Denote M (r :: v1) v2 f
-    end
+    forall (r : R M), 
+      lt M r (Poly_Denote M v1 p) ->
+      FirstOrder_Denote M (r :: v1) v2 f
   end.
 
 Fixpoint otraverse {T} (s : seq (option T)) : option (seq T) :=
@@ -751,38 +843,19 @@ Program Fixpoint SecondOrder_Denote (M : SecondOrderFormulaModel)
   (f : @SecondOrderFormula [seq length (projT1 (projT2 i)) | i <- v2] (length v1)) : Prop :=
   match f with
   | FO f => FirstOrder_Denote M v1 v2 f
-  | SOExists p ps f =>
-    let p' := Ring_Denote M v1 v2 p in
-    let ps' := otraverse (map (Ring_Denote M v1 v2) ps) in
-    match obind (fun y => obind (fun bs => Some (y, bs)) ps') p' with
-    | None => false
-    | Some (y, bs) =>
-      exists rf : (forall i : {m | m < length bs}, { r : R M | lt M r (lnth bs i) }) 
-               -> { r : R M | lt M r y },
-      SecondOrder_Denote M v1 
-        (existT _ y
-        (existT _ bs
-        rf) :: v2) f
-    end
+  | SOExists y bs f =>
+    let y' := Poly_Denote M v1 y in
+    let bs' := [seq Poly_Denote M v1 i | i <- bs] in
+    exists rf : (forall i : {m | m < length bs}, { r : R M | lt M r (lnth bs' i) }) 
+              -> { r : R M | lt M r y' },
+    SecondOrder_Denote M v1 
+    (existT _ y' (existT _ bs' rf) :: v2) f
   end.
 Next Obligation.
-  f_equal.
-  remember (Ring_Denote M v1 v2) as F; clear HeqF.
-  clear rf f.
-  destruct (F p);[|fcrush].
-  simpl in Heq_anonymous.
-  move: ps bs Heq_anonymous.
-  elim.
-  move=> [|x bs] H;[auto|fcrush].
-  move=> z ps IH bs H.
-  simpl in H.
-  destruct (F z);[|hauto].
-  simpl in H.
-  destruct bs;[destruct (otraverse _);[fcrush|hauto]|].
-  simpl.
-  assert (length ps = length bs);[|auto].
-  apply: IH.
-  destruct (otraverse [seq F i | i <- ps]);[hauto|fcrush].
+  by rewrite map_length.
+Qed.
+Next Obligation.
+  by rewrite map_length.
 Qed.
 
 End Sigma_1_1_Denotation.
