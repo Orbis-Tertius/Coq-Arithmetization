@@ -114,51 +114,6 @@ End Sigma_1_1_Internal.
 
 Section Sigma_1_1_Denotation.
 
-(*How to write this nicer?*)
-(* Definition Rin_Denot_con (M : Sigma11Model)
-  (v1 : seq (R M))
-  (v2 : seq {n : nat & (({m : nat | m < n} -> R M) -> R M)}}) : 
-  forall i : {m : nat | m < length [seq length (projT1 (projT2 i)) | i <- v2]},
-  ({m : nat | m < lnth [seq length (projT1 (projT2 i0)) | i0 <- v2] i} -> option (R M)) -> option (R M).
-    move=> idx IH.
-    rewrite map_lnth in IH.
-    destruct (lnth _ _) as [y[bs f]]; simpl in IH.
-    assert (forall i : {m : nat | m < length bs}, option {r : R M | lt M r (lnth bs i)}).
-    * move=> i.
-      apply (fun x => obind x (IH i)).
-      intro r.
-      destruct (lt_total M r (lnth bs i)).
-      + apply Some; exists r; assumption.
-      + exact None.
-    clear IH.
-    assert (forall i : {m : nat | m < length bs},
-    option {r : R M | lt M r (nth 0%R bs (` i))}) as X'.
-    move=>i.
-    replace {r : R M | lt M r (nth 0%R bs (` i))}
-       with {r : R M | lt M r (lnth bs i)}.
-    apply X.
-    f_equal.
-    apply functional_extensionality=> x.
-    f_equal.
-    unfold lnth; rewrite (tnth_nth 0%R).
-    by destruct i. 
-    clear X.
-    apply (OptionArgs (B := fun x => {r : R M | lt M r (nth 0%R bs x)})) in X'.
-    apply (fun x => obind x X'); clear X'.
-    move=> x.
-    assert (forall i : {m : nat | m < length bs}, {r : R M | lt M r (lnth bs i)}) as x'.
-    move=> i.
-    replace {r : R M | lt M r (lnth bs i)} with {r : R M | lt M r (nth 0%R bs (` i))}.
-    apply x.
-    f_equal; apply functional_extensionality=> x0; f_equal.
-    unfold lnth; rewrite (tnth_nth 0%R); by destruct i. clear x.
-    apply f in x'.
-    exact (Some (` x')).
-Defined. *)
-
-Theorem Hole {A : Type} : A.
-Admitted.
-
 Definition emptyTuple {A} : {n : nat | n < 0} -> A. fcrush. Defined.
 Program Fixpoint option_tuple {A} {l : nat} (t : {n : nat | n < l} -> option A) : option ({n : nat | n < l} -> A) := 
   match l with
