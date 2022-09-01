@@ -324,6 +324,11 @@ Record Sigma11Model : Type :=
         lt : relation R;
         so : StrictOrder lt;
         lt_total : forall x y, (lt x y) + ((x==y) + (lt y x));
+        lt_dec x y :=
+          match lt_total x y with
+          | inl _ => true
+          | inr _ => false
+          end;
         min : R;
         least_elem : forall x, lt min x
       }.
