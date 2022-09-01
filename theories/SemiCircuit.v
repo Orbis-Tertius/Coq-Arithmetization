@@ -89,8 +89,6 @@ Record SemiCircuitInstance (c : SemiCircuit) (M : Sigma11Model) : Type :=
 Record SemiCircuitAdvice (c : SemiCircuit) (M : Sigma11Model) : Type :=
   mkSemiCircuitAdvice { 
     exiFInst : forall i : |[exiFN c]|, (|[exiFArity c i]| -> R M) -> option (R M);
-    UChar : (|[uniVN c]| -> R M) -> bool;
-    U := { f : |[uniVN c]| -> R M | UChar f = true };
     (* s in paper *)
     exiVInst : |[exiVN c]| -> (|[uniVN c]| -> R M) -> R M;
     (* o in paper *)
@@ -135,7 +133,7 @@ Program Fixpoint SemicircuitPropDenotation
   (inst : SemiCircuitInstance c M)
   (adv : SemiCircuitAdvice c M)
   (p : @SemicircuitPropConstraint (freeVN c) (exiVN c) (uniVN c) (freeFN c) (exiFN c) (freeFunCalls c) (exiFCalls c)) :
-  U _ _ adv -> Prop :=
+  (|[uniVN c]| -> R M) -> Prop :=
   match p with
   | ZOConsNot p => fun u => 
     let r := SemicircuitPropDenotation c M inst adv p u in
@@ -158,6 +156,16 @@ Program Fixpoint SemicircuitPropDenotation
     r1 = r2
   end.
 
+Definition UProp {c : SemiCircuit} {M : Sigma11Model}
+                 (inst : SemiCircuitInstance c M) (adv : SemiCircuitAdvice c M) 
+                 (t : |[uniVN c]| -> R M) : Prop :=
+  let ev i := SemicircuitPolyDenotation c M inst adv (lnth (polyConstraints c) (uniVBounds c i)) in
+  forall i, lt M (t i) (ev i t).
+
+Definition U {c : SemiCircuit} {M : Sigma11Model}
+             (inst : SemiCircuitInstance c M) (adv : SemiCircuitAdvice c M) : Type 
+  := { t : |[uniVN c]| -> R M | UProp inst adv t }.
+
 Definition SemiCircuitFormulaCondition
   (c : SemiCircuit) (M : Sigma11Model)
   (inst : SemiCircuitInstance c M)
@@ -168,7 +176,7 @@ Definition SemiCircuitFreeFunCondition
   (c : SemiCircuit) (M : Sigma11Model)
   (inst : SemiCircuitInstance c M)
   (adv : SemiCircuitAdvice c M) : Prop :=
-  forall u : U _ _ adv, forall i : |[freeFN c]|, forall j : |[freeFunCalls c i]|,
+  forall u : U inst adv, forall i : |[freeFN c]|, forall j : |[freeFunCalls c i]|,
   let t (a : |[freeFunArity c i]|) : R M
       := SemicircuitPolyDenotation c M inst adv (lnth (polyConstraints c) (freeFunArgs c i j a)) (` u) in
   freeFInst _ _ inst i t = Some (freeFCallOut c M adv i j (` u)).
@@ -177,7 +185,7 @@ Definition SemiCircuitexiFCondition
   (c : SemiCircuit) (M : Sigma11Model)
   (inst : SemiCircuitInstance c M)
   (adv : SemiCircuitAdvice c M) : Prop :=
-  forall u : U _ _ adv, forall i : |[exiFN c]|, forall j : |[exiFCalls c i]|,
+  forall u : U inst adv, forall i : |[exiFN c]|, forall j : |[exiFCalls c i]|,
   let t (a : |[exiFArity c i]|) : R M
       := SemicircuitPolyDenotation c M inst adv (lnth (polyConstraints c) (exiFArgs c i j a)) (` u) in
   exiFInst _ _ adv i t = Some (exiFCallOut c M adv i j (` u)).
@@ -186,7 +194,7 @@ Definition SemiCircuitFOBoundCondition
   (c : SemiCircuit) (M : Sigma11Model)
   (inst : SemiCircuitInstance c M)
   (adv : SemiCircuitAdvice c M) : Prop :=
-  forall u : U _ _ adv, forall i : |[exiVN c]|,
+  forall u : U inst adv, forall i : |[exiVN c]|,
   let B := SemicircuitPolyDenotation c M inst adv (lnth (polyConstraints c) (exiVBounds c i)) (` u) in
   lt M (exiVInst _ _ adv i (` u)) B.
 
@@ -195,20 +203,12 @@ Definition SemiCircuitSOBoundCondition
   (c : SemiCircuit) (M : Sigma11Model)
   (inst : SemiCircuitInstance c M)
   (adv : SemiCircuitAdvice c M) : Prop :=
-  forall u : U _ _ adv, forall i : |[exiFN c]|,
+  forall u : U inst adv, forall i : |[exiFN c]|,
   let B := SemicircuitPolyDenotation c M inst adv (lnth (polyConstraints c) (exiFOutputBounds c i)) (` u) in
   let G (j : |[exiFArity c i]|) := SemicircuitPolyDenotation c M inst adv (lnth (polyConstraints c) (exiFInputBounds c i j)) (` u) in
   forall (t : |[exiFArity c i]| -> R M) (out : R M),
   exiFInst _ _ adv i t = Some out ->
   (forall x, lt M (t x) (G x)) /\ lt M out B.
-
-Definition SemiCircuitUDefCondition
-  (c : SemiCircuit) (M : Sigma11Model)
-  (inst : SemiCircuitInstance c M)
-  (adv : SemiCircuitAdvice c M) : Prop :=
-  forall t : |[uniVN c]| -> R M,
-  let ev t := SemicircuitPolyDenotation c M inst adv (lnth (polyConstraints c) (uniVBounds c t)) in
-  UChar _ _ adv t = true <-> forall i, lt M (t i) (ev i t).
 
 Program Fixpoint TupConcat {T} {a b} (m : |[a]| -> T) (n : |[b]| -> T) (i : |[a + b]|) : T :=
   (if i < a as b return i < a = b -> T
@@ -221,7 +221,7 @@ Qed.
 
 Ltac SemiCircuitExiStratConditionScript c i H0 Heqa :=
   remember ((` (nu c)) (exist (fun n : nat => n < exiVN c) i H0)) as a; clear Heqa;
-  remember (uniVN c) as b;
+  remember (uniVN c) as b; clear H0;
   destruct (a < b) eqn:ltba;[
     assert (a < b);[sfirstorder|hauto use: ltnW, subnKC]
   | assert (b <= a);[hecrush use: notF, contraFltn|hauto use: leq_trans, ltn_addr]].
@@ -232,8 +232,8 @@ Program Definition SemiCircuitExiStratCondition
   (adv : SemiCircuitAdvice c M) : Prop :=
   forall i : |[exiVN c]|, forall m : |[nu c i]| -> R M,
   forall n1 n2 : |[uniVN c - nu c i]| -> R M,
-  forall H1 : UChar _ _ adv (TupConcat m n1) = true,
-  forall H2 : UChar _ _ adv (TupConcat m n2) = true,
+  forall H1 : UProp inst adv (TupConcat m n1),
+  forall H2 : UProp inst adv (TupConcat m n2),
   exiVInst _ _ adv i (TupConcat m n1) = exiVInst _ _ adv i (TupConcat m n2).
 Next Obligation. SemiCircuitExiStratConditionScript c i H0 Heqa. Qed.
 Next Obligation. clear H1; SemiCircuitExiStratConditionScript c i H0 Heqa. Qed.
@@ -248,7 +248,12 @@ Definition SemiCircuitDenotation
     SemiCircuitexiFCondition c M i a /\
     SemiCircuitFOBoundCondition c M i a /\
     SemiCircuitSOBoundCondition c M i a /\
-    SemiCircuitUDefCondition c M i a /\
     SemiCircuitExiStratCondition c M i a.
 
 End SemicircuitDef.
+
+Section SemicircuitTranslation.
+
+
+
+End SemicircuitTranslation.
