@@ -1,142 +1,299 @@
 From Hammer Require Import Tactics Reflect Hints.
+From Hammer Require Import Hammer.
 
-From mathcomp Require Import ssreflect ssrfun ssrbool eqtype ssrnat ssrint seq choice.
-From mathcomp Require Import fintype div intdiv tuple bigop prime finset fingroup.
-From mathcomp Require Import ssralg poly polydiv morphism action finalg zmodp.
-From mathcomp Require Import cyclic center pgroup abelian matrix mxpoly vector.
-From mathcomp Require Import falgebra fieldext separable galois.
-From mathcomp Require ssrnum ssrint.
+From mathcomp Require Import ssreflect ssrfun ssrbool ssrnat ssralg seq fintype tuple eqtype.
 
-Require Import CoqArith.Sigma_1_1_Stratified.
+From Coq Require Import FunctionalExtensionality.
+From Coq Require Import Relation_Definitions RelationClasses.
+
+Require Import CoqArith.Utils.
+
+Require Import CoqArith.Sigma_1_1.
+Require Import Program.
 
 Section SemicircuitDef.
 
+Theorem Hole {A : Type} : A.
+Admitted.
 
-(* Some theorems justifying skolemization. *)
-Theorem Cannon (phi : nat -> nat -> Prop) : 
-  (exists (x : nat), forall (y : nat), phi x y) ->
-  (forall (y : nat), exists (x : nat), phi x y).
-Proof. sauto. Qed.
+Notation "|[ v ]|" := {n : nat | n < v} : type_scope.
 
-Theorem Cannon2 (phi : nat -> nat -> Prop) (f : nat -> nat) : 
-  (exists n, forall x, f x = n) ->
-  (forall (y : nat), phi (f y) y) -> (exists (x : nat), forall (y : nat), phi x y).
-Proof. sauto. Qed.
+Inductive SemicircuitPolyConstraint (* <P> in the paper *)
+  {freeV exiV uniV freeF exiF : nat} 
+  {freeFA : (|[freeF]| -> nat)} 
+  {exiFA : (|[exiF]| -> nat)} : Type :=
+| RingConsZero : SemicircuitPolyConstraint
+| RingConsPlusOne : SemicircuitPolyConstraint
+| RingConsMinusOne : SemicircuitPolyConstraint
+| RingConsPlus : SemicircuitPolyConstraint -> SemicircuitPolyConstraint -> SemicircuitPolyConstraint
+| RingConsTimes : SemicircuitPolyConstraint -> SemicircuitPolyConstraint -> SemicircuitPolyConstraint
+| RingConsInd : SemicircuitPolyConstraint -> SemicircuitPolyConstraint -> SemicircuitPolyConstraint
+| RingConsFreeV : |[freeV]| -> SemicircuitPolyConstraint
+| RingConsExiV : |[exiV]| -> SemicircuitPolyConstraint
+| RingConsUniV : |[uniV]| -> SemicircuitPolyConstraint
+| RingConsFreeF : forall x : |[freeF]|, |[freeFA x]| -> SemicircuitPolyConstraint
+| RingConsUniF : forall x : |[exiF]|, |[exiFA x]| -> SemicircuitPolyConstraint.
 
-Theorem Cannon3 (phi : nat -> nat -> Prop) : 
-  forall (f : forall (y : nat), { x : nat & phi x y }),
-  (exists n, forall i, projT1 (f i) = n) ->
-  (exists (x : nat), forall (y : nat), phi x y).
-Proof.
-  move => f [n e].
-  exists n.
-  move=> y.
-  assert (phi (projT1 (f y)) y);[exact (projT2 (f y))|hauto].
-Qed.
+Inductive SemicircuitPropConstraint (* <S> in the paper *)
+  {freeV exiV uniV freeF exiF : nat} 
+  {freeFA : (|[freeF]| -> nat)} 
+  {exiFA : (|[exiF]| -> nat)} : Type :=
+| ZOConsNot : SemicircuitPropConstraint -> SemicircuitPropConstraint
+| ZOConsAnd : SemicircuitPropConstraint ->
+              SemicircuitPropConstraint ->
+              SemicircuitPropConstraint
+| ZOConsOr : SemicircuitPropConstraint ->
+              SemicircuitPropConstraint ->
+              SemicircuitPropConstraint
+| ZOConsImp : SemicircuitPropConstraint ->
+              SemicircuitPropConstraint ->
+              SemicircuitPropConstraint
+| ZOConsEq : @SemicircuitPolyConstraint freeV exiV uniV freeF exiF freeFA exiFA
+          -> @SemicircuitPolyConstraint freeV exiV uniV freeF exiF freeFA exiFA
+          -> SemicircuitPropConstraint.
 
-
-(*Convert a sequence of bounds for universally quantified vars
-  into the input type of a skolem function. *)
-Definition QuantBoundType (M : SecondOrderFormulaModel) (l : seq nat) : Type :=
-  forall (i : 'I_(length l)), { r : R M | lt M r (naturalRingElement (tnth (in_tuple l) i)) }.
-
-Inductive RingConstraint {funs unis exis : nat} : Type :=
-| RingConsFun : 'I_funs -> RingConstraint
-| RingConsUni : 'I_unis -> RingConstraint
-| RingConsExi : 'I_exis -> RingConstraint
-| RingConsMinusOne : RingConstraint
-| RingConsPlusOne : RingConstraint
-| RingConsZero : RingConstraint
-| RingConsPlus : RingConstraint -> RingConstraint -> RingConstraint
-| RingConsTimes : RingConstraint -> RingConstraint -> RingConstraint.
-
-Inductive ZerothOrderConstraint {eqidx : nat} : Type :=
-| ZOConsTrue : ZerothOrderConstraint
-| ZOConsFalse : ZerothOrderConstraint
-| ZOConsNot : ZerothOrderConstraint -> ZerothOrderConstraint
-| ZOConsAnd : ZerothOrderConstraint ->
-          ZerothOrderConstraint ->
-          ZerothOrderConstraint
-| ZOConsOr : ZerothOrderConstraint ->
-         ZerothOrderConstraint ->
-         ZerothOrderConstraint
-| ZOConsImp : ZerothOrderConstraint ->
-          ZerothOrderConstraint ->
-          ZerothOrderConstraint
-| ZOConsEq : 'I_eqidx -> 'I_eqidx -> ZerothOrderConstraint.
-
-Record SemiCircuit (M : SecondOrderFormulaModel) : Type :=
+Record SemiCircuit : Type :=
   mkSemiCircuit {
-    InstanceFO : seq (R M);
-    InstanceSO : seq {n : nat & 
-                     {y : (R M) & 
-                     {bs : n.-tuple (R M) & 
-                     (forall i : 'I_n, {r : R M | lt M r (tnth bs i)}) -> {r : R M | lt M r y}}}};
-
-    ExQuantSO : seq {n : nat & 
-                  {y : (R M) & 
-                  {bs : n.-tuple (R M) & 
-                  (forall i : 'I_n, {r : R M | lt M r (tnth bs i)}) -> {r : R M | lt M r y}}}};
-    
-    UniQuantBnds : seq nat;
-
-    ExQuantFO : seq (QuantBoundType M UniQuantBnds -> R M);
-
-    (*Function calls with their inputs and outputs. *)
-    FunCalls : seq (QuantBoundType M UniQuantBnds -> 
-                    (R M * 
-                    {i : 'I_(length (InstanceSO ++ ExQuantSO)) & 
-                         (projT1 (tnth (in_tuple (InstanceSO ++ ExQuantSO)) i)).-tuple (R M)
-                    }));
-
-    (*The constraints defining the values at each function call. *)
-    FunConst : forall (c : 'I_(length FunCalls))
-                (unVals : QuantBoundType M UniQuantBnds),
-                (projT1 (tnth (in_tuple (InstanceSO ++ ExQuantSO)) (projT1 (tnth (in_tuple FunCalls) c unVals).2))).-tuple
-                (@RingConstraint (length FunCalls) (length UniQuantBnds) (length ExQuantFO));
-
-    (*Equation value pairs*)
-    Equs : seq (R M * R M);
-
-    (*The constraints defininf the values at each equation entry.*)
-    EquConst : 'I_(length Equs) -> QuantBoundType M UniQuantBnds ->
-              (@RingConstraint (length FunCalls) (length UniQuantBnds) (length ExQuantFO))
-              * (@RingConstraint (length FunCalls) (length UniQuantBnds) (length ExQuantFO));
-
-    FormulaConst : QuantBoundType M UniQuantBnds -> @ZerothOrderConstraint (length Equs);
-
+    freeVN : nat; (* n in paper *)
+    freeFN : nat; (* Number of free functions *)
+    freeFunArity : |[freeFN]| -> nat; (* a in paper *)
+    exiVN : nat; (* m in paper *)
+    exiFN : nat; (* Number of SO existential functions *)
+    exiFArity : |[exiFN]| -> nat; (* b in paper *)
+    uniVN : nat; (* u in paper *)
+    nu : {s : |[exiVN]| -> nat | forall i j : |[exiVN]|, (` i) <= (` j) -> s i <= s j};
+    freeFunCalls : |[freeFN]| -> nat; (* r in paper *)
+    exiFCalls : |[exiFN]| -> nat; (* q in paper *)
+    polyConstraints : seq (@SemicircuitPolyConstraint freeVN exiVN uniVN freeFN exiFN freeFunCalls exiFCalls);
+    (* w in paper *)
+    freeFunArgs : forall (i : |[freeFN]|), |[freeFunCalls i]| -> |[freeFunArity i]| -> |[length polyConstraints]|;
+    (* omega in paper *)
+    exiFArgs : forall (i : |[exiFN]|), |[exiFCalls i]| -> |[exiFArity i]| -> |[length polyConstraints]|;
+    (* V in paper *)
+    uniVBounds : |[uniVN]| -> |[length polyConstraints]|;
+    (* S in paper *)
+    exiVBounds : |[exiVN]| -> |[length polyConstraints]|;
+    (* B in paper *)
+    exiFOutputBounds : |[exiFN]| -> |[length polyConstraints]|;
+    (* G in paper *)
+    exiFInputBounds : forall (i : |[exiFN]|), |[exiFArity i]| -> |[length polyConstraints]|;
+    formula : unit + @SemicircuitPropConstraint freeVN exiVN uniVN freeFN exiFN freeFunCalls exiFCalls
   }.
 
-Program Fixpoint Skolemize
+Record SemiCircuitInstance (c : SemiCircuit) (M : Sigma11Model) : Type :=
+  mkSemiCircuitInstance { 
+    freeVInst : |[freeVN c]| -> R M;
+    freeFInst : forall i : |[freeFN c]|, (|[freeFunArity c i]| -> R M) -> option (R M);
+  }.
 
-(*
-Definition CircuitGenRingCont (M : SecondOrderFormulaModel) (c : SemiCircuit M)
+Record SemiCircuitAdvice (c : SemiCircuit) (M : Sigma11Model) : Type :=
+  mkSemiCircuitAdvice { 
+    exiFInst : forall i : |[exiFN c]|, (|[exiFArity c i]| -> R M) -> option (R M);
+    UChar : (|[uniVN c]| -> R M) -> bool;
+    U := { f : |[uniVN c]| -> R M | UChar f = true };
+    (* s in paper *)
+    exiVInst : |[exiVN c]| -> U -> R M;
+    (* o in paper *)
+    freeFCallOut : forall i : |[freeFN c]|, |[freeFunCalls c i]| -> U -> R M;
+    (* sigma in paper *)
+    exiFCallOut : forall i : |[exiFN c]|, |[exiFCalls c i]| -> U -> R M;
+  }.
 
-  (s : @RingTerm [seq projT1 i | i <- ExQuantSO M c ++ InstanceSO M c] (length (InstanceFO M c))) :
-  RingConstraint M.
-Admitted.
-*)
+Definition indFun (M : Sigma11Model) (x y : R M) : R M := if lt_dec M x y then 1%R else 0%R.
 
-Definition CircuitGenRing (M : SecondOrderFormulaModel) (c : SemiCircuit M)
-  (s : @RingTerm [seq projT1 i | i <- ExQuantSO M c ++ InstanceSO M c] (length (InstanceFO M c))) :
-  SemiCircuit M.
-Admitted.
+Fixpoint SemicircuitPolyDenotation
+  (c : SemiCircuit) (M : Sigma11Model)
+  (inst : SemiCircuitInstance c M)
+  (adv : SemiCircuitAdvice c M)
+  (p : @SemicircuitPolyConstraint (freeVN c) (exiVN c) (uniVN c) (freeFN c) (exiFN c) (freeFunCalls c) (exiFCalls c)) :
+  U _ _ adv -> R M :=
+  match p with
+  | RingConsZero => fun _ => 0%R
+  | RingConsPlusOne => fun _ => 1%R
+  | RingConsMinusOne => fun _ => (-1)%R
+  | RingConsPlus p1 p2 => fun u =>
+    let r1 := SemicircuitPolyDenotation c M inst adv p1 u in
+    let r2 := SemicircuitPolyDenotation c M inst adv p2 u in 
+    (r1 + r2)%R
+  | RingConsTimes p1 p2 => fun u =>
+    let r1 := SemicircuitPolyDenotation c M inst adv p1 u in
+    let r2 := SemicircuitPolyDenotation c M inst adv p2 u in 
+    (r1 * r2)%R
+  | RingConsInd p1 p2 => fun u => 
+    let r1 := SemicircuitPolyDenotation c M inst adv p1 u in
+    let r2 := SemicircuitPolyDenotation c M inst adv p2 u in
+    indFun M r1 r2
+  | RingConsFreeV i => fun _ => freeVInst _ _ inst i
+  | RingConsExiV i => exiVInst _ _ adv i
+  | RingConsUniV i => fun u => ` u i
+  | RingConsFreeF i j => freeFCallOut _ _ adv i j
+  | RingConsUniF i j => exiFCallOut _ _ adv i j
+  end.
 
-Definition CircuitGenZO (M : SecondOrderFormulaModel) (c : SemiCircuit M)
-  (s : @ZerothOrderFormula [seq projT1 i | i <- ExQuantSO M c ++ InstanceSO M c] (length (InstanceFO M c))) :
-  SemiCircuit M.
-Admitted.
+Fixpoint SemicircuitPropDenotation
+  (c : SemiCircuit) (M : Sigma11Model)
+  (inst : SemiCircuitInstance c M)
+  (adv : SemiCircuitAdvice c M)
+  (p : @SemicircuitPropConstraint (freeVN c) (exiVN c) (uniVN c) (freeFN c) (exiFN c) (freeFunCalls c) (exiFCalls c)) :
+  U _ _ adv -> Prop :=
+  match p with
+  | ZOConsNot p => fun u => 
+    let r := SemicircuitPropDenotation c M inst adv p u in
+    not r
+  | ZOConsAnd p1 p2 => fun u => 
+    let r1 := SemicircuitPropDenotation c M inst adv p1 u in
+    let r2 := SemicircuitPropDenotation c M inst adv p2 u in
+    r1 /\ r2
+  | ZOConsOr p1 p2 => fun u => 
+    let r1 := SemicircuitPropDenotation c M inst adv p1 u in
+    let r2 := SemicircuitPropDenotation c M inst adv p2 u in
+    r1 \/ r2
+  | ZOConsImp p1 p2 => fun u => 
+    let r1 := SemicircuitPropDenotation c M inst adv p1 u in
+    let r2 := SemicircuitPropDenotation c M inst adv p2 u in
+    r1 -> r2
+  | ZOConsEq p1 p2 => fun u => 
+    let r1 := SemicircuitPolyDenotation c M inst adv p1 u in
+    let r2 := SemicircuitPolyDenotation c M inst adv p2 u in
+    r1 = r2
+  end.
 
-Definition CircuitGenFO (M : SecondOrderFormulaModel) (c : SemiCircuit M)
-  (s : @FirstOrderFormula [seq projT1 i | i <- ExQuantSO M c ++ InstanceSO M c] (length (InstanceFO M c))) :
-  SemiCircuit M.
-Admitted.
+Definition SemiCircuitFormulaCondition
+  (c : SemiCircuit) (M : Sigma11Model)
+  (inst : SemiCircuitInstance c M)
+  (adv : SemiCircuitAdvice c M) : Prop :=
+  exists p, formula c = inr p /\ forall u, SemicircuitPropDenotation c M inst adv p u = true.
 
-Definition CircuitGenSO (M : SecondOrderFormulaModel) (c : SemiCircuit M)
-  (s : @SecondOrderFormula [seq projT1 i | i <- ExQuantSO M c ++ InstanceSO M c] (length (InstanceFO M c))) :
-  SemiCircuit M.
-Admitted.
+Definition SemiCircuitFreeFunCondition
+  (c : SemiCircuit) (M : Sigma11Model)
+  (inst : SemiCircuitInstance c M)
+  (adv : SemiCircuitAdvice c M) : Prop :=
+  forall u : U _ _ adv, forall i : |[freeFN c]|, forall j : |[freeFunCalls c i]|,
+  let t (a : |[freeFunArity c i]|) : R M
+      := SemicircuitPolyDenotation c M inst adv (lnth (polyConstraints c) (freeFunArgs c i j a)) u in
+  freeFInst _ _ inst i t = Some (freeFCallOut c M adv i j u).
 
+Definition SemiCircuitexiFCondition
+  (c : SemiCircuit) (M : Sigma11Model)
+  (inst : SemiCircuitInstance c M)
+  (adv : SemiCircuitAdvice c M) : Prop :=
+  forall u : U _ _ adv, forall i : |[exiFN c]|, forall j : |[exiFCalls c i]|,
+  let t (a : |[exiFArity c i]|) : R M
+      := SemicircuitPolyDenotation c M inst adv (lnth (polyConstraints c) (exiFArgs c i j a)) u in
+  exiFInst _ _ adv i t = Some (exiFCallOut c M adv i j u).
 
+Definition SemiCircuitFOBoundCondition
+  (c : SemiCircuit) (M : Sigma11Model)
+  (inst : SemiCircuitInstance c M)
+  (adv : SemiCircuitAdvice c M) : Prop :=
+  forall u : U _ _ adv, forall i : |[exiVN c]|,
+  let B := SemicircuitPolyDenotation c M inst adv (lnth (polyConstraints c) (exiVBounds c i)) u in
+  lt M (exiVInst _ _ adv i u) B.
+
+(* Note: This covers both conditions 5 and 6 in the paper *)
+Definition SemiCircuitSOBoundCondition
+  (c : SemiCircuit) (M : Sigma11Model)
+  (inst : SemiCircuitInstance c M)
+  (adv : SemiCircuitAdvice c M) : Prop :=
+  forall u : U _ _ adv, forall i : |[exiFN c]|,
+  let B := SemicircuitPolyDenotation c M inst adv (lnth (polyConstraints c) (exiFOutputBounds c i)) u in
+  let G (j : |[exiFArity c i]|) := SemicircuitPolyDenotation c M inst adv (lnth (polyConstraints c) (exiFInputBounds c i j)) u in
+  forall (t : |[exiFArity c i]| -> R M) (out : R M),
+  exiFInst _ _ adv i t = Some out ->
+  (forall x, lt M (t x) (G x)) /\ lt M out B.
+
+Definition SemiCircuitUDefCondition
+  (c : SemiCircuit) (M : Sigma11Model)
+  (inst : SemiCircuitInstance c M)
+  (adv : SemiCircuitAdvice c M) : Prop :=
+  forall t : |[uniVN c]| -> R M,
+  let ev t := SemicircuitPolyDenotation c M inst adv (lnth (polyConstraints c) (uniVBounds c t)) in
+  true.
+  (* UChar _ _ adv t = true -> forall i, lt M (t i) (ev i t). *)
+
+Program Fixpoint TupConcat {T} {a b} (m : |[a]| -> T) (n : |[b]| -> T) (i : |[a + b]|) : T :=
+  (if i < a as b return i < a = b -> T
+   then fun _ => m i
+   else fun _ => n (i - a)
+  ) (erefl _).
+Next Obligation.
+  assert (a <= i); [hecrush use: notF, contraFltn|hauto use: ltn_subLR ].
+Qed.
+
+Program Definition SemiCircuitExiStratCondition
+  (c : SemiCircuit) (M : Sigma11Model)
+  (inst : SemiCircuitInstance c M)
+  (adv : SemiCircuitAdvice c M) : Prop :=
+  forall i : |[exiVN c]|, forall m : |[nu c i]| -> R M,
+  forall n1 n2 : |[uniVN c - nu c i]| -> R M,
+  forall H1 : UChar _ _ adv (TupConcat m n1) = true,
+  forall H2 : UChar _ _ adv (TupConcat m n2) = true,
+  exiVInst _ _ adv i (TupConcat m n1) = exiVInst _ _ adv i (TupConcat m n2).
+Next Obligation.
+  remember ((` (nu c)) (exist (fun n : nat => n < exiVN c) i H0)) as a.
+  remember (uniVN c) as b.
+  clear n1 n2 Heqa H0 m i adv inst Heqb c M.
+  destruct (a < b) eqn:ltba.
+  assert (a < b);[sfirstorder|hauto use: ltnW, subnKC].
+  assert (b <= a);[hecrush use: notF, contraFltn|hauto use: leq_trans, ltn_addr].
+Qed.
+Next Obligation.
+  clear H1.
+  remember ((` (nu c)) (exist (fun n : nat => n < exiVN c) i H0)) as a.
+  remember (uniVN c) as b.
+  clear n1 n2 Heqa H0 m i adv inst Heqb c M.
+  destruct (a < b) eqn:ltba.
+  assert (a < b);[sfirstorder|hauto use: ltnW, subnKC].
+  assert (b <= a);[hecrush use: notF, contraFltn|hauto use: leq_trans, ltn_addr].
+Qed.
+Next Obligation.
+  clear H1 H2.
+  remember ((` (nu c)) (exist (fun n : nat => n < exiVN c) i H0)) as a.
+  remember (uniVN c) as b.
+  clear n1 n2 Heqa H0 m i adv inst Heqb c M.
+  destruct (a < b) eqn:ltba.
+  assert (a < b);[sfirstorder|hauto use: ltnW, subnKC].
+  assert (b <= a);[hecrush use: notF, contraFltn|hauto use: leq_trans, ltn_addr].
+Qed.
+Next Obligation.
+  transitivity (UChar c M adv
+       (fun x : {n : nat | n < uniVN c} => TupConcat m n1 (exist _  (` x)
+        (SemiCircuitExiStratCondition_obligation_1 c M _ m n1 n2 x))));[|by []].
+  f_equal.
+  apply functional_extensionality.
+  move => x.
+  do 2 f_equal.
+  apply proof_irrelevance.
+Qed.
+Next Obligation.
+  clear H1 H2.
+  remember ((` (nu c)) (exist (fun n : nat => n < exiVN c) i H0)) as a.
+  remember (uniVN c) as b.
+  clear n1 n2 Heqa H0 m i adv inst Heqb c M.
+  destruct (a < b) eqn:ltba.
+  assert (a < b);[sfirstorder|hauto use: ltnW, subnKC].
+  assert (b <= a);[hecrush use: notF, contraFltn|hauto use: leq_trans, ltn_addr].
+Qed.
+Next Obligation.
+  transitivity (UChar c M adv
+       (fun x : {n : nat | n < uniVN c} => TupConcat m n2 (exist _  (` x)
+        (SemiCircuitExiStratCondition_obligation_2 c M adv (exist _ i H) m n1 n2 H1 x))));[|by []].
+  f_equal.
+  apply functional_extensionality.
+  move => x.
+  do 2 f_equal.
+  apply proof_irrelevance.
+Qed.
+
+Definition SemiCircuitDenotation 
+  (c : SemiCircuit) (M : Sigma11Model) (i : SemiCircuitInstance c M) : Prop :=
+  exists (a : SemiCircuitAdvice c M),
+    SemiCircuitFormulaCondition c M i a /\
+    SemiCircuitFreeFunCondition c M i a /\
+    SemiCircuitexiFCondition c M i a /\
+    SemiCircuitFOBoundCondition c M i a /\
+    SemiCircuitSOBoundCondition c M i a /\
+    SemiCircuitUDefCondition c M i a /\
+    SemiCircuitExiStratCondition c M i a.
 
 End SemicircuitDef.
