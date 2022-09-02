@@ -114,7 +114,7 @@ End Sigma_1_1_Internal.
 
 Section Sigma_1_1_Denotation.
 
-Definition emptyTuple {A} : {n : nat | n < 0} -> A. fcrush. Defined.
+Definition emptyTuple {A} : |[0]| -> A. fcrush. Defined.
 Program Fixpoint option_tuple {A} {l : nat} (t : {n : nat | n < l} -> option A) : option ({n : nat | n < l} -> A) := 
   match l with
   | 0 => Some emptyTuple

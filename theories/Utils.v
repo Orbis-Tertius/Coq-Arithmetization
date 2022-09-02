@@ -8,6 +8,8 @@ From Coq Require Import Relation_Definitions RelationClasses.
 
 Require Import Program.
 
+Notation "|[ v ]|" := {n : nat | n < v} : type_scope.
+
 Definition drop_index {T} (m : nat) (s : seq T) : seq T := 
   take m s ++ behead (drop m s).
 
@@ -316,6 +318,34 @@ Next Obligation.
   hauto use: contra_ltn_leq.
 Qed.
 
+Theorem dep_if_case_true {T}
+  (p : bool)
+  (t : p = true) 
+  (a : p = true -> T) 
+  (b : p = false -> T) :
+  (if p as b return p = b -> T then a else b) (erefl _) = a t.
+Proof.
+  destruct p.
+  f_equal. apply proof_irrelevance.
+  fcrush.
+Qed.
+
+Theorem dep_if_case_false {T}
+  (p : bool)
+  (t : p = false) 
+  (a : p = true -> T) 
+  (b : p = false -> T) :
+  (if p as b return p = b -> T then a else b) (erefl _) = b t.
+Proof.
+  destruct p.
+  fcrush.
+  f_equal. apply proof_irrelevance.
+Qed.
+
+Ltac dep_if_case b :=
+  let t := fresh "dep_if_case_DUMMY" in
+  pose t := b;assert (b = t);
+  [trivial|destruct t;[rewrite dep_if_case_true|rewrite dep_if_case_false]].
 
 Record Sigma11Model : Type :=
     mkSigma11Model {
