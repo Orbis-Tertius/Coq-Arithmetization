@@ -10,6 +10,18 @@ Require Import Program.
 
 Notation "|[ v ]|" := {n : nat | n < v} : type_scope.
 
+Definition inlMap {A B C} (f : A -> C) (c : A + B) : C + B :=
+  match c with
+  | inl a => inl (f a)
+  | inr b => inr b
+  end.
+
+Definition inrMap {A B C} (f : B -> C) (c : A + B) : A + C :=
+  match c with
+  | inl a => inl a
+  | inr b => inr (f b)
+  end.
+
 Definition drop_index {T} (m : nat) (s : seq T) : seq T := 
   take m s ++ behead (drop m s).
 
