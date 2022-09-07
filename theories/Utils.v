@@ -330,6 +330,16 @@ Next Obligation.
   hauto use: contra_ltn_leq.
 Qed.
 
+Lemma NoFractions {j k} : ~ (j < k /\ k < j.+1).
+  move: k; elim j.
+  - move=> [|k] [H0 H1]; fcrush.
+  - move=> n IH k [H0 H1].
+    destruct k;[fcrush|].
+    replace (n.+1 < k.+1) with (n < k) in H0;[|sfirstorder].
+    replace (k.+1 < n.+2) with (k < n.+1) in H1;[|sfirstorder].
+    assert (n < k /\ k < n.+1);[auto|apply (IH k H)].
+Qed.
+
 Theorem dep_if_case_true {T}
   (p : bool)
   (t : p = true) 
