@@ -343,6 +343,15 @@ Qed.
 
 Definition emptyTuple {A} : |[0]| -> A. fcrush. Defined.
 
+Program Fixpoint TupConcat {T} {a b} (m : |[a]| -> T) (n : |[b]| -> T) (i : |[a + b]|) : T :=
+  (if i < a as b return i < a = b -> T
+   then fun _ => m i
+   else fun _ => n (i - a)
+  ) (erefl _).
+Next Obligation.
+  assert (a <= i); [hecrush use: notF, contraFltn|hauto use: ltn_subLR ].
+Qed.
+
 Program Definition cRangeFun (m : nat) (n : nat) : |[n]| -> |[m + n]| := fun x => x + m.
 Next Obligation. scongruence use: addnCAC, addnS, addn1, ltn_add2l. Qed.
 
