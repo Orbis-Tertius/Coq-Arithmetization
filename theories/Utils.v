@@ -330,6 +330,69 @@ Next Obligation.
   hauto use: contra_ltn_leq.
 Qed.
 
+
+Theorem EEConvert {i j : nat} : (i == j) = true <-> i = j.
+Proof.
+  split; move: j; elim: i; cbn; destruct j; hauto.
+Qed.
+
+Theorem EEFConvert {i j : nat} : (i == j) = false <-> i <> j.
+Proof.
+  split; move: j; elim: i; cbn; destruct j; hauto.
+Qed.
+
+Definition emptyTuple {A} : |[0]| -> A. fcrush. Defined.
+
+Program Definition cRangeFun (m : nat) (n : nat) : |[n]| -> |[m + n]| := fun x => x + m.
+Next Obligation. scongruence use: addnCAC, addnS, addn1, ltn_add2l. Qed.
+
+Program Fixpoint cRange (m : nat) (n : nat) : seq {k : nat | k < m + n} := 
+  match n with
+  | 0 => [::]
+  | n'.+1 => m :: eq_rect _ (fun x => seq {k : nat | k < x}) (cRange m.+1 n') _ (addSnnS m n')
+  end.
+Next Obligation. scongruence use: ltnS, addnS, leq_addr. Qed.
+
+
+Theorem length_cRange {n m} : length (cRange n m) = m.
+Proof.
+  move:n; elim: m; auto.
+  move=> m IH n.
+  by simpl; destruct (addSnnS n m); rewrite IH.
+Qed.
+
+Theorem leq_neq_lt {x y} : x <= y -> x <> y -> x < y.
+Proof.
+  move: y; elim: x;[destruct y; auto|]=>x IH y leq neq.
+  destruct y;[fcrush|].
+  apply (IH y leq); auto.
+Qed.
+
+Theorem nth_map {T S} {x} {f : T -> S} {s : seq T} {i : nat} :
+  nth (f x) (map f s) i = f (nth x s i).
+  move: i; elim: s;[move=> [|i]; auto|].
+  move=> a l IH i.
+  destruct i; simpl; auto.
+Qed.
+
+Theorem nth_cRange {m n i} {x} {H : i < n} :
+  nth x (cRange m n) i = exist _ (m + i) (eq_rect _ _ H _ (esym (ltn_add2l m i n))).
+  move: i m x H; elim: n;[fcrush|].
+  move=> n IH i m x H.
+  destruct i.
+  simpl.
+  apply subset_eq_compat.
+  clear H x IH n; hauto use: addn2, addSnnS, Utils.cRange_obligation_1 inv: nat.
+  rewrite subset_eq.
+  simpl; destruct (addSnnS m n); simpl.
+  rewrite IH; simpl.
+  hauto use: addn2, add1n, addn1, addSnnS, add2n inv: nat.
+Qed.
+
+Theorem length_rcons {T} {s : seq T} {t} : length (rcons s t) = (length s).+1.
+Proof. elim: s; hauto. Qed.
+
+
 Lemma NoFractions {j k} : ~ (j < k /\ k < j.+1).
   move: k; elim j.
   - move=> [|k] [H0 H1]; fcrush.
@@ -369,18 +432,3 @@ Ltac dep_if_case b :=
   pose t := b;assert (b = t);
   [trivial|destruct t;[rewrite dep_if_case_true|rewrite dep_if_case_false]].
 
-Record Sigma11Model : Type :=
-    mkSigma11Model {
-        R : ringType;
-        (*lt should be a strict, total order with a least element*)
-        lt : relation R;
-        so : StrictOrder lt;
-        lt_total : forall x y, (lt x y) + ((x==y) + (lt y x));
-        lt_dec x y :=
-          match lt_total x y with
-          | inl _ => true
-          | inr _ => false
-          end;
-        min : R;
-        least_elem : forall x, lt min x
-      }.
