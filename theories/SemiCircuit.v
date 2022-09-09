@@ -25,8 +25,8 @@ Record SemicircuitCtx := mkSemicircuitCtx
   ; exiFS := exiF subCtx
   ; exiFSA := exiFA subCtx
   ; uniVS := uniV subCtx
-  ; freeFC : |[freeFS]| -> nat (*Number of function calls*)
-  ; exiFC : |[exiFS]| -> nat (*Number of function calls*)
+  ; freeFC : |[freeF subCtx]| -> nat (*Number of function calls*)
+  ; exiFC : |[exiF subCtx]| -> nat (*Number of function calls*)
   }.
 
 (* <P> in the paper *)
@@ -636,6 +636,7 @@ Next Obligation.
 Qed.
 Next Obligation. by destruct (k _); rewrite ltn_add2l. Qed.
 
+(*Add a list of circuit constraints associated to a free fun call to data*)
 Program Definition FreeCallIncorp {ctx}
   (d : @PolyConversionData ctx) (i : |[freeF ctx]|) :
   forall s : seq (@SemicircuitPolyConstraint {| subCtx := ctx; freeFC := newFreeFCalls d; exiFC := newExiFCalls d |}),
@@ -662,6 +663,7 @@ Next Obligation.
   hauto use: ltnW, ltn_addr, ltnS.
 Qed.
 
+(*Add a list of circuit constraints associated to an exi fun call to data*)
 Program Definition ExiCallIncorp {ctx}
   (d : @PolyConversionData ctx) (i : |[exiF ctx]|) :
   forall s : seq (@SemicircuitPolyConstraint {| subCtx := ctx; freeFC := newFreeFCalls d; exiFC := newExiFCalls d |}),
@@ -689,36 +691,6 @@ Next Obligation.
   by rewrite ls.
 Qed.
 
-Lemma PolyConvertLem1 {ctx}
-  (rs : seq { d : @PolyConversionData ctx &  
-                  @SemicircuitPolyConstraint {| subCtx := ctx; freeFC := newFreeFCalls d; exiFC := newExiFCalls d |} }) :
-  (fun x => sumn [seq projT1 i x | i <- map OutReform rs]) 
-  = (newFreeFCalls (foldr PolyConversionCombineData PolyConversionEmptyData [seq projT1 i | i <- rs])).
-Proof.
-  apply functional_extensionality.
-  elim: rs; auto.
-  move=> [d p] l IH x.
-  transitivity ((projT1 (OutReform (existT _ d p)) x) + sumn [seq projT1 i x | i <- [seq OutReform j | j <- l]]); auto.
-  rewrite IH.
-  destruct d, x.
-  by simpl; destruct (foldr PolyConversionCombineData PolyConversionEmptyData [seq projT1 i0 | i0 <- l]).
-Qed.
-
-Lemma PolyConvertLem2 {ctx}
-  (rs : seq { d : @PolyConversionData ctx &  
-    @SemicircuitPolyConstraint {| subCtx := ctx; freeFC := newFreeFCalls d; exiFC := newExiFCalls d |} }) :
-  (fun x => sumn [seq projT1 (projT2 i) x | i <- map OutReform rs]) 
-  = (newExiFCalls (foldr PolyConversionCombineData PolyConversionEmptyData [seq projT1 i | i <- rs])).
-Proof.
-  apply functional_extensionality.
-  elim: rs; auto.
-  move=> [d p] l IH x.
-  transitivity ((projT1 (projT2 (OutReform (existT _ d p))) x) + sumn [seq projT1 (projT2 i) x | i <- [seq OutReform j | j <- l]]); auto.
-  rewrite IH.
-  destruct d, x.
-  by simpl; destruct (foldr PolyConversionCombineData PolyConversionEmptyData [seq projT1 i0 | i0 <- l]).
-Qed.
-
 Program Definition PolyConvertLem3 {T} {n} {f : |[n]| -> T} {i : |[n]|} :
   f i = lnth [seq f i | i <- cRange 0 n] i := erefl _.
 Next Obligation. by rewrite map_length (length_cRange (n := 0) (m := n)). Qed.
@@ -730,6 +702,148 @@ Next Obligation.
   by apply subset_eq_compat.
 Qed.
 
+Theorem PolymorphicEqElim 
+  {T S}  {fam : Type -> Type}
+  {P : S -> Type} 
+  {f : forall x, fam x -> T}
+  {x y}
+  {e : x = y}
+  {s : fam (P x)} :
+  f _ (eq_rect _ (fun x => fam (P x)) s _ e) = f _ s.
+Proof. by destruct e. Qed.
+
+Lemma PolyConvertFreeCaseLem {ctx} {D : @PolyConversionData ctx} {i : |[freeF ctx]|} {B} {e} :
+  newFreeFCalls D i < newFreeFCalls (FreeCallIncorp D i B e) i.
+Proof.
+  destruct D; simpl.
+  unfold AddCall.
+  unfold SingleCall.
+  rewrite dep_if_case_true;[by rewrite EEConvert|].
+  hauto use: ltnSn, addn1, contra_ltn_leq.
+Qed.
+
+Program Definition PolyConvertFreeCase {ctx} 
+  (i : |[freeF ctx]|) 
+  (t : |[freeFA ctx i]| ->
+    { d : @PolyConversionData ctx &  
+    @SemicircuitPolyConstraint {| subCtx := ctx; freeFC := newFreeFCalls d; exiFC := newExiFCalls d |} }) :
+  { d : @PolyConversionData ctx &  
+    @SemicircuitPolyConstraint {| subCtx := ctx; freeFC := newFreeFCalls d; exiFC := newExiFCalls d |} } := 
+  (* We start with a function name and a list of data and constraints that needs to be fused together *)
+  (* The first thing we need to do is fuse this list of data into a single peice of data*)
+  let rs : seq {d : @PolyConversionData ctx 
+                  & @SemicircuitPolyConstraint {| subCtx := ctx; freeFC := newFreeFCalls d; exiFC := newExiFCalls d |} } 
+         := [seq t i | i <- cRange 0 (freeFA ctx i) ] in
+  let data : @PolyConversionData ctx := foldr PolyConversionCombineData PolyConversionEmptyData [seq projT1 i | i <- rs] in
+
+  (* We also need consolidate all the polynomial constraints into a single list and add those to the data*)
+  let polys : seq (@SemicircuitPolyConstraint {| subCtx := ctx
+                      ; freeFC := newFreeFCalls data
+                      ; exiFC := newExiFCalls data |})
+               := eq_rect _ (fun x => seq (@SemicircuitPolyConstraint {| subCtx := _; freeFC := _; exiFC := x |})) (
+                  eq_rect _ (fun x => seq (@SemicircuitPolyConstraint {| subCtx := _; freeFC := x; exiFC := _ |})) 
+                  (PolyCallSeqFuse (map OutReform rs)) _ _) _ _ in
+  let data2 : @PolyConversionData ctx := FreeCallIncorp data i polys _ in
+
+  (*We return a call the the most recently added function *)
+  existT _ data2 (PolyConsFreeF i (newFreeFCalls data i)).
+Next Obligation.
+  apply functional_extensionality.
+  elim: [seq t i0 | i0 <- cRange 0 _]; auto.
+  move=> [d p] l IH x.
+  transitivity ((projT1 (OutReform (existT _ d p)) x) + sumn [seq projT1 i x | i <- [seq OutReform j | j <- l]]); auto.
+  rewrite IH.
+  destruct d, x.
+  by simpl; destruct (foldr PolyConversionCombineData PolyConversionEmptyData [seq projT1 i0 | i0 <- l]).
+Qed.
+Next Obligation.
+  apply functional_extensionality.
+  elim: [seq t i0 | i0 <- cRange 0 _]; auto.
+  move=> [d p] l IH x.
+  transitivity ((projT1 (projT2 (OutReform (existT _ d p))) x) + sumn [seq projT1 (projT2 i) x | i <- [seq OutReform j | j <- l]]); auto.
+  rewrite IH.
+  destruct d, x.
+  by simpl; destruct (foldr PolyConversionCombineData PolyConversionEmptyData [seq projT1 i0 | i0 <- l]).
+Qed.
+Next Obligation.
+  do 2 rewrite PolymorphicEqElim.
+  remember (freeFA _ _) as F; clear HeqF.
+  remember [seq OutReform i | i <- [seq t i0 | i0 <- cRange 0 F]] as L;
+  transitivity (length [seq OutReform i | i <- [seq t i0 | i0 <- cRange 0 F]]);[
+  |do 2 rewrite map_length; apply (length_cRange (n := 0) (m := F))].
+  transitivity (length L);[clear HeqL|hauto].
+  elim: L;[auto|].
+  move=> [d [b x]] L IH.
+  qauto use: map_length q:on.
+Qed.
+Next Obligation. apply PolyConvertFreeCaseLem. Qed.
+
+Lemma PolyConvertExiCaseLem {ctx} {D : @PolyConversionData ctx} {i : |[exiF ctx]|} {B} {e} :
+  newExiFCalls D i < newExiFCalls (ExiCallIncorp D i B e) i.
+Proof.
+  destruct D; simpl.
+  unfold AddCall.
+  unfold SingleCall.
+  rewrite dep_if_case_true;[by rewrite EEConvert|].
+  hauto use: ltnSn, addn1, contra_ltn_leq.
+Qed.
+
+Program Definition PolyConvertExiCase {ctx} 
+  (i : |[exiF ctx]|) 
+  (t : |[exiFA ctx i]| ->
+    { d : @PolyConversionData ctx &  
+    @SemicircuitPolyConstraint {| subCtx := ctx; freeFC := newFreeFCalls d; exiFC := newExiFCalls d |} }) :
+  { d : @PolyConversionData ctx &  
+    @SemicircuitPolyConstraint {| subCtx := ctx; freeFC := newFreeFCalls d; exiFC := newExiFCalls d |} } := 
+  (* We start with a function name and a list of data and constraints that needs to be fused together *)
+  (* The first thing we need to do is fuse this list of data into a single peice of data*)
+  let rs : seq {d : @PolyConversionData ctx 
+                  & @SemicircuitPolyConstraint {| subCtx := ctx; freeFC := newFreeFCalls d; exiFC := newExiFCalls d |} } 
+         := [seq t i | i <- cRange 0 (exiFA ctx i) ] in
+  let data : @PolyConversionData ctx := foldr PolyConversionCombineData PolyConversionEmptyData [seq projT1 i | i <- rs] in
+
+  (* We also need consolidate all the polynomial constraints into a single list and add those to the data*)
+  let polys : seq (@SemicircuitPolyConstraint {| subCtx := ctx
+                      ; freeFC := newFreeFCalls data
+                      ; exiFC := newExiFCalls data |})
+               := eq_rect _ (fun x => seq (@SemicircuitPolyConstraint {| subCtx := _; freeFC := _; exiFC := x |})) (
+                  eq_rect _ (fun x => seq (@SemicircuitPolyConstraint {| subCtx := _; freeFC := x; exiFC := _ |})) 
+                  (PolyCallSeqFuse (map OutReform rs)) _ _) _ _ in
+  let data2 : @PolyConversionData ctx := ExiCallIncorp data i polys _ in
+
+  (*We return a call the the most recently added function *)
+  existT _ data2 (PolyConsExiF i (newExiFCalls data i)).
+Next Obligation.
+  apply functional_extensionality.
+  elim: [seq t i0 | i0 <- cRange 0 _]; auto.
+  move=> [d p] l IH x.
+  transitivity ((projT1 (OutReform (existT _ d p)) x) + sumn [seq projT1 i x | i <- [seq OutReform j | j <- l]]); auto.
+  rewrite IH.
+  destruct d, x.
+  by simpl; destruct (foldr PolyConversionCombineData PolyConversionEmptyData [seq projT1 i0 | i0 <- l]).
+Qed.
+Next Obligation.
+  apply functional_extensionality.
+  elim: [seq t i0 | i0 <- cRange 0 _]; auto.
+  move=> [d p] l IH x.
+  transitivity ((projT1 (projT2 (OutReform (existT _ d p))) x) + sumn [seq projT1 (projT2 i) x | i <- [seq OutReform j | j <- l]]); auto.
+  rewrite IH.
+  destruct d, x.
+  by simpl; destruct (foldr PolyConversionCombineData PolyConversionEmptyData [seq projT1 i0 | i0 <- l]).
+Qed.
+Next Obligation.
+  do 2 rewrite PolymorphicEqElim.
+  remember (exiFA _ _) as F; clear HeqF.
+  remember [seq OutReform i | i <- [seq t i0 | i0 <- cRange 0 F]] as L;
+  transitivity (length [seq OutReform i | i <- [seq t i0 | i0 <- cRange 0 F]]);[
+  |do 2 rewrite map_length; apply (length_cRange (n := 0) (m := F))].
+  transitivity (length L);[clear HeqL|hauto].
+  elim: L;[auto|].
+  move=> [d [b x]] L IH.
+  qauto use: map_length q:on.
+Qed.
+Next Obligation. apply PolyConvertExiCaseLem. Qed.
+
 (*Construct a polynomial constraint, new calls within that constraint, simultanious with a modified semicircuit *)
 Program Fixpoint PolyConvert {ctx} (r : @RingTerm ctx) :
   { d : @PolyConversionData ctx &  
@@ -738,23 +852,8 @@ Program Fixpoint PolyConvert {ctx} (r : @RingTerm ctx) :
   | RingFVar m => existT _ PolyConversionEmptyData (PolyConsFreeV (freeV ctx - m - 1))
   | RingEVar m => existT _ PolyConversionEmptyData (PolyConsExiV (exiV ctx - m - 1))
   | RingUVar m => existT _ PolyConversionEmptyData (PolyConsUniV (uniV ctx - m - 1))
-  | RingFFun i t => Hole
-    (* let t' := fun x => PolyConvert (t x) in
-    let rs := [seq t' i | i <- cRange 0 (freeFA ctx i) ] in
-    let data := foldr PolyConversionCombineData PolyConversionEmptyData [seq projT1 i | i <- rs] in
-    let polys : seq (@SemicircuitPolyConstraint {| subCtx := ctx
-                      ; freeFC := (fun x => sumn [seq projT1 i x | i <- map OutReform rs])
-                      ; exiFC := (fun x => sumn [seq projT1 (projT2 i) x | i <- map OutReform rs]) |})
-              := PolyCallSeqFuse (map OutReform rs) in
-    let polys2 : seq (@SemicircuitPolyConstraint {| subCtx := ctx
-                      ; freeFC := newFreeFCalls data
-                      ; exiFC := newExiFCalls data |})
-               := eq_rect _ (fun x => seq (@SemicircuitPolyConstraint {| subCtx := _; freeFC := _; exiFC := x |})) (
-                  eq_rect _ (fun x => seq (@SemicircuitPolyConstraint {| subCtx := _; freeFC := x; exiFC := _ |})) polys _ (PolyConvertLem1 rs)) _ (PolyConvertLem2 rs) in
-    let polysl : length polys2 = freeFA ctx i := _ in
-    let data2 := FreeCallIncorp data i polys2 polysl in
-    existT _ data2 (PolyConsFreeF i (newFreeFCalls data i)) *)
-  | RingEFun i t => Hole
+  | RingFFun i t => PolyConvertFreeCase i (fun x => PolyConvert (t x))
+  | RingEFun i t => PolyConvertExiCase i (fun x => PolyConvert (t x))
   | RingMinusOne => existT _ PolyConversionEmptyData PolyConsMinusOne
   | RingPlusOne => existT _ PolyConversionEmptyData PolyConsPlusOne
   | RingZero => existT _ PolyConversionEmptyData PolyConsZero
