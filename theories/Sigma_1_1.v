@@ -42,36 +42,36 @@ Next Obligation.
   by apply leq_neq_lt.
 Qed.
 
-Inductive RingTerm {ctx : Sigma11Ctx} : Type :=
-| RingFVar : |[freeV ctx]| -> RingTerm
-| RingEVar : |[exiV ctx]| -> RingTerm
-| RingUVar : |[uniV ctx]| -> RingTerm
-| RingFFun : forall (i : |[freeF ctx]|), (|[freeFA ctx i]| -> RingTerm) -> RingTerm
-| RingEFun : forall (i : |[exiF ctx]|), (|[exiFA ctx i]| -> RingTerm) -> RingTerm
-| RingMinusOne : RingTerm
-| RingPlusOne : RingTerm
-| RingZero : RingTerm
-| RingPlus : RingTerm -> RingTerm -> RingTerm
-| RingTimes : RingTerm -> RingTerm -> RingTerm
-| RingInd : RingTerm -> RingTerm -> RingTerm.
+Inductive PolyTerm {ctx : Sigma11Ctx} : Type :=
+| PolyFVar : |[freeV ctx]| -> PolyTerm
+| PolyEVar : |[exiV ctx]| -> PolyTerm
+| PolyUVar : |[uniV ctx]| -> PolyTerm
+| PolyFFun : forall (i : |[freeF ctx]|), (|[freeFA ctx i]| -> PolyTerm) -> PolyTerm
+| PolyEFun : forall (i : |[exiF ctx]|), (|[exiFA ctx i]| -> PolyTerm) -> PolyTerm
+| PolyMinusOne : PolyTerm
+| PolyPlusOne : PolyTerm
+| PolyZero : PolyTerm
+| PolyPlus : PolyTerm -> PolyTerm -> PolyTerm
+| PolyTimes : PolyTerm -> PolyTerm -> PolyTerm
+| PolyInd : PolyTerm -> PolyTerm -> PolyTerm.
 
 Inductive ZerothOrderFormula {ctx : Sigma11Ctx} : Type :=
-| ZOTrue : ZerothOrderFormula
-| ZOFalse : ZerothOrderFormula
+(* | ZOTrue : ZerothOrderFormula
+| ZOFalse : ZerothOrderFormula *)
 | ZONot : ZerothOrderFormula -> ZerothOrderFormula
 | ZOAnd : ZerothOrderFormula -> ZerothOrderFormula -> ZerothOrderFormula
 | ZOOr : ZerothOrderFormula -> ZerothOrderFormula -> ZerothOrderFormula
 | ZOImp : ZerothOrderFormula -> ZerothOrderFormula -> ZerothOrderFormula
-| ZOEq : @RingTerm ctx -> @RingTerm ctx -> ZerothOrderFormula.
+| ZOEq : @PolyTerm ctx -> @PolyTerm ctx -> ZerothOrderFormula.
 
 Inductive FirstOrderFormula {ctx : Sigma11Ctx} : Type :=
 | ZO : @ZerothOrderFormula ctx -> FirstOrderFormula
-| FOExists : @RingTerm ctx -> FirstOrderFormula (ctx := incExiV ctx) -> FirstOrderFormula
-| FOForall : @RingTerm ctx -> FirstOrderFormula (ctx := incUniV ctx) -> FirstOrderFormula.
+| FOExists : @PolyTerm ctx -> FirstOrderFormula (ctx := incExiV ctx) -> FirstOrderFormula
+| FOForall : @PolyTerm ctx -> FirstOrderFormula (ctx := incUniV ctx) -> FirstOrderFormula.
 
 Inductive SecondOrderFormula {ctx : Sigma11Ctx} : Type :=
 | FO : @FirstOrderFormula ctx -> SecondOrderFormula
-| SOExists : forall (y : @RingTerm ctx) (bs : seq (@RingTerm ctx)), 
+| SOExists : forall (y : @PolyTerm ctx) (bs : seq (@PolyTerm ctx)), 
              SecondOrderFormula (ctx := addExiF (length bs) ctx) ->
              SecondOrderFormula.
 
@@ -123,29 +123,29 @@ Record Sigma11Model {ctx : Sigma11Ctx} : Type :=
       uniV_F : |[uniV ctx]| -> R;
     }.
 
-Fixpoint Ring_Denote {ctx} (M : @Sigma11Model ctx) (r : @RingTerm ctx) : option (R M) :=
+Fixpoint Poly_Denote {ctx} (M : @Sigma11Model ctx) (r : @PolyTerm ctx) : option (R M) :=
   match r with
-  | RingFVar m => Some (freeV_F M m)
-  | RingEVar m => Some (exiV_F M m)
-  | RingUVar m => Some (uniV_F M m)
-  | RingFFun i t => 
-    obind (fun t => freeF_S M i t) (option_tuple (fun x => Ring_Denote M (t x)))
-  | RingEFun i t => 
-    obind (fun t => exiF_S M i t) (option_tuple (fun x => Ring_Denote M (t x)))
-  | RingMinusOne => Some (-1)%R
-  | RingPlusOne => Some 1%R
-  | RingZero => Some 0%R
-  | RingPlus r1 r2 => 
-    let d1 := Ring_Denote M r1 in
-    let d2 := Ring_Denote M r2 in
+  | PolyFVar m => Some (freeV_F M m)
+  | PolyEVar m => Some (exiV_F M m)
+  | PolyUVar m => Some (uniV_F M m)
+  | PolyFFun i t => 
+    obind (fun t => freeF_S M i t) (option_tuple (fun x => Poly_Denote M (t x)))
+  | PolyEFun i t => 
+    obind (fun t => exiF_S M i t) (option_tuple (fun x => Poly_Denote M (t x)))
+  | PolyMinusOne => Some (-1)%R
+  | PolyPlusOne => Some 1%R
+  | PolyZero => Some 0%R
+  | PolyPlus r1 r2 => 
+    let d1 := Poly_Denote M r1 in
+    let d2 := Poly_Denote M r2 in
     obind (fun r1 => obind (fun r2 => Some (r1 + r2)%R) d2) d1
-  | RingTimes r1 r2 => 
-    let d1 := Ring_Denote M r1 in
-    let d2 := Ring_Denote M r2 in
+  | PolyTimes r1 r2 => 
+    let d1 := Poly_Denote M r1 in
+    let d2 := Poly_Denote M r2 in
     obind (fun r1 => obind (fun r2 => Some (r1 * r2)%R) d2) d1
-  | RingInd r1 r2 => 
-    let d1 := Ring_Denote M r1 in
-    let d2 := Ring_Denote M r2 in
+  | PolyInd r1 r2 => 
+    let d1 := Poly_Denote M r1 in
+    let d2 := Poly_Denote M r2 in
     (obind (fun r1 => obind (fun r2 => 
       match lt_total (D M) r1 r2 with
       | inl _ => Some 1%R
@@ -155,17 +155,17 @@ Fixpoint Ring_Denote {ctx} (M : @Sigma11Model ctx) (r : @RingTerm ctx) : option 
 
 Fixpoint ZerothOrder_Denote {ctx} (M : @Sigma11Model ctx) (f : @ZerothOrderFormula ctx) : Prop :=
   match f with
-  | ZOTrue => true
-  | ZOFalse => false
+  (* | ZOTrue => true
+  | ZOFalse => false *)
   | ZONot f => not (ZerothOrder_Denote M f)
   | ZOAnd f1 f2 => (ZerothOrder_Denote M f1) /\ (ZerothOrder_Denote M f2)
   | ZOOr f1 f2 => (ZerothOrder_Denote M f1) \/ (ZerothOrder_Denote M f2)
   | ZOImp f1 f2 => (ZerothOrder_Denote M f1) -> (ZerothOrder_Denote M f2)
   | ZOEq r1 r2 => 
-    match Ring_Denote M r1 with
+    match Poly_Denote M r1 with
     | None => false
     | Some r1 =>
-      match Ring_Denote M r2 with
+      match Poly_Denote M r2 with
       | None => false
       | Some r2 => r1 = r2
       end
@@ -232,13 +232,13 @@ Fixpoint FirstOrder_Denote {ctx} (M : @Sigma11Model ctx) (f : @FirstOrderFormula
   match f with
   | ZO z => ZerothOrder_Denote M z
   | FOExists p f => 
-    let op := Ring_Denote M p in
+    let op := Poly_Denote M p in
     match op with
     | None => False
     | Some p' => exists (r : R M), lt (D M) r p' /\ FirstOrder_Denote (AddModelExi M r) f
     end
   | FOForall p f =>
-    let op := Ring_Denote M p in
+    let op := Poly_Denote M p in
     match op with
     | None => False
     | Some p' => forall (r : R M),  lt (D M) r p' -> FirstOrder_Denote (AddModelUni M r) f
@@ -283,9 +283,9 @@ Fixpoint SecondOrder_Denote {ctx} (M : @Sigma11Model ctx) (f : @SecondOrderFormu
   match f with
   | FO f => FirstOrder_Denote M f
   | SOExists y bs f => 
-    let y' : option (R M) := Ring_Denote M y in
+    let y' : option (R M) := Poly_Denote M y in
     let bs' : option (|[length bs]| -> R M) := 
-        option_tuple (fun m => Ring_Denote M (lnth bs m)) in
+        option_tuple (fun m => Poly_Denote M (lnth bs m)) in
     match y' with
     | None => false
     | Some y' =>
