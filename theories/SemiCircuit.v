@@ -71,8 +71,7 @@ Record SemiCircuit : Type :=
     uniVN := uniVS Ctx; (* u in paper *)
     freeFCalls := freeFC Ctx; (* r in paper *)
     exiFCalls := exiFC Ctx; (* q in paper *)
-    nu : |[exiVN]| -> nat;
-    (* {s : |[exiVN]| -> nat | forall i j : |[exiVN]|, (` i) <= (` j) -> s i <= s j}; *)
+    nu : {s : |[exiVN]| -> { m : nat | m <= uniVN } | forall i j : |[exiVN]|, (` i) <= (` j) -> (` (s j)) <= (` (s i))};
     polyConstraints : seq (@SemicircuitPolyConstraint Ctx);
     (* w in paper *)
     freeFArgs : forall (i : |[freeFN]|), |[freeFCalls i]| -> |[freeFArity i]| -> |[length polyConstraints]|;
@@ -219,13 +218,6 @@ Definition SemiCircuitSOBoundCondition
   exiFInst _ _ adv i t = Some out ->
   (forall x, lt M (t x) (G x)) /\ lt M out B.
 
-Ltac SemiCircuitExiStratConditionScript c i H0 Heqa :=
-  remember ((` (nu c)) (exist (fun n : nat => n < exiVN c) i H0)) as a; clear Heqa;
-  remember (uniVN c) as b; clear H0;
-  destruct (a < b) eqn:ltba;[
-    assert (a < b);[sfirstorder|hauto use: ltnW, subnKC]
-  | assert (b <= a);[hecrush use: notF, contraFltn|hauto use: leq_trans, ltn_addr]].
-
 Program Definition SemiCircuitExiStratCondition
   (M : RingData) (c : SemiCircuit)
   (inst : SemiCircuitInstance M c)
@@ -235,10 +227,33 @@ Program Definition SemiCircuitExiStratCondition
   forall H1 : UProp inst adv (TupConcat m n1),
   forall H2 : UProp inst adv (TupConcat m n2),
   exiVInst _ _ adv i (TupConcat m n1) = exiVInst _ _ adv i (TupConcat m n2).
-Next Obligation. SemiCircuitExiStratConditionScript c i H0 Heqa. Qed.
-Next Obligation. clear H1; SemiCircuitExiStratConditionScript c i H0 Heqa. Qed.
-Next Obligation. clear H2 H1; SemiCircuitExiStratConditionScript c i H0 Heqa. Qed.
-Next Obligation. clear H2 H1; SemiCircuitExiStratConditionScript c i H0 Heqa. Qed.
+Next Obligation.
+  destruct ((` (nu c)) (exist (fun n : nat => n < exiVN c) i H0)); simpl in *.
+  replace (x0 + (uniVN c - x0)) with (uniVN c); auto.
+  remember (uniVN c) as U; clear HeqU H x n1 n2 m H0 adv inst c M i.
+  sfirstorder use: subnKC.
+Qed.
+Next Obligation.
+  clear H1.
+  destruct ((` (nu c)) (exist (fun n : nat => n < exiVN c) i H0)); simpl in *.
+  replace (x0 + (uniVN c - x0)) with (uniVN c); auto.
+  remember (uniVN c) as U; clear HeqU H x n1 n2 m H0 adv inst c M i.
+  sfirstorder use: subnKC.
+Qed.
+Next Obligation.
+  clear H2 H1.
+  destruct ((` (nu c)) (exist (fun n : nat => n < exiVN c) i H0)); simpl in *.
+  replace (x0 + (uniVN c - x0)) with (uniVN c); auto.
+  remember (uniVN c) as U; clear HeqU H x n1 n2 m H0 adv inst c M i.
+  sfirstorder use: subnKC.
+Qed.
+Next Obligation.
+  clear H2 H1.
+  destruct ((` (nu c)) (exist (fun n : nat => n < exiVN c) i H0)); simpl in *.
+  replace (x0 + (uniVN c - x0)) with (uniVN c); auto.
+  remember (uniVN c) as U; clear HeqU H x n1 n2 m H0 adv inst c M i.
+  sfirstorder use: subnKC.
+Qed.
 
 Definition SemiCircuitDenotation (M : RingData)
   (c : SemiCircuit) (i : SemiCircuitInstance M c) : Prop :=
@@ -1189,6 +1204,30 @@ Next Obligation.
   assert (i <> 0);[by rewrite <- EEFConvert|].
   by destruct i;[fcrush|].
 Qed.
+Next Obligation.
+  change (exist _ ?x _ == exist _ ?y _) with (x == y).
+  dep_if_case (i == 0); auto.
+  by destruct (Ctx c), subCtx0.
+  destruct ((` (nu c)) _).
+  clear H.
+  by destruct c, Ctx0, subCtx0.
+Qed.
+Next Obligation.
+  change (exist _ ?x _ == exist _ ?y _) with (x == y).
+  dep_if_case (j == 0); auto.
+  assert (j = 0);[by rewrite <- EEConvert|].
+  assert (i = 0). rewrite H3 in H;destruct i;[auto|fcrush].
+  rewrite <- EEConvert in H4.
+  rewrite dep_if_case_true; auto.
+  dep_if_case (i == 0); auto.
+  destruct (` (nu c) _).
+  by destruct c, Ctx0, subCtx0.
+  destruct (nu c).
+  simpl.
+  apply i0.
+  simpl.
+  destruct i, j;auto.
+Qed.
 Next Obligation. by destruct (exiVS _);[fcrush|]. Qed.
 Next Obligation. 
   assert ((i == 0) = false);[exact e|clear e].
@@ -1223,6 +1262,15 @@ Program Definition SemicircuitUniInc (c : SemiCircuit) (p : @SemicircuitPolyCons
   |}.
 Next Obligation. by destruct c, Ctx0, subCtx0. Qed.
 Next Obligation.
+  destruct (` (nu c)).
+  clear H.  
+  by destruct c, Ctx0, subCtx0; apply leqW.
+Qed.
+Next Obligation.
+  destruct (nu c).
+  by apply i0.
+Qed.
+Next Obligation.
   remember (PolyLiftUniV_obligation_1 _ _) as P; clear HeqP; simpl in P.
   destruct c, Ctx0, subCtx0; simpl in *.
   replace P with H1;auto.
@@ -1254,7 +1302,7 @@ Next Obligation.
 Qed.
 Next Obligation. by destruct c, Ctx0, subCtx0. Qed.
 Next Obligation.
-  remember (SemicircuitUniInc_obligation_10 _ _ _) as P; clear HeqP; simpl in P.
+  remember (SemicircuitUniInc_obligation_12 _ _ _) as P; clear HeqP; simpl in P.
   destruct c, Ctx0, subCtx0; simpl in *.
   replace P with H0;auto.
   apply eq_irrelevance.
@@ -1294,422 +1342,139 @@ Fixpoint Translate_FirstOrderFormula
     Translate_FirstOrderFormula c1 f
   end.
 
-
-
-(*Construct a polynomial constraint, new calls within that constraint, simultanious with a modified semicircuit *)
-Fixpoint IncorpRingOut
-  (c : SemiCircuit)
-  (r : @RingTerm (subCtx (Ctx c))) :
-  SemiCircuit * 
-  sigT (fun (newFreeFCalls : |[freeFN c]| -> nat) => sigT (fun (newExiFCalls : |[exiFN c]| -> nat) =>
-  prod  (forall (i : |[freeFN c]|), |[freeFCalls c i + newFreeFCalls i]| -> |[freeFArity c i]| -> |[length (polyConstraints c)]|)
-  (prod (forall (i : |[exiFN c]|), |[exiFCalls c i + newExiFCalls i]| -> |[exiFArity c i]| -> |[length (polyConstraints c)]|)
-        (@SemicircuitPolyConstraint {| subCtx := (subCtx (Ctx c))
-                                     ; freeFC := (fun x => freeFCalls c x + newFreeFCalls x) 
-                                     ; exiFC := (fun x => exiFCalls c x + newExiFCalls x) |}
-                                    )))) := 
-  Hole.
-  
-
-  mkSemiCircuit {
-    freeVN : nat; (* n in paper *)
-    freeFN : nat; (* Number of free functions *)
-    freeFArity : |[freeFN]| -> nat; (* a in paper *)
-    exiVN : nat; (* m in paper *)
-    exiFN : nat; (* Number of SO existential functions *)
-    exiFArity : |[exiFN]| -> nat; (* b in paper *)
-    uniVN : nat; (* u in paper *)
-    nu : {s : |[exiVN]| -> nat | forall i j : |[exiVN]|, (` i) <= (` j) -> s i <= s j};
-    freeFCalls : |[freeFN]| -> nat; (* r in paper *)
-    exiFCalls : |[exiFN]| -> nat; (* q in paper *)
-    polyConstraints : seq (@SemicircuitPolyConstraint freeVN exiVN uniVN freeFN exiFN freeFCalls exiFCalls);
-    (* w in paper *)
-    freeFArgs : forall (i : |[freeFN]|), |[freeFCalls i]| -> |[freeFArity i]| -> |[length polyConstraints]|;
-    (* omega in paper *)
-    exiFArgs : forall (i : |[exiFN]|), |[exiFCalls i]| -> |[exiFArity i]| -> |[length polyConstraints]|;
-    (* V in paper *)
-    uniVBounds : |[uniVN]| -> |[length polyConstraints]|;
-    (* S in paper *)
-    exiVBounds : |[exiVN]| -> |[length polyConstraints]|;
-    (* B in paper *)
-    exiFOutputBounds : |[exiFN]| -> |[length polyConstraints]|;
-    (* G in paper *)
-    exiFInputBounds : forall (i : |[exiFN]|), |[exiFArity i]| -> |[length polyConstraints]|;
-    formula : unit + @SemicircuitPropConstraint freeVN exiVN uniVN freeFN exiFN freeFCalls exiFCalls
-  }.
-
-(*Convert constraint to one with new function with no calls*)
-Program Fixpoint SemicircuitPolyConstraint_ExiFunExtend_1
-    (freeVN freeFN exiVN exiFN uniVN : nat)
-    (freeFCalls : |[freeFN]| -> nat)
-    (exiFCalls : |[exiFN]| -> nat)
-    (p : @SemicircuitPolyConstraint freeVN exiVN uniVN freeFN exiFN freeFCalls exiFCalls) :
-    @SemicircuitPolyConstraint freeVN exiVN uniVN freeFN (exiFN.+1) freeFCalls (fseqSnoc 0 exiFCalls) := 
+Program Fixpoint PolyLiftAddExiF {ctx}
+  (a : nat)
+  (p : @SemicircuitPolyConstraint ctx) :
+    @SemicircuitPolyConstraint {| subCtx := addExiF a (subCtx ctx)
+                                ; freeFC := freeFC ctx
+                                ; exiFC := fun i =>
+          ( if i == 0 as b return (i == 0) = b -> nat
+            then fun _ => 0
+            else fun _ => exiFC ctx (i.-1) ) (erefl _)
+    |} := 
   match p with
   | PolyConsZero => PolyConsZero
   | PolyConsPlusOne => PolyConsPlusOne
   | PolyConsMinusOne => PolyConsMinusOne
   | PolyConsPlus p1 p2 =>
-    let r1 := SemicircuitPolyConstraint_ExiFunExtend_1 _ _ _ _ uniVN freeFCalls exiFCalls p1 in
-    let r2 := SemicircuitPolyConstraint_ExiFunExtend_1 _ _ _ _ uniVN freeFCalls exiFCalls p2 in 
+    let r1 := PolyLiftAddExiF a p1 in
+    let r2 := PolyLiftAddExiF a p2 in 
     PolyConsPlus r1 r2
   | PolyConsTimes p1 p2 =>
-    let r1 := SemicircuitPolyConstraint_ExiFunExtend_1 _ _ _ _ uniVN freeFCalls exiFCalls p1 in
-    let r2 := SemicircuitPolyConstraint_ExiFunExtend_1 _ _ _ _ uniVN freeFCalls exiFCalls p2 in 
+    let r1 := PolyLiftAddExiF a p1 in
+    let r2 := PolyLiftAddExiF a p2 in 
     PolyConsTimes r1 r2
   | PolyConsInd p1 p2 =>
-    let r1 := SemicircuitPolyConstraint_ExiFunExtend_1 _ _ _ _ uniVN freeFCalls exiFCalls p1 in
-    let r2 := SemicircuitPolyConstraint_ExiFunExtend_1 _ _ _ _ uniVN freeFCalls exiFCalls p2 in 
+    let r1 := PolyLiftAddExiF a p1 in
+    let r2 := PolyLiftAddExiF a p2 in 
     PolyConsInd r1 r2
   | PolyConsFreeV i => PolyConsFreeV i
   | PolyConsExiV i => PolyConsExiV i
   | PolyConsUniV i => PolyConsUniV i
   | PolyConsFreeF i j => PolyConsFreeF i j
-  | PolyConsExiF i j => PolyConsExiF i j
+  | PolyConsExiF i j => PolyConsExiF (i.+1) j
   end.
-Next Obligation. by unfold fseqSnoc; rewrite dep_if_case_true. Qed.
+Next Obligation. by destruct (subCtx ctx). Qed.
+Next Obligation. destruct (exiF (addExiF a (subCtx ctx)));[fcrush|auto]. Qed.
+Next Obligation.
+  assert (i <> 0);[by rewrite <- EEFConvert|clear e].
+  destruct i;[fcrush|].
+  simpl.
+  by destruct (subCtx ctx).
+Qed.
+Next Obligation. by unfold freeVS in *; simpl; destruct (subCtx ctx). Qed. 
+Next Obligation. by unfold exiVS in *; simpl; destruct (subCtx ctx). Qed.
+Next Obligation. by unfold uniVS in *; simpl; destruct (subCtx ctx). Qed.
+Next Obligation. by clear H; unfold freeFS in *; simpl; destruct (subCtx ctx). Qed.
+Next Obligation.
+  remember (PolyLiftAddExiF_obligation_1 _ _ _) as P; clear HeqP; simpl in P.
+  replace P with H0; auto.
+  apply eq_irrelevance.
+Qed.
+Next Obligation. by clear H; unfold exiFS in *; simpl; destruct (subCtx ctx). Qed.
+Next Obligation.
+  remember (PolyLiftAddExiF_obligation_3 _ _ _ _) as P; clear HeqP; simpl in P.
+  replace P with H0; auto.
+  apply eq_irrelevance.
+Qed.
 
-(*Convert constraint to one with new function with no calls*)
-Fixpoint SemicircuitPropConstraint_ExiFunExtend_1
-    (freeVN freeFN exiVN exiFN uniVN : nat)
-    (freeFCalls : |[freeFN]| -> nat)
-    (exiFCalls : |[exiFN]| -> nat)
-    (p : @SemicircuitPropConstraint freeVN exiVN uniVN freeFN exiFN freeFCalls exiFCalls) :
-    @SemicircuitPropConstraint freeVN exiVN uniVN freeFN (exiFN.+1) freeFCalls (fseqSnoc 0 exiFCalls) := 
+Program Fixpoint PropLiftAddExiF {ctx}
+  (a : nat)
+  (p : @SemicircuitPropConstraint ctx) :
+    @SemicircuitPropConstraint {| subCtx := addExiF a (subCtx ctx)
+                                ; freeFC := freeFC ctx
+                                ; exiFC := fun i =>
+          ( if i == 0 as b return (i == 0) = b -> nat
+            then fun _ => 0
+            else fun _ => exiFC ctx (i.-1) ) (erefl _)
+    |} := 
   match p with
   | ZOConsNot p =>
-    let r := SemicircuitPropConstraint_ExiFunExtend_1 _ _ _ _ uniVN freeFCalls exiFCalls p in
+    let r := PropLiftAddExiF a p in
     ZOConsNot r
   | ZOConsAnd p1 p2 =>
-    let r1 := SemicircuitPropConstraint_ExiFunExtend_1 _ _ _ _ uniVN freeFCalls exiFCalls p1 in
-    let r2 := SemicircuitPropConstraint_ExiFunExtend_1 _ _ _ _ uniVN freeFCalls exiFCalls p2 in
+    let r1 := PropLiftAddExiF a p1 in
+    let r2 := PropLiftAddExiF a p2 in
     ZOConsAnd r1 r2
   | ZOConsOr p1 p2 =>
-    let r1 := SemicircuitPropConstraint_ExiFunExtend_1 _ _ _ _ uniVN freeFCalls exiFCalls p1 in
-    let r2 := SemicircuitPropConstraint_ExiFunExtend_1 _ _ _ _ uniVN freeFCalls exiFCalls p2 in
+    let r1 := PropLiftAddExiF a p1 in
+    let r2 := PropLiftAddExiF a p2 in
     ZOConsOr r1 r2
   | ZOConsImp p1 p2 =>
-    let r1 := SemicircuitPropConstraint_ExiFunExtend_1 _ _ _ _ uniVN freeFCalls exiFCalls p1 in
-    let r2 := SemicircuitPropConstraint_ExiFunExtend_1 _ _ _ _ uniVN freeFCalls exiFCalls p2 in
+    let r1 := PropLiftAddExiF a p1 in
+    let r2 := PropLiftAddExiF a p2 in
     ZOConsImp r1 r2
   | ZOConsEq p1 p2 =>
-    let r1 := SemicircuitPolyConstraint_ExiFunExtend_1 _ _ _ _ uniVN freeFCalls exiFCalls p1 in
-    let r2 := SemicircuitPolyConstraint_ExiFunExtend_1 _ _ _ _ uniVN freeFCalls exiFCalls p2 in
+    let r1 := PolyLiftAddExiF a p1 in
+    let r2 := PolyLiftAddExiF a p2 in
     ZOConsEq r1 r2
   end.
 
-(* Add new existential function assuming polynomial constraints have already been added *)
-Program Definition SemiCircuit_ExiFunExtend_1
+Program Definition SemicircuitExiFAdd 
+  (c : SemiCircuit) 
+  (y : @SemicircuitPolyConstraint (Ctx c))
+  (bs : seq (@SemicircuitPolyConstraint (Ctx c))) : SemiCircuit :=
+  {| Ctx := {| subCtx := addExiF (length bs) (subCtx ctx)
+                                ; freeFC := freeFC ctx
+                                ; exiFC := fun i =>
+          ( if i == 0 as b return (i == 0) = b -> nat
+            then fun _ => 0
+            else fun _ => exiFC ctx (i.-1) ) (erefl _)
+          |}
+  ; nu := nu c
+  ; polyConstraints := map (PolyLiftExiV (length bs)) (rcons (polyConstraints c) p)
+  ; freeFArgs := freeFArgs c
+  ; exiFArgs := exiFArgs c
+  ; uniVBounds := uniVBounds c
+  ; exiVBounds := 
+  ; exiFOutputBounds := fun i =>
+    (if i == 0 as b return (i == 0) = b -> |[length (map PolyLiftExiV (rcons (polyConstraints c) p))]|
+    then fun _ => ???
+    else fun _ => exiFOutputBounds c (i.-1)) (erefl _)
+  ; exiFInputBounds := fun i =>
+    (if i == 0 as b return (i == 0) = b -> |[length (map PolyLiftExiV (rcons (polyConstraints c) p))]|
+    then fun _ => ???
+    else fun _ => exiFInputBounds c (i.-1)) (erefl _)
+  ; formula := inrMap PropLiftExiV (formula c)
+  |}.
+
+
+Program Fixpoint Translate_SecondOrderFormula 
   (c : SemiCircuit)
-  (arity : nat)
-  (ocons : |[length (polyConstraints c)]|)
-  (icons : |[arity]| -> |[length (polyConstraints c)]|) :
-  SemiCircuit :=
-  match c with
-  | {| freeVN := freeVN
-     ; freeFN := freeFN
-     ; freeFArity := freeFArity
-     ; exiVN := exiVN
-     ; exiFN := exiFN
-     ; exiFArity := exiFArity 
-     ; uniVN := uniVN 
-     ; nu := nu 
-     ; freeFCalls := freeFCalls 
-     ; exiFCalls := exiFCalls 
-     ; polyConstraints := polyConstraints 
-     ; freeFArgs := freeFArgs 
-     ; exiFArgs := exiFArgs 
-     ; uniVBounds := uniVBounds 
-     ; exiVBounds := exiVBounds 
-     ; exiFOutputBounds := exiFOutputBounds 
-     ; exiFInputBounds := exiFInputBounds 
-     ; formula := formula 
-    |} => 
-      {| freeVN := freeVN
-       ; freeFN := freeFN
-       ; freeFArity := freeFArity
-       ; exiVN := exiVN
-       ; exiFN := exiFN.+1
-       ; exiFArity := fseqSnoc arity exiFArity
-       ; uniVN := uniVN 
-       ; nu := nu 
-       ; freeFCalls := freeFCalls 
-       ; exiFCalls := fseqSnoc 0 exiFCalls
-       ; polyConstraints := map (SemicircuitPolyConstraint_ExiFunExtend_1 _ _ _ _ _ _ _) polyConstraints
-       ; freeFArgs := freeFArgs
-       ; exiFArgs := fun i =>
-         (if i < exiFN as b return (i < exiFN) = b -> |[fseqSnoc 0 exiFCalls i]| -> |[fseqSnoc arity exiFArity i]| -> |[length polyConstraints]|
-          then fun _ => exiFArgs i
-          else fun _ => emptyTuple) (erefl _)
-       ; uniVBounds := uniVBounds
-       ; exiVBounds := exiVBounds
-       ; exiFOutputBounds := fun i =>
-         (if i < exiFN as b return (i < exiFN) = b -> |[length polyConstraints]|
-          then fun _ => exiFOutputBounds i
-          else fun _ => ocons) (erefl _)
-       ; exiFInputBounds := fun i =>
-         (if i < exiFN as b return (i < exiFN) = b -> |[fseqSnoc arity exiFArity i]| -> |[length polyConstraints]|
-          then fun _ => exiFInputBounds i
-          else fun _ => icons) (erefl _)
-       ; formula := inrMap (SemicircuitPropConstraint_ExiFunExtend_1 _ _ _ _ _ _ _) formula
-      |}
+  (f : @SecondOrderFormula (subCtx (Ctx c))) : SemiCircuit :=
+  match f with
+  | FO f => Translate_FirstOrderFormula c f
+  | SOExists y bs f => 
+    let (day, boy) := PolyConvert y in
+    let c0 := IntegrateConversionData c day in
+    let boy0 : @SemicircuitPolyConstraint (Ctx c0) := PolyCallLift boy in
+    let bs' := map PolyConvert bs in
+    let dabs := foldr PolyConversionCombineData PolyConversionEmptyData [seq projT1 i | i <- bs'] in
+    let c1 := IntegrateConversionData c0 dabs in
+    let boy1 : @SemicircuitPolyConstraint (Ctx c1) := PolyCallCast boy0 in
+    let bobs := PolyCallSeqFuse (map OutReform bs') in
+    let bobs1 : seq (@SemicircuitPolyConstraint (Ctx c1))
+             := Hole in
+    let c2 := SemicircuitExiFAdd c1 boy1 bobs1 in
+    Translate_SecondOrderFormula c2 f
   end.
-Next Obligation. by rewrite map_length; destruct (freeFArgs0 _ _ _). Qed.
-Next Obligation. by unfold fseqSnoc in H; rewrite dep_if_case_true in H. Qed.
-Next Obligation. by unfold fseqSnoc in H; rewrite dep_if_case_true in H. Qed.
-Next Obligation. by unfold fseqSnoc in H; rewrite dep_if_case_false in H. Qed.
-Next Obligation.
-  by dep_if_case (i < exiFN0);[
-        destruct (exiFArgs0 _ _ _); rewrite map_length
-      | remember (SemiCircuit_ExiFunExtend_1_obligation_5 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) as D5].
-Qed.
-Next Obligation. by rewrite map_length; destruct (uniVBounds0 _). Qed.
-Next Obligation. by rewrite map_length; destruct (exiVBounds0 _). Qed.
-Next Obligation.
-  by dep_if_case (i < exiFN0); auto;[
-      destruct (exiFOutputBounds0 _); rewrite map_length
-    | rewrite map_length].
-Qed.
-Next Obligation. by unfold fseqSnoc in H; rewrite dep_if_case_true in H. Qed.
-Next Obligation. by unfold fseqSnoc in H; rewrite dep_if_case_false in H. Qed.
-Next Obligation. qauto. Qed.
-Next Obligation. 
-  by dep_if_case (i < exiFN0);[
-        destruct (exiFInputBounds0 _); rewrite map_length
-      | rewrite map_length; qauto].
-Qed.
-
-Program Fixpoint ZOSigma11_Semicircuit 
-  (freeVN : nat) (exiVN : nat) (uniVN : nat)
-  (freeFA : seq nat) (exiFA : seq nat)
-  (f : @ZerothOrderFormula 
-          {| freeFOctx := freeVN; exiFOctx := exiVN; uniFOctx := uniVN
-          ; freeSOctx := freeFA; exiSOctx := exiFA |}) :
-  SemiCircuit := Hole.
-
-Program Fixpoint FOSigma11_Semicircuit 
-  (freeVN : nat) (exiVN : nat) (uniVN : nat)
-  (freeFA : seq nat) (exiFA : seq nat)
-  (f : @FirstOrderFormula 
-          {| freeFOctx := freeVN; exiFOctx := exiVN; uniFOctx := uniVN
-          ; freeSOctx := freeFA; exiSOctx := exiFA |}) :
-  SemiCircuit := Hole.
-
-Program Fixpoint Sigma11_Semicircuit 
-  (freeVN : nat) (exiVN : nat) (uniVN : nat)
-  (freeFA : seq nat) (exiFA : seq nat)
-  (f : @SecondOrderFormula 
-          {| freeFOctx := freeVN; exiFOctx := exiVN; uniFOctx := uniVN
-          ; freeSOctx := freeFA; exiSOctx := exiFA |}) :
-  SemiCircuit := Hole.
-
-End SemicircuitTranslation.
-
-
-(* These add new functions. Are these useful?
-(*Convert constraint to one over context with additional function calls*)
-Program Fixpoint PolyCallCast
-    (freeVN freeFN exiVN exiFN uniVN : nat)
-    (freeFCalls : |[freeFN]| -> nat)
-    (exiFCalls : |[exiFN]| -> nat)
-    (newFreeFN newExiFN : nat)
-    (newFreeFCalls : |[newFreeFN]| -> nat)
-    (newExiFCalls : |[newExiFN]| -> nat)
-
-    (p : @SemicircuitPolyConstraint freeVN exiVN uniVN freeFN exiFN freeFCalls exiFCalls) :
-    @SemicircuitPolyConstraint freeVN exiVN uniVN (freeFN + newFreeFN) (exiFN + newExiFN) 
-                                                  (fseqCCat freeFCalls newFreeFCalls) (fseqCCat exiFCalls newExiFCalls) := 
-  match p with
-  | PolyConsZero => PolyConsZero
-  | PolyConsPlusOne => PolyConsPlusOne
-  | PolyConsMinusOne => PolyConsMinusOne
-  | PolyConsPlus p1 p2 =>
-    let r1 := PolyCallCast _ _ _ _ uniVN freeFCalls exiFCalls _ _ newFreeFCalls newExiFCalls p1 in
-    let r2 := PolyCallCast _ _ _ _ uniVN freeFCalls exiFCalls _ _ newFreeFCalls newExiFCalls p2 in 
-    PolyConsPlus r1 r2
-  | PolyConsTimes p1 p2 =>
-    let r1 := PolyCallCast _ _ _ _ uniVN freeFCalls exiFCalls _ _ newFreeFCalls newExiFCalls p1 in
-    let r2 := PolyCallCast _ _ _ _ uniVN freeFCalls exiFCalls _ _ newFreeFCalls newExiFCalls p2 in 
-    PolyConsTimes r1 r2
-  | PolyConsInd p1 p2 =>
-    let r1 := PolyCallCast _ _ _ _ uniVN freeFCalls exiFCalls _ _ newFreeFCalls newExiFCalls p1 in
-    let r2 := PolyCallCast _ _ _ _ uniVN freeFCalls exiFCalls _ _ newFreeFCalls newExiFCalls p2 in 
-    PolyConsInd r1 r2
-  | PolyConsFreeV i => PolyConsFreeV i
-  | PolyConsExiV i => PolyConsExiV i
-  | PolyConsUniV i => PolyConsUniV i
-  | PolyConsFreeF i j => PolyConsFreeF i j
-  | PolyConsExiF i j => PolyConsExiF i j
-  end.
-Next Obligation. hauto use: ltn_addl, ltn_addr, ltnW. Qed.
-Next Obligation. by unfold fseqCCat; rewrite dep_if_case_true. Qed.
-Next Obligation. hauto use: ltn_addl, ltn_addr, ltnW. Qed.
-Next Obligation. by unfold fseqCCat; rewrite dep_if_case_true. Qed.
-
-(*Convert constraint to one with new function with no calls*)
-Fixpoint PropCallCast
-    (freeVN freeFN exiVN exiFN uniVN : nat)
-    (freeFCalls : |[freeFN]| -> nat)
-    (exiFCalls : |[exiFN]| -> nat)
-    (newFreeFN newExiFN : nat)
-    (newFreeFCalls : |[newFreeFN]| -> nat)
-    (newExiFCalls : |[newExiFN]| -> nat)
-
-    (p : @SemicircuitPropConstraint freeVN exiVN uniVN freeFN exiFN freeFCalls exiFCalls) :
-    @SemicircuitPropConstraint freeVN exiVN uniVN (freeFN + newFreeFN) (exiFN + newExiFN) 
-                                                  (fseqCCat freeFCalls newFreeFCalls) (fseqCCat exiFCalls newExiFCalls) := 
-  match p with
-  | ZOConsNot p =>
-    let r := PropCallCast _ _ _ _ uniVN freeFCalls exiFCalls _ _ newFreeFCalls newExiFCalls p in
-    ZOConsNot r
-  | ZOConsAnd p1 p2 =>
-    let r1 := PropCallCast _ _ _ _ uniVN freeFCalls exiFCalls _ _ newFreeFCalls newExiFCalls p1 in
-    let r2 := PropCallCast _ _ _ _ uniVN freeFCalls exiFCalls _ _ newFreeFCalls newExiFCalls p2 in
-    ZOConsAnd r1 r2
-  | ZOConsOr p1 p2 =>
-    let r1 := PropCallCast _ _ _ _ uniVN freeFCalls exiFCalls _ _ newFreeFCalls newExiFCalls p1 in
-    let r2 := PropCallCast _ _ _ _ uniVN freeFCalls exiFCalls _ _ newFreeFCalls newExiFCalls p2 in
-    ZOConsOr r1 r2
-  | ZOConsImp p1 p2 =>
-    let r1 := PropCallCast _ _ _ _ uniVN freeFCalls exiFCalls _ _ newFreeFCalls newExiFCalls p1 in
-    let r2 := PropCallCast _ _ _ _ uniVN freeFCalls exiFCalls _ _ newFreeFCalls newExiFCalls p2 in
-    ZOConsImp r1 r2
-  | ZOConsEq p1 p2 =>
-    let r1 := PolyCallCast _ _ _ _ uniVN freeFCalls exiFCalls _ _ newFreeFCalls newExiFCalls p1 in
-    let r2 := PolyCallCast _ _ _ _ uniVN freeFCalls exiFCalls _ _ newFreeFCalls newExiFCalls p2 in
-    ZOConsEq r1 r2
-  end. *)
-
-
-(*Lift the new polynomial args so names don't conflict with arguments from other polynomial *)
-(* Program Fixpoint PolyLift2
-    (freeVN freeFN exiVN exiFN uniVN : nat)
-    (freeFCalls : |[freeFN]| -> nat)
-    (exiFCalls : |[exiFN]| -> nat)
-    (newFreeFCalls1 : |[freeFN]| -> nat)
-    (newExiFCalls1 : |[exiFN]| -> nat)
-    (newFreeFCalls2 : |[freeFN]| -> nat)
-    (newExiFCalls2 : |[exiFN]| -> nat)
-
-    (p : @SemicircuitPolyConstraint freeVN exiVN uniVN freeFN exiFN (fun x => freeFCalls x + newFreeFCalls2 x)
-                                                                    (fun x => exiFCalls x + newExiFCalls2 x)) :
-    @SemicircuitPolyConstraint freeVN exiVN uniVN freeFN exiFN
-                               (fun x => freeFCalls x + newFreeFCalls1 x + newFreeFCalls2 x) 
-                               (fun x => exiFCalls x + newExiFCalls1 x + newExiFCalls2 x) :=
-  match p with
-  | PolyConsZero => PolyConsZero
-  | PolyConsPlusOne => PolyConsPlusOne
-  | PolyConsMinusOne => PolyConsMinusOne
-  | PolyConsPlus p1 p2 =>
-    let r1 := PolyLift2 _ _ _ _ uniVN freeFCalls exiFCalls newFreeFCalls1 newExiFCalls1 newFreeFCalls2 newExiFCalls2 p1 in
-    let r2 := PolyLift2 _ _ _ _ uniVN freeFCalls exiFCalls newFreeFCalls1 newExiFCalls1 newFreeFCalls2 newExiFCalls2 p2 in 
-    PolyConsPlus r1 r2
-  | PolyConsTimes p1 p2 =>
-    let r1 := PolyLift2 _ _ _ _ uniVN freeFCalls exiFCalls newFreeFCalls1 newExiFCalls1 newFreeFCalls2 newExiFCalls2 p1 in
-    let r2 := PolyLift2 _ _ _ _ uniVN freeFCalls exiFCalls newFreeFCalls1 newExiFCalls1 newFreeFCalls2 newExiFCalls2 p2 in 
-    PolyConsTimes r1 r2
-  | PolyConsInd p1 p2 =>
-    let r1 := PolyLift2 _ _ _ _ uniVN freeFCalls exiFCalls newFreeFCalls1 newExiFCalls1 newFreeFCalls2 newExiFCalls2 p1 in
-    let r2 := PolyLift2 _ _ _ _ uniVN freeFCalls exiFCalls newFreeFCalls1 newExiFCalls1 newFreeFCalls2 newExiFCalls2 p2 in 
-    PolyConsInd r1 r2
-  | PolyConsFreeV i => PolyConsFreeV i
-  | PolyConsExiV i => PolyConsExiV i
-  | PolyConsUniV i => PolyConsUniV i
-  | PolyConsFreeF i j => (
-    if j < freeFCalls i as b return (j < freeFCalls i = b -> 
-                                     @SemicircuitPolyConstraint _ _ _ _ _
-                                        (fun x => freeFCalls x + newFreeFCalls1 x + newFreeFCalls2 x) 
-                                        (fun x => exiFCalls x + newExiFCalls1 x + newExiFCalls2 x))
-    then fun _ => PolyConsFreeF i j
-    else fun _ => PolyConsFreeF i (j + newFreeFCalls1 i)
-    ) (erefl _)
-  | PolyConsExiF i j => (
-    if j < exiFCalls i as b return (j < exiFCalls i = b -> 
-                                     @SemicircuitPolyConstraint _ _ _ _ _
-                                        (fun x => freeFCalls x + newFreeFCalls1 x + newFreeFCalls2 x) 
-                                        (fun x => exiFCalls x + newExiFCalls1 x + newExiFCalls2 x))
-    then fun _ => PolyConsExiF i j
-    else fun _ => PolyConsExiF i (j + newExiFCalls1 i)
-    ) (erefl _)
-  end.
-Next Obligation. qauto use: ltn_addr. Qed.
-Next Obligation. by rewrite <- addnA, (addnC (newFreeFCalls1 _)), addnA, ltn_add2r. Qed.
-Next Obligation. qauto use: ltn_addr. Qed.
-Next Obligation. by rewrite <- addnA, (addnC (newExiFCalls1 _)), addnA, ltn_add2r. Qed. *)
-
-(* 
-
-(*Add new poly constraint to a circuit.*)
-Program Definition SemiCircuit_PolyExtend
-  (c : SemiCircuit)
-  (newPoly : @SemicircuitPolyConstraint (Ctx c)) :
-  SemiCircuit :=
-    {| Ctx := Ctx c
-      ; nu := nu c
-      ; polyConstraints := rcons (polyConstraints c) newPoly
-      ; freeFArgs := freeFArgs c
-      ; exiFArgs := exiFArgs c
-      ; uniVBounds := uniVBounds c
-      ; exiVBounds := exiVBounds c
-      ; exiFOutputBounds := exiFOutputBounds c
-      ; exiFInputBounds := exiFInputBounds c
-      ; formula := formula c
-    |}.
-Next Obligation. rewrite length_rcons; destruct (freeFArgs _ _ _); hauto. Qed.
-Next Obligation. rewrite length_rcons; destruct (exiFArgs _ _ _); hauto. Qed.
-Next Obligation. rewrite length_rcons; destruct (uniVBounds _ _); hauto. Qed.
-Next Obligation. rewrite length_rcons; destruct (exiVBounds _ _); hauto. Qed.
-Next Obligation. rewrite length_rcons; destruct (exiFOutputBounds _ _); hauto. Qed.
-Next Obligation. rewrite length_rcons; destruct (exiFInputBounds _); hauto. Qed.
-
-(* Add new precomputed function calls to a circuit. *)
-Program Definition SemiCircuit_CallExtend
-  (c : SemiCircuit)
-  (newFreeFCalls : |[freeFN c]| -> nat)
-  (newExiFCalls : |[exiFN c]| -> nat) 
-  (newFreeFArgs : forall (i : |[freeFN c]|), |[newFreeFCalls i]| -> |[freeFArity c i]| -> |[length (polyConstraints c)]|)
-  (newExiFArgs : forall (i : |[exiFN c]|), |[newExiFCalls i]| -> |[exiFArity c i]| -> |[length (polyConstraints c)]|) :
-  SemiCircuit :=
-    {| Ctx := {| subCtx := subCtx (Ctx c) 
-                ; freeFC := fun x => freeFC (Ctx c) x + newFreeFCalls x
-                ; exiFC := fun x => exiFC (Ctx c) x + newExiFCalls x|}
-      ; nu := nu c
-      ; polyConstraints := map PolyCallCast (polyConstraints c)
-      ; freeFArgs := fun i (j : |[freeFCalls c i + newFreeFCalls i]|) =>
-        (if j < freeFCalls c i as b return (j < freeFCalls c i) = b -> |[freeFArity c i]| -> |[length (polyConstraints c)]|
-        then fun _ => freeFArgs c i j
-        else fun _ => newFreeFArgs i (j - freeFCalls c i)) (erefl _)
-      ; exiFArgs := fun i (j : |[exiFCalls c i + newExiFCalls i]|) =>
-        (if j < exiFCalls c i as b return (j < exiFCalls c i) = b -> |[exiFArity c i]| -> |[length (polyConstraints c)]|
-        then fun _ => exiFArgs c i j
-        else fun _ => newExiFArgs i (j - exiFCalls c i)) (erefl _)
-      ; uniVBounds := uniVBounds c
-      ; exiVBounds := exiVBounds c
-      ; exiFOutputBounds := exiFOutputBounds c
-      ; exiFInputBounds := exiFInputBounds c
-      ; formula := inrMap PropCallCast (formula c)
-    |}.
-Next Obligation.
-  remember (freeFCalls c _) as F; clear HeqF; remember (newFreeFCalls0 _) as N; clear HeqN.
-  assert (~ (j < F));[hauto|assert (F <= j);[by apply (contra_not_leq (P := j < F))|]].
-  qauto use: ltn_subLR, ltn_addr.
-Qed.
-Next Obligation.
-  dep_if_case (j < freeFCalls c (exist _ i H1));rewrite map_length.
-  by destruct (freeFArgs _ _ _ _).
-  by destruct (newFreeFArgs _ _ _).
-Qed.
-Next Obligation.
-  remember (exiFCalls c _) as F; clear HeqF; remember (newExiFCalls0 _) as N; clear HeqN.
-  assert (~ (j < F));[hauto|assert (F <= j);[by apply (contra_not_leq (P := j < F))|]].
-  qauto use: ltn_subLR, ltn_addr.
-Qed.
-Next Obligation.
-  dep_if_case (j < exiFCalls c (exist _ i H1));rewrite map_length.
-  by destruct (exiFArgs _ _ _ _).
-  by destruct (newExiFArgs _ _ _).
-Qed.
-Next Obligation. by destruct (uniVBounds _ _);rewrite map_length. Qed. 
-Next Obligation. by destruct (exiVBounds _ _);rewrite map_length. Qed. 
-Next Obligation. by destruct (exiFOutputBounds _ _);rewrite map_length. Qed. 
-Next Obligation. by destruct (exiFInputBounds _ _);rewrite map_length. Qed.  *)
