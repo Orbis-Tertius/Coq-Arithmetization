@@ -71,7 +71,8 @@ Record SemiCircuit : Type :=
     uniVN := uniVS Ctx; (* u in paper *)
     freeFCalls := freeFC Ctx; (* r in paper *)
     exiFCalls := exiFC Ctx; (* q in paper *)
-    nu : {s : |[exiVN]| -> nat | forall i j : |[exiVN]|, (` i) <= (` j) -> s i <= s j};
+    nu : |[exiVN]| -> nat;
+    (* {s : |[exiVN]| -> nat | forall i j : |[exiVN]|, (` i) <= (` j) -> s i <= s j}; *)
     polyConstraints : seq (@SemicircuitPolyConstraint Ctx);
     (* w in paper *)
     freeFArgs : forall (i : |[freeFN]|), |[freeFCalls i]| -> |[freeFArity i]| -> |[length polyConstraints]|;
@@ -965,16 +966,333 @@ Definition Translate_ZerothOrderFormula
   let (d, p) := PropConvert f in
   let c0 := IntegrateConversionData c d in
   {| Ctx := Ctx c0
-    ; nu := nu c0
-    ; polyConstraints := polyConstraints c0
-    ; freeFArgs := freeFArgs c0
-    ; exiFArgs := exiFArgs c0
-    ; uniVBounds := uniVBounds c0
-    ; exiVBounds := exiVBounds c0
-    ; exiFOutputBounds := exiFOutputBounds c0
-    ; exiFInputBounds := exiFInputBounds c0
-    ; formula := inr (PropCallLift p)
+   ; nu := nu c0
+   ; polyConstraints := polyConstraints c0
+   ; freeFArgs := freeFArgs c0
+   ; exiFArgs := exiFArgs c0
+   ; uniVBounds := uniVBounds c0
+   ; exiVBounds := exiVBounds c0
+   ; exiFOutputBounds := exiFOutputBounds c0
+   ; exiFInputBounds := exiFInputBounds c0
+   ; formula := inr (PropCallLift p)
   |}.
+
+Program Fixpoint PolyLiftExiV {ctx}
+  (p : @SemicircuitPolyConstraint ctx) :
+    @SemicircuitPolyConstraint {| subCtx := incExiV (subCtx ctx)
+                                ; freeFC := freeFC ctx
+                                ; exiFC := exiFC ctx|} := 
+  match p with
+  | PolyConsZero => PolyConsZero
+  | PolyConsPlusOne => PolyConsPlusOne
+  | PolyConsMinusOne => PolyConsMinusOne
+  | PolyConsPlus p1 p2 =>
+    let r1 := PolyLiftExiV p1 in
+    let r2 := PolyLiftExiV p2 in 
+    PolyConsPlus r1 r2
+  | PolyConsTimes p1 p2 =>
+    let r1 := PolyLiftExiV p1 in
+    let r2 := PolyLiftExiV p2 in 
+    PolyConsTimes r1 r2
+  | PolyConsInd p1 p2 =>
+    let r1 := PolyLiftExiV p1 in
+    let r2 := PolyLiftExiV p2 in 
+    PolyConsInd r1 r2
+  | PolyConsFreeV i => PolyConsFreeV i
+  | PolyConsExiV i => PolyConsExiV i.+1
+  | PolyConsUniV i => PolyConsUniV i
+  | PolyConsFreeF i j => PolyConsFreeF i j
+  | PolyConsExiF i j => PolyConsExiF i j
+  end.
+Next Obligation. by destruct (subCtx ctx). Qed. Next Obligation. by destruct (subCtx ctx). Qed.
+Next Obligation. by unfold freeVS in *; simpl; destruct (subCtx ctx). Qed. 
+Next Obligation. by unfold exiVS in *; simpl; destruct (subCtx ctx). Qed.
+Next Obligation. by unfold uniVS in *; simpl; destruct (subCtx ctx). Qed.
+Next Obligation. by clear H; unfold freeFS in *; simpl; destruct (subCtx ctx). Qed.
+Next Obligation.
+  remember (PolyLiftExiV_obligation_1 _ _) as P; clear HeqP; simpl in P.
+  replace P with H0; auto.
+  apply eq_irrelevance.
+Qed.
+Next Obligation. by clear H; unfold exiFS in *; simpl; destruct (subCtx ctx). Qed.
+Next Obligation.
+  remember (PolyLiftExiV_obligation_2 _ _) as P; clear HeqP; simpl in P.
+  replace P with H0; auto.
+  apply eq_irrelevance.
+Qed.
+
+Program Fixpoint PropLiftExiV {ctx}
+  (p : @SemicircuitPropConstraint ctx) :
+  @SemicircuitPropConstraint {| subCtx := incExiV (subCtx ctx)
+                              ; freeFC := freeFC ctx
+                              ; exiFC := exiFC ctx|} := 
+  match p with
+  | ZOConsNot p =>
+    let r := PropLiftExiV p in
+    ZOConsNot r
+  | ZOConsAnd p1 p2 =>
+    let r1 := PropLiftExiV p1 in
+    let r2 := PropLiftExiV p2 in
+    ZOConsAnd r1 r2
+  | ZOConsOr p1 p2 =>
+    let r1 := PropLiftExiV p1 in
+    let r2 := PropLiftExiV p2 in
+    ZOConsOr r1 r2
+  | ZOConsImp p1 p2 =>
+    let r1 := PropLiftExiV p1 in
+    let r2 := PropLiftExiV p2 in
+    ZOConsImp r1 r2
+  | ZOConsEq p1 p2 =>
+    let r1 := PolyLiftExiV p1 in
+    let r2 := PolyLiftExiV p2 in
+    ZOConsEq r1 r2
+  end.
+
+Program Fixpoint PolyLiftUniV {ctx}
+  (p : @SemicircuitPolyConstraint ctx) :
+    @SemicircuitPolyConstraint {| subCtx := incUniV (subCtx ctx)
+                                ; freeFC := freeFC ctx
+                                ; exiFC := exiFC ctx|} := 
+  match p with
+  | PolyConsZero => PolyConsZero
+  | PolyConsPlusOne => PolyConsPlusOne
+  | PolyConsMinusOne => PolyConsMinusOne
+  | PolyConsPlus p1 p2 =>
+    let r1 := PolyLiftUniV p1 in
+    let r2 := PolyLiftUniV p2 in 
+    PolyConsPlus r1 r2
+  | PolyConsTimes p1 p2 =>
+    let r1 := PolyLiftUniV p1 in
+    let r2 := PolyLiftUniV p2 in 
+    PolyConsTimes r1 r2
+  | PolyConsInd p1 p2 =>
+    let r1 := PolyLiftUniV p1 in
+    let r2 := PolyLiftUniV p2 in 
+    PolyConsInd r1 r2
+  | PolyConsFreeV i => PolyConsFreeV i
+  | PolyConsExiV i => PolyConsExiV i
+  | PolyConsUniV i => PolyConsUniV i.+1
+  | PolyConsFreeF i j => PolyConsFreeF i j
+  | PolyConsExiF i j => PolyConsExiF i j
+  end.
+Next Obligation. by destruct (subCtx ctx). Qed. Next Obligation. by destruct (subCtx ctx). Qed.
+Next Obligation. by unfold freeVS in *; simpl; destruct (subCtx ctx). Qed. 
+Next Obligation. by unfold exiVS in *; simpl; destruct (subCtx ctx). Qed.
+Next Obligation. by unfold uniVS in *; simpl; destruct (subCtx ctx). Qed.
+Next Obligation. by clear H; unfold freeFS in *; simpl; destruct (subCtx ctx). Qed.
+Next Obligation.
+  remember (PolyLiftUniV_obligation_1 _ _) as P; clear HeqP; simpl in P.
+  replace P with H0; auto.
+  apply eq_irrelevance.
+Qed.
+Next Obligation. by clear H; unfold exiFS in *; simpl; destruct (subCtx ctx). Qed.
+Next Obligation.
+  remember (PolyLiftUniV_obligation_2 _ _) as P; clear HeqP; simpl in P.
+  replace P with H0; auto.
+  apply eq_irrelevance.
+Qed.
+
+Program Fixpoint PropLiftUniV {ctx}
+  (p : @SemicircuitPropConstraint ctx) :
+  @SemicircuitPropConstraint {| subCtx := incUniV (subCtx ctx)
+                              ; freeFC := freeFC ctx
+                              ; exiFC := exiFC ctx|} := 
+  match p with
+  | ZOConsNot p =>
+    let r := PropLiftUniV p in
+    ZOConsNot r
+  | ZOConsAnd p1 p2 =>
+    let r1 := PropLiftUniV p1 in
+    let r2 := PropLiftUniV p2 in
+    ZOConsAnd r1 r2
+  | ZOConsOr p1 p2 =>
+    let r1 := PropLiftUniV p1 in
+    let r2 := PropLiftUniV p2 in
+    ZOConsOr r1 r2
+  | ZOConsImp p1 p2 =>
+    let r1 := PropLiftUniV p1 in
+    let r2 := PropLiftUniV p2 in
+    ZOConsImp r1 r2
+  | ZOConsEq p1 p2 =>
+    let r1 := PolyLiftUniV p1 in
+    let r2 := PolyLiftUniV p2 in
+    ZOConsEq r1 r2
+  end.
+
+(*Add a new existentially quantified first order variable to semicircuit *)
+Program Definition SemicircuitExiInc (c : SemiCircuit) (p : @SemicircuitPolyConstraint (Ctx c)): SemiCircuit :=
+  {| Ctx := {| subCtx := incExiV (subCtx (Ctx c))
+              ; freeFC := freeFC (Ctx c)
+              ; exiFC := exiFC (Ctx c)|}
+  ; nu := fun i =>
+    (if i == 0 as b return (i == 0) = b -> nat
+     then fun _ => uniV (subCtx (Ctx c))
+     else fun _ => nu c (i.-1)) (erefl _)
+  ; polyConstraints := map PolyLiftExiV (rcons (polyConstraints c) p)
+  ; freeFArgs := freeFArgs c
+  ; exiFArgs := exiFArgs c
+  ; uniVBounds := uniVBounds c
+  ; exiVBounds := fun i =>
+    (if i == 0 as b return (i == 0) = b -> |[length (map PolyLiftExiV (rcons (polyConstraints c) p))]|
+    then fun _ => length (polyConstraints c)
+    else fun _ => exiVBounds c (i.-1)) (erefl _)
+  ; exiFOutputBounds := exiFOutputBounds c
+  ; exiFInputBounds := exiFInputBounds c
+  ; formula := inrMap PropLiftExiV (formula c)
+  |}.
+Next Obligation.
+  remember (PolyLiftExiV_obligation_1 _ _) as P; clear HeqP; simpl in P.
+  destruct c, Ctx0, subCtx0; simpl in *.
+  replace P with H1;auto.
+  apply eq_irrelevance.
+Qed.
+Next Obligation.
+  destruct (freeFArgs _ _).
+  rewrite map_length length_rcons; sfirstorder.
+Qed.
+Next Obligation.
+  remember (PolyLiftExiV_obligation_2 _ _) as P; clear HeqP; simpl in P.
+  destruct c, Ctx0, subCtx0; simpl in *.
+  replace P with H1;auto.
+  apply eq_irrelevance.
+Qed.
+Next Obligation.
+  destruct (exiFArgs _).
+  rewrite map_length length_rcons; sfirstorder.
+Qed.
+Next Obligation. by destruct c, Ctx0, subCtx0. Qed.
+Next Obligation.
+  destruct (uniVBounds _ _).
+  rewrite map_length length_rcons; sfirstorder.
+Qed.
+Next Obligation. by destruct c, Ctx0, subCtx0. Qed.
+Next Obligation.
+  destruct (exiFOutputBounds _ _).
+  rewrite map_length length_rcons; sfirstorder.
+Qed.
+Next Obligation. by destruct c, Ctx0, subCtx0. Qed.
+Next Obligation.
+  remember (SemicircuitExiInc_obligation_9 _ _ _) as P; clear HeqP; simpl in P.
+  destruct c, Ctx0, subCtx0; simpl in *.
+  replace P with H0;auto.
+  apply eq_irrelevance.
+Qed.
+Next Obligation.
+  destruct (exiFInputBounds _ _).
+  rewrite map_length length_rcons; sfirstorder.
+Qed.
+Next Obligation. by destruct c, Ctx0, subCtx0. Qed.
+Next Obligation.
+  assert ((i == 0) = false);[exact e|clear e].
+  destruct c, Ctx0, subCtx0; simpl in *.
+  unfold exiVS, exiVN, Ctx, exiVS, subCtx, Sigma_1_1.exiV in *.
+  assert (i <> 0);[by rewrite <- EEFConvert|].
+  by destruct i;[fcrush|].
+Qed.
+Next Obligation. by destruct (exiVS _);[fcrush|]. Qed.
+Next Obligation. 
+  assert ((i == 0) = false);[exact e|clear e].
+  destruct c, Ctx0, subCtx0; simpl in *.
+  unfold exiVS, exiVN, Ctx, exiVS, subCtx, Sigma_1_1.exiV in *.
+  assert (i <> 0);[by rewrite <- EEFConvert|].
+  by destruct i;[fcrush|].
+Qed.
+Next Obligation. 
+  destruct (exiVBounds _ _).
+  rewrite map_length length_rcons; sfirstorder.
+Qed.
+Next Obligation. rewrite map_length length_rcons; sfirstorder. Qed.
+
+(*Add a new universally quantified first order variable to semicircuit *)
+Program Definition SemicircuitUniInc (c : SemiCircuit) (p : @SemicircuitPolyConstraint (Ctx c)): SemiCircuit :=
+  {| Ctx := {| subCtx := incUniV (subCtx (Ctx c))
+              ; freeFC := freeFC (Ctx c)
+              ; exiFC := exiFC (Ctx c)|}
+  ; nu := nu c
+  ; polyConstraints := map PolyLiftUniV (rcons (polyConstraints c) p)
+  ; freeFArgs := freeFArgs c
+  ; exiFArgs := exiFArgs c
+  ; uniVBounds := fun i =>
+    (if i == 0 as b return (i == 0) = b -> |[length (map PolyLiftUniV (rcons (polyConstraints c) p))]|
+    then fun _ => length (polyConstraints c)
+    else fun _ => uniVBounds c (i.-1)) (erefl _)
+  ; exiVBounds := exiVBounds c
+  ; exiFOutputBounds := exiFOutputBounds c
+  ; exiFInputBounds := exiFInputBounds c
+  ; formula := inrMap PropLiftUniV (formula c)
+  |}.
+Next Obligation. by destruct c, Ctx0, subCtx0. Qed.
+Next Obligation.
+  remember (PolyLiftUniV_obligation_1 _ _) as P; clear HeqP; simpl in P.
+  destruct c, Ctx0, subCtx0; simpl in *.
+  replace P with H1;auto.
+  apply eq_irrelevance.
+Qed.
+Next Obligation.
+  destruct (freeFArgs _ _).
+  rewrite map_length length_rcons; sfirstorder.
+Qed.
+Next Obligation.
+  remember (PolyLiftUniV_obligation_2 _ _) as P; clear HeqP; simpl in P.
+  destruct c, Ctx0, subCtx0; simpl in *.
+  replace P with H1;auto.
+  apply eq_irrelevance.
+Qed.
+Next Obligation.
+  destruct (exiFArgs _).
+  rewrite map_length length_rcons; sfirstorder.
+Qed.
+Next Obligation. by destruct c, Ctx0, subCtx0. Qed.
+Next Obligation.
+  destruct (exiVBounds _ _).
+  rewrite map_length length_rcons; sfirstorder.
+Qed.
+Next Obligation. by destruct c, Ctx0, subCtx0. Qed.
+Next Obligation.
+  destruct (exiFOutputBounds _ _).
+  rewrite map_length length_rcons; sfirstorder.
+Qed.
+Next Obligation. by destruct c, Ctx0, subCtx0. Qed.
+Next Obligation.
+  remember (SemicircuitUniInc_obligation_10 _ _ _) as P; clear HeqP; simpl in P.
+  destruct c, Ctx0, subCtx0; simpl in *.
+  replace P with H0;auto.
+  apply eq_irrelevance.
+Qed.
+Next Obligation.
+  destruct (exiFInputBounds _ _).
+  rewrite map_length length_rcons; sfirstorder.
+Qed.
+Next Obligation. by destruct c, Ctx0, subCtx0. Qed.
+Next Obligation.
+  assert ((i == 0) = false);[exact e|clear e].
+  destruct c, Ctx0, subCtx0; simpl in *.
+  unfold exiVS, exiVN, Ctx, exiVS, subCtx, Sigma_1_1.exiV in *.
+  assert (i <> 0);[by rewrite <- EEFConvert|].
+  by destruct i;[fcrush|].
+Qed.
+Next Obligation.
+  destruct (uniVBounds _ _).
+  rewrite map_length length_rcons; sfirstorder.
+Qed.
+Next Obligation. rewrite map_length length_rcons; sfirstorder. Qed.
+
+Fixpoint Translate_FirstOrderFormula 
+  (c : SemiCircuit)
+  (f : @FirstOrderFormula (subCtx (Ctx c))) : SemiCircuit :=
+  match f with
+  | ZO f => Translate_ZerothOrderFormula c f
+  | FOExists b f =>
+    let (da, bo) := PolyConvert b in
+    let c0 := IntegrateConversionData c da in
+    let c1 := SemicircuitExiInc c0 (PolyCallLift bo) in
+    Translate_FirstOrderFormula c1 f
+  | FOForall b f => 
+    let (da, bo) := PolyConvert b in
+    let c0 := IntegrateConversionData c da in
+    let c1 := SemicircuitUniInc c0 (PolyCallLift bo) in
+    Translate_FirstOrderFormula c1 f
+  end.
 
 
 
