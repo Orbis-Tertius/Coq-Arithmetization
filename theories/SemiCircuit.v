@@ -408,22 +408,6 @@ Program Fixpoint PolyCallLift {ctx}
   end.
 Solve All Obligations with qauto use: ltn_add2l.
 
-(*Cast a sequence of polynomials so they have no conflicting variables. *)
-Fixpoint PolyCallSeqFuse {ctx : Sigma11Ctx} 
-  (s : seq { freeFCalls : |[freeF ctx]| -> nat & { exiFCalls : |[exiF ctx]| -> nat & 
-      @SemicircuitPolyConstraint {| subCtx := ctx
-                                  ; freeFC := freeFCalls
-                                  ; exiFC := exiFCalls |}
-      } }) :
-  seq (@SemicircuitPolyConstraint {| subCtx := ctx
-                                   ; freeFC := (fun x => sumn [seq projT1 i x | i <- s])
-                                   ; exiFC := (fun x => sumn [seq projT1 (projT2 i) x | i <- s]) |}) :=
-  match s with
-  | [::] => [::]
-  | existT a (existT b x) :: xs => 
-    PolyCallCast x :: map PolyCallLift (PolyCallSeqFuse xs)
-  end.
-
 Record PolyConversionData {ctx : Sigma11Ctx} : Type := mkPolyConvertData {
   newFreeFCalls : |[freeF ctx]| -> nat ;
   newExiFCalls : |[exiF ctx]| -> nat ;
@@ -457,7 +441,7 @@ Program Definition PolyConversionCombineData {ctx}
       ) (erefl _) |}
   end.
 Next Obligation.
-  change (length ?n) with (size n); rewrite size_cat; do 2 rewrite size_map.
+  rewrite length_cat map_length map_length.
   by destruct (fcal1 _); apply ltn_addr.
 Qed.
 Next Obligation.
@@ -466,11 +450,11 @@ Next Obligation.
   qauto use: ltn_subLR, ltn_addr.
 Qed.
 Next Obligation.
-  change (length ?n) with (size n); rewrite size_cat; do 2 rewrite size_map.
+  rewrite length_cat map_length map_length.
   by destruct (fcal2 _); apply ltn_addl.
 Qed.
 Next Obligation.
-  change (length ?n) with (size n); rewrite size_cat; do 2 rewrite size_map.
+  rewrite length_cat map_length map_length.
   by destruct (ecal1 _); apply ltn_addr.
 Qed.
 Next Obligation.
@@ -479,10 +463,37 @@ Next Obligation.
   qauto use: ltn_subLR, ltn_addr.
 Qed.
 Next Obligation.
-  change (length ?n) with (size n); rewrite size_cat; do 2 rewrite size_map.
+  rewrite length_cat map_length map_length.
   by destruct (ecal2 _); apply ltn_addl.
 Qed.
 
+(*Fuse sequence of poly conversion outputs into a single output. *)
+Program Fixpoint PolyCallSeqFuse {ctx : Sigma11Ctx} 
+  (s : seq { d : @PolyConversionData ctx &  
+    @SemicircuitPolyConstraint {| subCtx := ctx; freeFC := newFreeFCalls d; exiFC := newExiFCalls d |} }) :
+  { d : @PolyConversionData ctx &
+    {t : seq (@SemicircuitPolyConstraint {| subCtx := ctx; freeFC := newFreeFCalls d; exiFC := newExiFCalls d |}) | length t = length s} } :=
+  match s with
+  | [::] => existT _ PolyConversionEmptyData [::]
+  | (existT b x) :: xs => 
+    let (d, p) := PolyCallSeqFuse xs in
+    let d0 := PolyConversionCombineData b d in
+    let p0 : seq (@SemicircuitPolyConstraint {| subCtx := ctx; freeFC := newFreeFCalls d0; exiFC := newExiFCalls d0 |})
+           := eq_rect _ (fun x => seq (@SemicircuitPolyConstraint {| subCtx := _; freeFC := x; exiFC := _ |})) (
+              eq_rect _ (fun x => seq (@SemicircuitPolyConstraint {| subCtx := _; freeFC := _; exiFC := x |})) 
+              (PolyCallCast x :: map PolyCallLift p) _ _) _ _ in
+    existT _ d0 p0
+  end.
+Next Obligation. by destruct b, d. Qed.
+Next Obligation. by destruct b, d. Qed.
+Next Obligation. 
+  do 2 rewrite PolymorphicEqElim.
+  rewrite <- H.
+  simpl.
+  by rewrite map_length.
+Qed.
+
+(* 
 (*Reform output of PolyConvert in preparation for PolyCallSeqFuse *)
 Definition OutReform {ctx}
   (s : { d : @PolyConversionData ctx &  
@@ -493,7 +504,7 @@ Definition OutReform {ctx}
   match s with
   | existT {| newFreeFCalls := nffc1; newExiFCalls := nefc1; newPolys := _; newFreeArgs := _; newExiArgs := _ |}
            p => existT _ nffc1 (existT _ nefc1 p)
-  end.
+  end. *)
 
 (*Call for a single function*)
 Definition SingleCall {FN} (i : |[FN]|) (j : |[FN]|) : nat :=
@@ -563,14 +574,12 @@ Program Definition FreeCallIncorp {ctx}
   end.
 Next Obligation.
   destruct (AddPolys _ _ _ _ _ _); simpl.
-  rewrite map_length; change (length ?x) with (size x).
-  rewrite size_cat; change (size ?x) with (length x).
+  rewrite map_length length_cat.
   by rewrite ls.
 Qed.
 Next Obligation.
   destruct (nec _ _ _); simpl.
-  rewrite map_length; change (length ?x) with (size x).
-  rewrite size_cat; change (size ?x) with (length x).
+  rewrite map_length length_cat.
   hauto use: ltnW, ltn_addr, ltnS.
 Qed.
 
@@ -591,14 +600,12 @@ Program Definition ExiCallIncorp {ctx}
   end.
 Next Obligation.
   destruct (nfc _ _ _); simpl.
-  rewrite map_length; change (length ?x) with (size x).
-  rewrite size_cat; change (size ?x) with (length x).
+  rewrite map_length length_cat.
   hauto use: ltnW, ltn_addr, ltnS.
 Qed.
 Next Obligation.
   destruct (AddPolys _ _ _ _ _ _); simpl.
-  rewrite map_length; change (length ?x) with (size x).
-  rewrite size_cat; change (size ?x) with (length x).
+  rewrite map_length length_cat.
   by rewrite ls.
 Qed.
 
@@ -613,26 +620,6 @@ Next Obligation.
   by apply subset_eq_compat.
 Qed.
 
-Theorem PolymorphicEqElim 
-  {T S}  {fam : Type -> Type}
-  {P : S -> Type} 
-  {f : forall x, fam x -> T}
-  {x y}
-  {e : x = y}
-  {s : fam (P x)} :
-  f _ (eq_rect _ (fun x => fam (P x)) s _ e) = f _ s.
-Proof. by destruct e. Qed.
-
-Lemma PolyConvertFreeCaseLem {ctx} {D : @PolyConversionData ctx} {i : |[freeF ctx]|} {B} {e} :
-  newFreeFCalls D i < newFreeFCalls (FreeCallIncorp D i B e) i.
-Proof.
-  destruct D; simpl.
-  unfold AddCall.
-  unfold SingleCall.
-  rewrite dep_if_case_true;[by rewrite EEConvert|].
-  hauto use: ltnSn, addn1, contra_ltn_leq.
-Qed.
-
 Program Definition PolyConvertFreeCase {ctx} 
   (i : |[freeF ctx]|) 
   (t : |[freeFA ctx i]| ->
@@ -640,59 +627,12 @@ Program Definition PolyConvertFreeCase {ctx}
     @SemicircuitPolyConstraint {| subCtx := ctx; freeFC := newFreeFCalls d; exiFC := newExiFCalls d |} }) :
   { d : @PolyConversionData ctx &  
     @SemicircuitPolyConstraint {| subCtx := ctx; freeFC := newFreeFCalls d; exiFC := newExiFCalls d |} } := 
-  (* We start with a function name and a list of data and constraints that needs to be fused together *)
-  (* The first thing we need to do is fuse this list of data into a single peice of data*)
-  let rs : seq {d : @PolyConversionData ctx 
-                  & @SemicircuitPolyConstraint {| subCtx := ctx; freeFC := newFreeFCalls d; exiFC := newExiFCalls d |} } 
-         := [seq t i | i <- cRange 0 (freeFA ctx i) ] in
-  let data : @PolyConversionData ctx := foldr PolyConversionCombineData PolyConversionEmptyData [seq projT1 i | i <- rs] in
-
-  (* We also need consolidate all the polynomial constraints into a single list and add those to the data*)
-  let polys : seq (@SemicircuitPolyConstraint {| subCtx := ctx
-                      ; freeFC := newFreeFCalls data
-                      ; exiFC := newExiFCalls data |})
-               := eq_rect _ (fun x => seq (@SemicircuitPolyConstraint {| subCtx := _; freeFC := _; exiFC := x |})) (
-                  eq_rect _ (fun x => seq (@SemicircuitPolyConstraint {| subCtx := _; freeFC := x; exiFC := _ |})) 
-                  (PolyCallSeqFuse (map OutReform rs)) _ _) _ _ in
+  let (data, polys) := PolyCallSeqFuse [seq t i | i <- cRange 0 (freeFA ctx i) ] in
   let data2 : @PolyConversionData ctx := FreeCallIncorp data i polys _ in
-
-  (*We return a call the the most recently added function *)
   existT _ data2 (PolyConsFreeF i (newFreeFCalls data i)).
+Next Obligation. by rewrite map_length (length_cRange (n := 0)) in H. Qed.
 Next Obligation.
-  apply functional_extensionality.
-  elim: [seq t i0 | i0 <- cRange 0 _]; auto.
-  move=> [d p] l IH x.
-  transitivity ((projT1 (OutReform (existT _ d p)) x) + sumn [seq projT1 i x | i <- [seq OutReform j | j <- l]]); auto.
-  rewrite IH.
-  destruct d, x.
-  by simpl; destruct (foldr PolyConversionCombineData PolyConversionEmptyData [seq projT1 i0 | i0 <- l]).
-Qed.
-Next Obligation.
-  apply functional_extensionality.
-  elim: [seq t i0 | i0 <- cRange 0 _]; auto.
-  move=> [d p] l IH x.
-  transitivity ((projT1 (projT2 (OutReform (existT _ d p))) x) + sumn [seq projT1 (projT2 i) x | i <- [seq OutReform j | j <- l]]); auto.
-  rewrite IH.
-  destruct d, x.
-  by simpl; destruct (foldr PolyConversionCombineData PolyConversionEmptyData [seq projT1 i0 | i0 <- l]).
-Qed.
-Next Obligation.
-  do 2 rewrite PolymorphicEqElim.
-  remember (freeFA _ _) as F; clear HeqF.
-  remember [seq OutReform i | i <- [seq t i0 | i0 <- cRange 0 F]] as L;
-  transitivity (length [seq OutReform i | i <- [seq t i0 | i0 <- cRange 0 F]]);[
-  |do 2 rewrite map_length; apply (length_cRange (n := 0) (m := F))].
-  transitivity (length L);[clear HeqL|hauto].
-  elim: L;[auto|].
-  move=> [d [b x]] L IH.
-  qauto use: map_length q:on.
-Qed.
-Next Obligation. apply PolyConvertFreeCaseLem. Qed.
-
-Lemma PolyConvertExiCaseLem {ctx} {D : @PolyConversionData ctx} {i : |[exiF ctx]|} {B} {e} :
-  newExiFCalls D i < newExiFCalls (ExiCallIncorp D i B e) i.
-Proof.
-  destruct D; simpl.
+  destruct data; simpl.
   unfold AddCall.
   unfold SingleCall.
   rewrite dep_if_case_true;[by rewrite EEConvert|].
@@ -705,55 +645,18 @@ Program Definition PolyConvertExiCase {ctx}
     { d : @PolyConversionData ctx &  
     @SemicircuitPolyConstraint {| subCtx := ctx; freeFC := newFreeFCalls d; exiFC := newExiFCalls d |} }) :
   { d : @PolyConversionData ctx &  
-    @SemicircuitPolyConstraint {| subCtx := ctx; freeFC := newFreeFCalls d; exiFC := newExiFCalls d |} } := 
-  (* We start with a function name and a list of data and constraints that needs to be fused together *)
-  (* The first thing we need to do is fuse this list of data into a single peice of data*)
-  let rs : seq {d : @PolyConversionData ctx 
-                  & @SemicircuitPolyConstraint {| subCtx := ctx; freeFC := newFreeFCalls d; exiFC := newExiFCalls d |} } 
-         := [seq t i | i <- cRange 0 (exiFA ctx i) ] in
-  let data : @PolyConversionData ctx := foldr PolyConversionCombineData PolyConversionEmptyData [seq projT1 i | i <- rs] in
-
-  (* We also need consolidate all the polynomial constraints into a single list and add those to the data*)
-  let polys : seq (@SemicircuitPolyConstraint {| subCtx := ctx
-                      ; freeFC := newFreeFCalls data
-                      ; exiFC := newExiFCalls data |})
-               := eq_rect _ (fun x => seq (@SemicircuitPolyConstraint {| subCtx := _; freeFC := _; exiFC := x |})) (
-                  eq_rect _ (fun x => seq (@SemicircuitPolyConstraint {| subCtx := _; freeFC := x; exiFC := _ |})) 
-                  (PolyCallSeqFuse (map OutReform rs)) _ _) _ _ in
+    @SemicircuitPolyConstraint {| subCtx := ctx; freeFC := newFreeFCalls d; exiFC := newExiFCalls d |} } :=
+  let (data, polys) := PolyCallSeqFuse [seq t i | i <- cRange 0 (exiFA ctx i) ] in
   let data2 : @PolyConversionData ctx := ExiCallIncorp data i polys _ in
-
-  (*We return a call the the most recently added function *)
   existT _ data2 (PolyConsExiF i (newExiFCalls data i)).
+Next Obligation. by rewrite map_length (length_cRange (n := 0)) in H. Qed.
 Next Obligation.
-  apply functional_extensionality.
-  elim: [seq t i0 | i0 <- cRange 0 _]; auto.
-  move=> [d p] l IH x.
-  transitivity ((projT1 (OutReform (existT _ d p)) x) + sumn [seq projT1 i x | i <- [seq OutReform j | j <- l]]); auto.
-  rewrite IH.
-  destruct d, x.
-  by simpl; destruct (foldr PolyConversionCombineData PolyConversionEmptyData [seq projT1 i0 | i0 <- l]).
+  destruct data; simpl.
+  unfold AddCall.
+  unfold SingleCall.
+  rewrite dep_if_case_true;[by rewrite EEConvert|].
+  hauto use: ltnSn, addn1, contra_ltn_leq.
 Qed.
-Next Obligation.
-  apply functional_extensionality.
-  elim: [seq t i0 | i0 <- cRange 0 _]; auto.
-  move=> [d p] l IH x.
-  transitivity ((projT1 (projT2 (OutReform (existT _ d p))) x) + sumn [seq projT1 (projT2 i) x | i <- [seq OutReform j | j <- l]]); auto.
-  rewrite IH.
-  destruct d, x.
-  by simpl; destruct (foldr PolyConversionCombineData PolyConversionEmptyData [seq projT1 i0 | i0 <- l]).
-Qed.
-Next Obligation.
-  do 2 rewrite PolymorphicEqElim.
-  remember (exiFA _ _) as F; clear HeqF.
-  remember [seq OutReform i | i <- [seq t i0 | i0 <- cRange 0 F]] as L;
-  transitivity (length [seq OutReform i | i <- [seq t i0 | i0 <- cRange 0 F]]);[
-  |do 2 rewrite map_length; apply (length_cRange (n := 0) (m := F))].
-  transitivity (length L);[clear HeqL|hauto].
-  elim: L;[auto|].
-  move=> [d [b x]] L IH.
-  qauto use: map_length q:on.
-Qed.
-Next Obligation. apply PolyConvertExiCaseLem. Qed.
 
 (*Construct a polynomial constraint, new calls within that constraint, simultanious with data to modify a semicircuit *)
 Program Fixpoint PolyConvert {ctx} (r : @PolyTerm ctx) :
@@ -793,7 +696,6 @@ Next Obligation. by f_equal; apply functional_extensionality;move=>[x ltx];destr
 Next Obligation. by f_equal; apply functional_extensionality;move=>[x ltx];destruct d1, d2. Qed.
 Next Obligation. by f_equal; apply functional_extensionality;move=>[x ltx];destruct d1, d2. Qed.
 Next Obligation. by f_equal; apply functional_extensionality;move=>[x ltx];destruct d1, d2. Qed.
-
 
 (*Convert constraint to one with new function with no calls*)
 Fixpoint PropCallCast {ctx}
@@ -923,7 +825,7 @@ Program Definition IntegrateConversionData
   |}.
 Next Obligation.
   destruct (freeFArgs _ _).
-  change (length ?n) with (size n); rewrite size_cat; do 2 rewrite size_map; change (size ?n) with (length n).
+  rewrite length_cat map_length map_length.
   qauto use: leq_addl, ltn_addr, addSnnS.
 Qed.
 Next Obligation.
@@ -934,12 +836,12 @@ Next Obligation.
 Qed.
 Next Obligation.
   destruct (newFreeArgs _ _).
-  change (length ?n) with (size n); rewrite size_cat; do 2 rewrite size_map; change (size ?n) with (length n).
+  rewrite length_cat map_length map_length.
   by rewrite ltn_add2l.
 Qed.
 Next Obligation.
   destruct (exiFArgs _ _).
-  change (length ?n) with (size n); rewrite size_cat; do 2 rewrite size_map; change (size ?n) with (length n).
+  rewrite length_cat map_length map_length.
   by apply ltn_addr.
 Qed.
 Next Obligation.
@@ -950,28 +852,28 @@ Next Obligation.
 Qed.
 Next Obligation.
   destruct (newExiArgs _ _).
-  change (length ?n) with (size n); rewrite size_cat; do 2 rewrite size_map; change (size ?n) with (length n).
+  rewrite length_cat map_length map_length.
   simpl.
   by rewrite ltn_add2l.
 Qed.
 Next Obligation. 
   destruct (uniVBounds _ _).
-  change (length ?n) with (size n); rewrite size_cat; do 2 rewrite size_map; change (size ?n) with (length n).
+  rewrite length_cat map_length map_length.
   by apply ltn_addr.
 Qed.
 Next Obligation. 
   destruct (exiVBounds _ _).
-  change (length ?n) with (size n); rewrite size_cat; do 2 rewrite size_map; change (size ?n) with (length n).
+  rewrite length_cat map_length map_length.
   by apply ltn_addr.
 Qed.
 Next Obligation. 
   destruct (exiFOutputBounds _ _).
-  change (length ?n) with (size n); rewrite size_cat; do 2 rewrite size_map; change (size ?n) with (length n).
+  rewrite length_cat map_length map_length.
   by apply ltn_addr.
 Qed.
 Next Obligation. 
   destruct (exiFInputBounds _ _).
-  change (length ?n) with (size n); rewrite size_cat; do 2 rewrite size_map; change (size ?n) with (length n).
+  rewrite length_cat map_length map_length.
   by apply ltn_addr.
 Qed.
 
@@ -1430,34 +1332,169 @@ Program Fixpoint PropLiftAddExiF {ctx}
     ZOConsEq r1 r2
   end.
 
+Print exiFSA.
+
 Program Definition SemicircuitExiFAdd 
   (c : SemiCircuit) 
   (y : @SemicircuitPolyConstraint (Ctx c))
   (bs : seq (@SemicircuitPolyConstraint (Ctx c))) : SemiCircuit :=
-  {| Ctx := {| subCtx := addExiF (length bs) (subCtx ctx)
-                                ; freeFC := freeFC ctx
-                                ; exiFC := fun i =>
-          ( if i == 0 as b return (i == 0) = b -> nat
-            then fun _ => 0
-            else fun _ => exiFC ctx (i.-1) ) (erefl _)
-          |}
+  let Ctx' := {| subCtx := addExiF (length bs) (subCtx (Ctx c))
+              ; freeFC := freeFC (Ctx c)
+              ; exiFC := fun i =>
+              ( if i == 0 as b return (i == 0) = b -> nat
+                then fun _ => 0
+                else fun _ => exiFC (Ctx c) (i.-1) ) (erefl _)
+              |} in
+  let polyConstraints' := map (PolyLiftAddExiF (length bs)) (rcons (polyConstraints c ++ bs) y) in
+  {| Ctx := Ctx'
   ; nu := nu c
-  ; polyConstraints := map (PolyLiftExiV (length bs)) (rcons (polyConstraints c) p)
+  ; polyConstraints := polyConstraints'
   ; freeFArgs := freeFArgs c
-  ; exiFArgs := exiFArgs c
+  ; exiFArgs := fun i =>
+    ( if i == 0 as b return (i == 0) = b -> |[exiFC Ctx' i]| -> |[exiFSA Ctx' i]| -> |[length polyConstraints']|
+      then fun _ => emptyTuple
+      else fun _ => exiFArgs c (i.-1) ) (erefl _)
   ; uniVBounds := uniVBounds c
-  ; exiVBounds := 
+  ; exiVBounds := exiVBounds c
   ; exiFOutputBounds := fun i =>
-    (if i == 0 as b return (i == 0) = b -> |[length (map PolyLiftExiV (rcons (polyConstraints c) p))]|
-    then fun _ => ???
+    (if i == 0 as b return (i == 0) = b -> |[length polyConstraints']|
+    then fun _ => length (polyConstraints c) + length bs
     else fun _ => exiFOutputBounds c (i.-1)) (erefl _)
   ; exiFInputBounds := fun i =>
-    (if i == 0 as b return (i == 0) = b -> |[length (map PolyLiftExiV (rcons (polyConstraints c) p))]|
-    then fun _ => ???
+    (if i == 0 as b return (i == 0) = b -> |[exiFSA Ctx' i]| -> |[length polyConstraints']|
+    then fun _ j => length (polyConstraints c) + j
     else fun _ => exiFInputBounds c (i.-1)) (erefl _)
-  ; formula := inrMap PropLiftExiV (formula c)
+  ; formula := inrMap (PropLiftAddExiF (length bs)) (formula c)
   |}.
-
+Next Obligation. by destruct c, Ctx0, subCtx0. Qed.
+Next Obligation.
+  destruct ((` (nu c))_).
+  clear H.
+  by destruct c, Ctx0, subCtx0; simpl in *.
+Qed.
+Next Obligation.
+  destruct (nu c); simpl.
+  by apply i0.
+Qed.
+Next Obligation. 
+  remember (PolyLiftAddExiF_obligation_1 _ _ _) as P; clear HeqP; simpl in P.
+  destruct c, Ctx0, subCtx0; simpl in *;
+  replace P with H1;auto;apply eq_irrelevance.
+Qed.
+Next Obligation. 
+  destruct (freeFArgs _ _); clear H H0 H1.
+  rewrite map_length length_rcons length_cat.
+  simpl.
+  remember (length (polyConstraints c)) as a; clear Heqa.
+  remember (length bs) as b; clear Heqb bs y c x x0 x1.
+  hauto use: leq_addl, ltn_addr, addSnnS.
+Qed.
+Next Obligation. by destruct c, Ctx0, subCtx0. Qed.
+Next Obligation. 
+  destruct (uniVBounds _ _); clear H.
+  rewrite map_length length_rcons length_cat.
+  simpl.
+  remember (length (polyConstraints c)) as a; clear Heqa.
+  remember (length bs) as b; clear Heqb bs y c x.
+  hauto use: leq_addl, ltn_addr, addSnnS.
+Qed.
+Next Obligation. by destruct c, Ctx0, subCtx0. Qed.
+Next Obligation. 
+  destruct (exiVBounds _ _); clear H.
+  rewrite map_length length_rcons length_cat.
+  simpl.
+  remember (length (polyConstraints c)) as a; clear Heqa.
+  remember (length bs) as b; clear Heqb bs y c x.
+  hauto use: leq_addl, ltn_addr, addSnnS.
+Qed.
+Next Obligation. destruct (exiFS _); auto. Qed.
+Next Obligation.
+  assert (i <> 0);[by rewrite <- EEFConvert|clear e].
+  destruct i;[fcrush|].
+  by destruct c, Ctx0, subCtx0.
+Qed.
+Next Obligation.
+  change (exist _ ?x _ == exist _ ?y _) with (x == y) in e.
+  clear H0.
+  destruct c, Ctx0, subCtx0; cbn; cbn in H.
+  rewrite dep_if_case_false in H.
+  remember (SemicircuitExiFAdd_obligation_11 _ _ _ _ _) as P; clear HeqP; simpl in P.
+  cbn in P.
+  replace (exist (fun n : nat => eqn (n.+1 - exiF)%Nrec 0) i.-1 P)
+     with (exist (fun n : nat => eqn (n.+1 - exiF)%Nrec 0) i.-1
+            (Sigma_1_1.addExiF_obligation_2 exiF
+               (exist (fun n : nat => eqn (n - exiF)%Nrec 0) i H1) e)); auto.
+  by apply subset_eq_compat.
+Qed.
+Next Obligation.
+  change (exist _ ?x _ == exist _ ?y _) with (x == y) in e.
+  destruct c, Ctx0, subCtx0; cbn in *.
+  rewrite dep_if_case_false in H.
+  remember (SemicircuitExiFAdd_obligation_11 _ _ _ _ _) as P; clear HeqP; simpl in P.
+  replace (exist _ i.-1 _)
+      with (exist (fun n : nat => eqn (n.+1 - exiF)%Nrec 0) i.-1 P) in H; auto.
+  by apply subset_eq_compat.
+Qed.
+Next Obligation.
+  destruct (exiFArgs _ _).
+  clear H H0 e H1.
+  rewrite map_length length_rcons length_cat.
+  simpl.
+  remember (length (polyConstraints c)) as a; clear Heqa.
+  remember (length bs) as b; clear Heqb bs y c x.
+  hauto use: leq_addl, ltn_addr, addSnnS.
+Qed.
+Next Obligation.
+  destruct c, Ctx0, subCtx0; cbn in *.
+  rewrite dep_if_case_true in H; auto.
+Qed.
+Next Obligation. by destruct c, Ctx0, subCtx0. Qed.
+Next Obligation.
+  destruct c, Ctx0, subCtx0; cbn in *.
+  destruct i; auto.
+Qed.
+Next Obligation.
+  destruct (exiFOutputBounds _ _).
+  rewrite map_length length_rcons length_cat.
+  simpl.
+  remember (length (polyConstraints c)) as a; clear Heqa e.
+  remember (length bs) as b; clear Heqb bs H.
+  hauto use: leq_addl, ltn_addr, addSnnS.
+Qed.
+Next Obligation.
+  rewrite map_length length_rcons length_cat.
+  apply ltnSn.
+Qed.
+Next Obligation. by destruct c, Ctx0, subCtx0. Qed.
+Next Obligation. 
+  destruct c, Ctx0, subCtx0; cbn in *.
+  destruct i; auto.
+Qed.
+Next Obligation. 
+  destruct c, Ctx0, subCtx0; cbn in *.
+  rewrite dep_if_case_false in H; auto.
+  remember (SemicircuitExiFAdd_obligation_21 _ _ _ _ _) as P; clear HeqP; simpl in P.
+  replace (exist _ i.-1 _)
+      with (exist (fun n : nat => eqn (n.+1 - exiF)%Nrec 0) i.-1 P) in H; auto.
+  by apply subset_eq_compat.
+Qed.
+Next Obligation.
+  destruct (exiFInputBounds _ _).
+  rewrite map_length length_rcons length_cat.
+  simpl.
+  remember (length (polyConstraints c)) as a; clear Heqa e.
+  remember (length bs) as b; clear Heqb bs H.
+  hauto use: leq_addl, ltn_addr, addSnnS.
+Qed.
+Next Obligation.
+  rewrite map_length length_rcons length_cat.
+  destruct c, Ctx0, subCtx0; cbn in *.
+  rewrite dep_if_case_true in H; auto.
+  assert (j < length bs);[auto|clear H].
+  assert (length polyConstraints0 + j <= length polyConstraints0 + length bs);[|auto].
+  rewrite leq_add2l.
+  by apply ltnW.
+Qed.
 
 Program Fixpoint Translate_SecondOrderFormula 
   (c : SemiCircuit)
@@ -1465,16 +1502,18 @@ Program Fixpoint Translate_SecondOrderFormula
   match f with
   | FO f => Translate_FirstOrderFormula c f
   | SOExists y bs f => 
-    let (day, boy) := PolyConvert y in
+    let (day, poy) := PolyConvert y in
     let c0 := IntegrateConversionData c day in
-    let boy0 : @SemicircuitPolyConstraint (Ctx c0) := PolyCallLift boy in
+    let poy0 : @SemicircuitPolyConstraint (Ctx c0) := PolyCallLift poy in
     let bs' := map PolyConvert bs in
-    let dabs := foldr PolyConversionCombineData PolyConversionEmptyData [seq projT1 i | i <- bs'] in
+    let (dabs, pobs) := PolyCallSeqFuse bs' in
     let c1 := IntegrateConversionData c0 dabs in
-    let boy1 : @SemicircuitPolyConstraint (Ctx c1) := PolyCallCast boy0 in
-    let bobs := PolyCallSeqFuse (map OutReform bs') in
-    let bobs1 : seq (@SemicircuitPolyConstraint (Ctx c1))
-             := Hole in
-    let c2 := SemicircuitExiFAdd c1 boy1 bobs1 in
+    let poy1 : @SemicircuitPolyConstraint (Ctx c1) := PolyCallCast poy0 in
+    let pobs1 : seq (@SemicircuitPolyConstraint (Ctx c1)) := map PolyCallLift pobs in
+    let c2 := SemicircuitExiFAdd c1 poy1 pobs1 in
     Translate_SecondOrderFormula c2 f
   end.
+Next Obligation.
+  do 2 rewrite map_length in H *.
+  by rewrite H.
+Qed.

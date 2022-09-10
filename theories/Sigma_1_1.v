@@ -34,12 +34,12 @@ Definition incUniV (ctx : Sigma11Ctx) : Sigma11Ctx :=
 Program Definition addExiF (newA : nat) (ctx : Sigma11Ctx) : Sigma11Ctx := 
   match ctx with
   | {| freeV := a; freeF := b; freeFA := f; exiV := c; exiF := d; exiFA := g; uniV := e |} =>
-    let g' := fun x : |[d.+1]| => (if x == d as b return (x == d) = b -> nat then fun _ => newA else fun _ => g x) (erefl _) in
+    let g' := fun x : |[d.+1]| => (if x == 0 as b return (x == 0) = b -> nat then fun _ => newA else fun _ => g (x.-1)) (erefl _) in
     {| freeV := a; freeF := b; freeFA := f; exiV := c; exiF := d.+1; exiFA := g'; uniV := e |}
   end.
 Next Obligation.
   apply EEFConvert in e0; simpl in e0.
-  by apply leq_neq_lt.
+  by destruct x.
 Qed.
 
 Inductive PolyTerm {ctx : Sigma11Ctx} : Type :=
@@ -269,7 +269,7 @@ Definition AddModelExiF {ctx} (M : @Sigma11Model ctx) (newA : nat) (f : (|[newA]
   assert (exiF_S' : forall i : |[exiF (addExiF newA ctx)]|, (|[exiFA (addExiF newA ctx) i]| -> R0) -> option R0).
   destruct ctx; simpl in *.
   move=> [i lti].
-  destruct (i == exiF0) eqn:b.
+  destruct (i == 0) eqn:b.
   - rewrite dep_if_case_true;[auto|].
     exact f.
   - rewrite dep_if_case_false.

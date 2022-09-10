@@ -22,6 +22,18 @@ Definition inrMap {A B C} (f : B -> C) (c : A + B) : A + C :=
   | inr b => inr (f b)
   end.
 
+
+Theorem PolymorphicEqElim 
+  {T S}  {fam : Type -> Type}
+  {P : S -> Type} 
+  {f : forall x, fam x -> T}
+  {x y}
+  {e : x = y}
+  {s : fam (P x)} :
+  f _ (eq_rect _ (fun x => fam (P x)) s _ e) = f _ s.
+Proof. by destruct e. Qed.
+
+
 Definition drop_index {T} (m : nat) (s : seq T) : seq T := 
   take m s ++ behead (drop m s).
 
@@ -401,6 +413,8 @@ Qed.
 Theorem length_rcons {T} {s : seq T} {t} : length (rcons s t) = (length s).+1.
 Proof. elim: s; hauto. Qed.
 
+Theorem length_cat {T} {s r : seq T} : length (s ++ r) = length s + length r.
+Proof. by change (length ?n) with (size n); rewrite size_cat. Qed.
 
 Lemma NoFractions {j k} : ~ (j < k /\ k < j.+1).
   move: k; elim j.
