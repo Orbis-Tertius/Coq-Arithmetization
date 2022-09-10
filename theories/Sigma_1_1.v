@@ -172,61 +172,63 @@ Fixpoint ZerothOrder_Denote {ctx} (M : @Sigma11Model ctx) (f : @ZerothOrderFormu
     end
   end.
 
-Definition AddModelExi {ctx} (M : @Sigma11Model ctx) (r : R M) : @Sigma11Model (incExiV ctx).
-  destruct M.
-  unfold R in r; simpl in r.
-  assert (freeV_F' : |[freeV (incExiV ctx)]| -> R0).
-  destruct ctx; exact freeV_F0.
-  assert (uniV_F' : |[uniV (incExiV ctx)]| -> R0).
-  destruct ctx; exact uniV_F0.
-  assert (freeF_S' : forall i : |[freeF (incExiV ctx)]|, (|[freeFA (incExiV ctx) i]| -> R0) -> option R0).
-  destruct ctx; exact freeF_S0.
-  assert (exiF_S' : forall i : |[exiF (incExiV ctx)]|, (|[exiFA (incExiV ctx) i]| -> R0) -> option R0).
-  destruct ctx; exact exiF_S0.
-  assert (exiV_F' : |[exiV (incExiV ctx)]| -> R0).
+Program Definition AddModelExi {ctx} (M : @Sigma11Model ctx) (r : R M) : @Sigma11Model (incExiV ctx) :=
+  let d' := fun x : |[exiV (incExiV ctx)]| => (
+      if x == 0 as b return ((x == 0) = b -> R M)
+      then fun _ => r
+      else fun _ => exiV_F M (x.-1)
+    ) (erefl _) 
+  in {| D := D M; freeV_F := freeV_F M; freeF_S := freeF_S M; exiV_F := d'; exiF_S := exiF_S M; uniV_F := uniV_F M |}.
+Next Obligation. by destruct ctx. Qed.
+Next Obligation.
   destruct ctx; simpl in *.
-  move=> [x lt].
-  destruct (x == exiV0) eqn:b.
-  exact r.
-  apply EEFConvert in b.
-  assert (x < exiV0);[by apply leq_neq_lt|].
-  exact (exiV_F0 (exist _ x H)).
-  exact {| D := D0; freeV_F := freeV_F'; freeF_S := freeF_S'; exiV_F := exiV_F'; exiF_S := exiF_S'; uniV_F := uniV_F' |}.
+  assert ((x == 0) = false);[auto|clear e].
+  by destruct x;[fcrush|].
 Qed.
-
-(*How to make this work???*)
-(* Program Definition AddModelExi {ctx} (M : @Sigma11Model ctx) (r : R M) : @Sigma11Model (incExiV ctx) :=
-  match M with
-  | {| D := a; freeV_F := b; freeF_S := c; exiV_F := d; exiF_S := e; uniV_F := f |} =>
-    let d' : |[exiV (incExiV ctx)]| -> R := fun x => (
-      if x == d as b return ((x == d) = b -> R)
-      then r
-      else exiV_F x
-    ) (erefl _) in
-    {| D := a; freeV_F := b; freeF_S := c; exiV_F := d'; exiF_S := e; uniV_F := f |}
-  end.   *)
-
-Definition AddModelUni {ctx} (M : @Sigma11Model ctx) (r : R M) : @Sigma11Model (incUniV ctx).
-  destruct M.
-  unfold R in r; simpl in r.
-  assert (freeV_F' : |[freeV (incUniV ctx)]| -> R0).
-  destruct ctx; exact freeV_F0.
-  assert (exiV_F' : |[exiV (incUniV ctx)]| -> R0).
-  destruct ctx; exact exiV_F0.
-  assert (freeF_S' : forall i : |[freeF (incUniV ctx)]|, (|[freeFA (incUniV ctx) i]| -> R0) -> option R0).
-  destruct ctx; exact freeF_S0.
-  assert (exiF_S' : forall i : |[exiF (incUniV ctx)]|, (|[exiFA (incUniV ctx) i]| -> R0) -> option R0).
-  destruct ctx; exact exiF_S0.
-  assert (uniV_F' : |[uniV (incUniV ctx)]| -> R0).
+Next Obligation. by destruct ctx. Qed. Next Obligation. by destruct ctx. Qed.
+Next Obligation. 
   destruct ctx; simpl in *.
-  move=> [x lt].
-  destruct (x == uniV0) eqn:b.
-  exact r.
-  apply EEFConvert in b.
-  assert (x < uniV0);[by apply leq_neq_lt|].
-  exact (uniV_F0 (exist _ x H)).
-  exact {| D := D0; freeV_F := freeV_F'; freeF_S := freeF_S'; exiV_F := exiV_F'; exiF_S := exiF_S'; uniV_F := uniV_F' |}.
+  remember (AddModelExi_obligation_4 _ _ _ _) as A; clear HeqA.
+  simpl in A.
+  replace A with H0 in H;[auto|apply eq_irrelevance].
 Qed.
+Next Obligation. by destruct ctx. Qed.
+Next Obligation. 
+  destruct ctx; simpl in *.
+  remember (AddModelExi_obligation_6 _ _ _ _) as A; clear HeqA.
+  simpl in A.
+  replace A with H0 in H;[auto|apply eq_irrelevance].
+Qed.
+Next Obligation. by destruct ctx. Qed.
+
+Program Definition AddModelUni {ctx} (M : @Sigma11Model ctx) (r : R M) : @Sigma11Model (incUniV ctx) :=
+  let d' := fun x : |[uniV (incUniV ctx)]|=> (
+      if x == 0 as b return ((x == 0) = b -> R M)
+      then fun _ => r
+      else fun _ => uniV_F M (x.-1)
+    ) (erefl _) 
+  in {| D := D M; freeV_F := freeV_F M; freeF_S := freeF_S M; exiV_F := exiV_F M; exiF_S := exiF_S M; uniV_F := d' |}.
+Next Obligation. by destruct ctx. Qed.
+Next Obligation.
+  destruct ctx; simpl in *.
+  assert ((x == 0) = false);[auto|clear e].
+  by destruct x;[fcrush|].
+Qed.
+Next Obligation. by destruct ctx. Qed.
+Next Obligation. 
+  destruct ctx; simpl in *.
+  remember (AddModelUni_obligation_3 _ _ _ _) as A; clear HeqA.
+  simpl in A.
+  replace A with H0 in H;[auto|apply eq_irrelevance].
+Qed.
+Next Obligation. by destruct ctx. Qed. Next Obligation. by destruct ctx. Qed.
+Next Obligation. 
+  destruct ctx; simpl in *.
+  remember (AddModelUni_obligation_6 _ _ _ _) as A; clear HeqA.
+  simpl in A.
+  replace A with H0 in H;[auto|apply eq_irrelevance].
+Qed.
+Next Obligation. by destruct ctx. Qed. 
 
 Fixpoint FirstOrder_Denote {ctx} (M : @Sigma11Model ctx) (f : @FirstOrderFormula ctx) : Prop :=
   match f with
@@ -254,30 +256,35 @@ forall (ins : |[n]| -> R M) (out : R M),
   f ins = Some out ->
   (forall x : |[n]|, lt (D M) (ins x) (bs x)) /\ lt (D M) out y.
 
-Definition AddModelExiF {ctx} (M : @Sigma11Model ctx) (newA : nat) (f : (|[newA]| -> R M) -> option (R M)) : 
-  @Sigma11Model (addExiF newA ctx).
-  destruct M.
-  unfold R in f; simpl in f.
-  assert (freeV_F' : |[freeV (addExiF newA ctx)]| -> R0).
-  destruct ctx; exact freeV_F0.
-  assert (exiV_F' : |[exiV (addExiF newA ctx)]| -> R0).
-  destruct ctx; exact exiV_F0.
-  assert (uniV_F' : |[uniV (addExiF newA ctx)]| -> R0).
-  destruct ctx; exact uniV_F0.
-  assert (freeF_S' : forall i : |[freeF (addExiF newA ctx)]|, (|[freeFA (addExiF newA ctx) i]| -> R0) -> option R0).
-  destruct ctx; exact freeF_S0.
-  assert (exiF_S' : forall i : |[exiF (addExiF newA ctx)]|, (|[exiFA (addExiF newA ctx) i]| -> R0) -> option R0).
+Program Definition AddModelExiF {ctx} (M : @Sigma11Model ctx) (newA : nat) (f : (|[newA]| -> R M) -> option (R M)) : 
+  @Sigma11Model (addExiF newA ctx) :=
+  let d' := fun x : |[exiF (addExiF newA ctx)]| => (
+      if x == 0 as b return ((x == 0) = b -> (|[exiFA (addExiF newA ctx) x]| -> R M) -> option (R M))
+      then fun _ => f
+      else fun _ t => exiF_S M (x.-1) t
+    ) (erefl _) 
+  in {| D := D M; freeV_F := freeV_F M; freeF_S := freeF_S M; exiV_F := exiV_F M; exiF_S := d'; uniV_F := uniV_F M |}.
+Next Obligation. by destruct ctx. Qed. Next Obligation. by destruct ctx, x. Qed.
+Next Obligation. 
   destruct ctx; simpl in *.
-  move=> [i lti].
-  destruct (i == 0) eqn:b.
-  - rewrite dep_if_case_true;[auto|].
-    exact f.
-  - rewrite dep_if_case_false.
-    move=> t.
-    apply: exiF_S0.
-    exact t.
-  exact {| D := D0; freeV_F := freeV_F'; freeF_S := freeF_S'; exiV_F := exiV_F'; exiF_S := exiF_S'; uniV_F := uniV_F' |}.
+  rewrite dep_if_case_false.
+  remember (AddModelExiF_obligation_2 _ _ _ _ _ _ _) as A; clear HeqA; simpl in A.
+  remember (addExiF_obligation_2 _ _ _) as B; clear HeqB; simpl in B.
+  replace B with A;[auto|apply eq_irrelevance].
 Qed.
+Next Obligation. 
+  destruct ctx; simpl in *.
+  rewrite dep_if_case_true; auto.
+Qed.
+Next Obligation. by destruct ctx. Qed. Next Obligation. by destruct ctx. Qed.
+Next Obligation. by destruct ctx. Qed.
+Next Obligation. 
+  destruct ctx; simpl in *.
+  remember (AddModelExiF_obligation_7 _ _ _ _ _) as A; clear HeqA.
+  simpl in A.
+  replace A with H0 in H;[auto|apply eq_irrelevance].
+Qed.
+Next Obligation. by destruct ctx. Qed.
 
 Fixpoint SecondOrder_Denote {ctx} (M : @Sigma11Model ctx) (f : @SecondOrderFormula ctx) : Prop :=
   match f with
