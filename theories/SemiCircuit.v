@@ -88,32 +88,32 @@ Record SemiCircuit : Type :=
     formula : unit + @SemicircuitPropConstraint Ctx
   }.
 
-Record SemiCircuitInstance (M : RingData) (c : SemiCircuit) : Type :=
+Record SemiCircuitInstance (M : RingData) (c : SemicircuitCtx) : Type :=
   mkSemiCircuitInstance { 
-    freeVInst : |[freeVN c]| -> T M;
-    freeFInst : forall i : |[freeFN c]|, (|[freeFArity c i]| -> T M) -> option (T M);
+    freeVInst : |[freeVS c]| -> T M;
+    freeFInst : forall i : |[freeFS c]|, (|[freeFSA c i]| -> T M) -> option (T M);
   }.
 
-Record SemiCircuitAdvice (M : RingData) (c : SemiCircuit) : Type :=
+Record SemiCircuitAdvice (M : RingData) (c : SemicircuitCtx) : Type :=
   mkSemiCircuitAdvice { 
-    exiFInst : forall i : |[exiFN c]|, (|[exiFArity c i]| -> T M) -> option (T M);
+    exiFInst : forall i : |[exiFS c]|, (|[exiFSA c i]| -> T M) -> option (T M);
     (* s in paper *)
-    exiVInst : |[exiVN c]| -> (|[uniVN c]| -> T M) -> T M;
+    exiVInst : |[exiVS c]| -> (|[uniVS c]| -> T M) -> T M;
     (* o in paper *)
-    freeFCallOut : forall i : |[freeFN c]|, |[freeFCalls c i]| -> (|[uniVN c]| -> T M) -> T M;
+    freeFCallOut : forall i : |[freeFS c]|, |[freeFC c i]| -> (|[uniVS c]| -> T M) -> T M;
     (* sigma in paper *)
-    exiFCallOut : forall i : |[exiFN c]|, |[exiFCalls c i]| -> (|[uniVN c]| -> T M) -> T M;
-    indCallOut : |[indCalls c]| -> (|[uniVN c]| -> T M) -> T M;
+    exiFCallOut : forall i : |[exiFS c]|, |[exiFC c i]| -> (|[uniVS c]| -> T M) -> T M;
+    indCallOut : |[indC c]| -> (|[uniVS c]| -> T M) -> T M;
   }.
 
 Definition indFun (M : RingData) (x y : T M) : T M := if lt_dec M x y then 1%R else 0%R.
 
 Fixpoint SemicircuitPolyDenotation
-  (M : RingData) (c : SemiCircuit)
+  (M : RingData) (c : SemicircuitCtx)
   (inst : SemiCircuitInstance M c)
   (adv : SemiCircuitAdvice M c)
-  (p : @SemicircuitPolyConstraint (Ctx c)) :
-  (|[uniVN c]| -> T M) -> T M :=
+  (p : @SemicircuitPolyConstraint c) :
+  (|[uniVS c]| -> T M) -> T M :=
   match p with
   | PolyConsZero => fun _ => 0%R
   | PolyConsPlusOne => fun _ => 1%R
@@ -135,11 +135,11 @@ Fixpoint SemicircuitPolyDenotation
   end.
 
 Program Fixpoint SemicircuitPropDenotation
-  (M : RingData) (c : SemiCircuit)
+  (M : RingData) (c : SemicircuitCtx)
   (inst : SemiCircuitInstance M c)
   (adv : SemiCircuitAdvice M c)
-  (p : @SemicircuitPropConstraint (Ctx c)) :
-  (|[uniVN c]| -> T M) -> Prop :=
+  (p : @SemicircuitPropConstraint c) :
+  (|[uniVS c]| -> T M) -> Prop :=
   match p with
   | ZOConsNot p => fun u => 
     let r := SemicircuitPropDenotation M c inst adv p u in
@@ -163,73 +163,73 @@ Program Fixpoint SemicircuitPropDenotation
   end.
 
 Definition UProp {c : SemiCircuit} {M : RingData}
-                 (inst : SemiCircuitInstance M c) (adv : SemiCircuitAdvice M c) 
+                 (inst : SemiCircuitInstance M (Ctx c)) (adv : SemiCircuitAdvice M (Ctx c)) 
                  (t : |[uniVN c]| -> T M) : Prop :=
-  let ev i := SemicircuitPolyDenotation M c inst adv (lnth (polyConstraints c) (uniVBounds c i)) in
+  let ev i := SemicircuitPolyDenotation M (Ctx c) inst adv (lnth (polyConstraints c) (uniVBounds c i)) in
   forall i, lt M (t i) (ev i t).
 
 Definition U {c : SemiCircuit} {M : RingData}
-             (inst : SemiCircuitInstance M c) (adv : SemiCircuitAdvice M c) : Type 
+             (inst : SemiCircuitInstance M (Ctx c)) (adv : SemiCircuitAdvice M (Ctx c)) : Type 
   := { t : |[uniVN c]| -> T M | UProp inst adv t }.
 
 Definition SemiCircuitFormulaCondition
   (M : RingData) (c : SemiCircuit)
-  (inst : SemiCircuitInstance M c)
-  (adv : SemiCircuitAdvice M c) : Prop :=
-  exists p, formula c = inr p /\ forall u, SemicircuitPropDenotation M c inst adv p u = true.
+  (inst : SemiCircuitInstance M (Ctx c))
+  (adv : SemiCircuitAdvice M (Ctx c)) : Prop :=
+  exists p, formula c = inr p /\ forall u, SemicircuitPropDenotation M (Ctx c) inst adv p u = true.
 
 Definition SemiCircuitFreeFunCondition
   (M : RingData) (c : SemiCircuit)
-  (inst : SemiCircuitInstance M c)
-  (adv : SemiCircuitAdvice M c) : Prop :=
+  (inst : SemiCircuitInstance M (Ctx c))
+  (adv : SemiCircuitAdvice M (Ctx c)) : Prop :=
   forall u : U inst adv, forall i : |[freeFN c]|, forall j : |[freeFCalls c i]|,
   let t (a : |[freeFArity c i]|) : T M
-      := SemicircuitPolyDenotation M c inst adv (lnth (polyConstraints c) (freeFArgs c i j a)) (` u) in
-  freeFInst _ _ inst i t = Some (freeFCallOut M c adv i j (` u)).
+      := SemicircuitPolyDenotation M _ inst adv (lnth (polyConstraints c) (freeFArgs c i j a)) (` u) in
+  freeFInst _ _ inst i t = Some (freeFCallOut M _ adv i j (` u)).
 
 Definition SemiCircuitexiFCondition
   (M : RingData) (c : SemiCircuit)
-  (inst : SemiCircuitInstance M c)
-  (adv : SemiCircuitAdvice M c) : Prop :=
+  (inst : SemiCircuitInstance M (Ctx c))
+  (adv : SemiCircuitAdvice M (Ctx c)) : Prop :=
   forall u : U inst adv, forall i : |[exiFN c]|, forall j : |[exiFCalls c i]|,
   let t (a : |[exiFArity c i]|) : T M
-      := SemicircuitPolyDenotation M c inst adv (lnth (polyConstraints c) (exiFArgs c i j a)) (` u) in
-  exiFInst _ _ adv i t = Some (exiFCallOut M c adv i j (` u)).
+      := SemicircuitPolyDenotation M _ inst adv (lnth (polyConstraints c) (exiFArgs c i j a)) (` u) in
+  exiFInst _ _ adv i t = Some (exiFCallOut M _ adv i j (` u)).
 
 Definition SemiCircuitIndCondition
   (M : RingData) (c : SemiCircuit)
-  (inst : SemiCircuitInstance M c)
-  (adv : SemiCircuitAdvice M c) : Prop :=
+  (inst : SemiCircuitInstance M (Ctx c))
+  (adv : SemiCircuitAdvice M (Ctx c)) : Prop :=
   forall u : U inst adv, forall i : |[indCalls c]|,
   let (a1, a2) := indArgs c i in
-  let b1 : T M := SemicircuitPolyDenotation M c inst adv (lnth (polyConstraints c) a1) (` u) in
-  let b2 : T M := SemicircuitPolyDenotation M c inst adv (lnth (polyConstraints c) a2) (` u) in
-  indFun M b1 b2 = indCallOut M c adv i (` u).
+  let b1 : T M := SemicircuitPolyDenotation M _ inst adv (lnth (polyConstraints c) a1) (` u) in
+  let b2 : T M := SemicircuitPolyDenotation M _ inst adv (lnth (polyConstraints c) a2) (` u) in
+  indFun M b1 b2 = indCallOut M _ adv i (` u).
 
 Definition SemiCircuitFOBoundCondition
   (M : RingData) (c : SemiCircuit)
-  (inst : SemiCircuitInstance M c)
-  (adv : SemiCircuitAdvice M c) : Prop :=
+  (inst : SemiCircuitInstance M (Ctx c))
+  (adv : SemiCircuitAdvice M (Ctx c)) : Prop :=
   forall u : U inst adv, forall i : |[exiVN c]|,
-  let B := SemicircuitPolyDenotation M c inst adv (lnth (polyConstraints c) (exiVBounds c i)) (` u) in
+  let B := SemicircuitPolyDenotation M _ inst adv (lnth (polyConstraints c) (exiVBounds c i)) (` u) in
   lt M (exiVInst _ _ adv i (` u)) B.
 
 (* Note: This covers both conditions 5 and 6 in the paper *)
 Definition SemiCircuitSOBoundCondition
   (M : RingData) (c : SemiCircuit)
-  (inst : SemiCircuitInstance M c)
-  (adv : SemiCircuitAdvice M c) : Prop :=
+  (inst : SemiCircuitInstance M (Ctx c))
+  (adv : SemiCircuitAdvice M (Ctx c)) : Prop :=
   forall u : U inst adv, forall i : |[exiFN c]|,
-  let B := SemicircuitPolyDenotation M c inst adv (lnth (polyConstraints c) (exiFOutputBounds c i)) (` u) in
-  let G (j : |[exiFArity c i]|) := SemicircuitPolyDenotation M c inst adv (lnth (polyConstraints c) (exiFInputBounds c i j)) (` u) in
+  let B := SemicircuitPolyDenotation M _ inst adv (lnth (polyConstraints c) (exiFOutputBounds c i)) (` u) in
+  let G (j : |[exiFArity c i]|) := SemicircuitPolyDenotation M _ inst adv (lnth (polyConstraints c) (exiFInputBounds c i j)) (` u) in
   forall (t : |[exiFArity c i]| -> T M) (out : T M),
   exiFInst _ _ adv i t = Some out ->
   (forall x, lt M (t x) (G x)) /\ lt M out B.
 
 Program Definition SemiCircuitExiStratCondition
   (M : RingData) (c : SemiCircuit)
-  (inst : SemiCircuitInstance M c)
-  (adv : SemiCircuitAdvice M c) : Prop :=
+  (inst : SemiCircuitInstance M (Ctx c))
+  (adv : SemiCircuitAdvice M (Ctx c)) : Prop :=
   forall i : |[exiVN c]|, forall m : |[nu c i]| -> T M,
   exists C, forall n : |[uniVN c - nu c i]| -> T M,
   exiVInst _ _ adv i (TupConcat m n) = C.
@@ -241,8 +241,8 @@ Next Obligation.
 Qed.
 
 Definition SemiCircuitDenotation (M : RingData)
-  (c : SemiCircuit) (i : SemiCircuitInstance M c) : Prop :=
-  exists (a : SemiCircuitAdvice M c),
+  (c : SemiCircuit) (i : SemiCircuitInstance M (Ctx c)) : Prop :=
+  exists (a : SemiCircuitAdvice M (Ctx c)),
     SemiCircuitFormulaCondition M c i a /\
     SemiCircuitFreeFunCondition M c i a /\
     SemiCircuitIndCondition M c i a /\
