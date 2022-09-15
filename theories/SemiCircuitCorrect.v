@@ -17,12 +17,33 @@ Section SemicircuitCorrect.
 
 Definition Hole {A} : A. Admitted.
 
+
 Definition PolyConvertDenotation (D : RingData) {ctx}
   (o : { d : @PolyConversionData ctx &
     @SemicircuitPolyConstraint {| subCtx := ctx; freeFC := newFreeFCalls d; exiFC := newExiFCalls d; indC := newIndCalls d |}})
   (inst : SemiCircuitInstance D {| subCtx := ctx; freeFC := newFreeFCalls (projT1 o); exiFC := newExiFCalls (projT1 o); indC := newIndCalls (projT1 o) |})
   (adv : SemiCircuitAdvice D {| subCtx := ctx; freeFC := newFreeFCalls (projT1 o); exiFC := newExiFCalls (projT1 o); indC := newIndCalls (projT1 o) |}) :
   (|[uniV ctx]| -> T D) -> T D := SemicircuitPolyDenotation D _ inst adv (projT2 o).
+
+Fixpoint ConstraintEq {ctx} {d1 d2 : @PolyConversionData ctx}
+  (p1 : @SemicircuitPolyConstraint {| subCtx := ctx; freeFC := newFreeFCalls d1; exiFC := newExiFCalls d1; indC := newIndCalls d1 |})
+  (p2 : @SemicircuitPolyConstraint {| subCtx := ctx; freeFC := newFreeFCalls d2; exiFC := newExiFCalls d2; indC := newIndCalls d2 |}) : Prop :=
+  match p1, p2 with
+  | PolyConsZero, PolyConsZero => true
+  | PolyConsPlusOne, PolyConsPlusOne => true
+  | PolyConsMinusOne, PolyConsMinusOne => true
+  | PolyConsPlus p11 p12, PolyConsPlus p21 p22 => ConstraintEq p11 p21 /\ ConstraintEq p12 p22
+  | PolyConsTimes p11 p12, PolyConsTimes p21 p22 => ConstraintEq p11 p21 /\ ConstraintEq p12 p22
+  | PolyConsInd i, PolyConsInd j => ` i = ` j
+  | PolyConsExiV i, PolyConsExiV j => ` i = ` j
+  | PolyConsUniV i, PolyConsUniV j => ` i = ` j
+  | PolyConsFreeF i1 j1, PolyConsFreeF i2 j2 => ` i1 = ` i2 /\ ` j1 = ` j2
+  | PolyConsExiF i1 j1, PolyConsFreeF i2 j2 => ` i1 = ` i2 /\ ` j1 = ` j2 
+  | _, _ => false
+  end.
+
+
+
 
 Definition SemiData_to_Sigma11Model {D : RingData} {ctx}
   (inst : SemiCircuitInstance D ctx)
@@ -37,10 +58,22 @@ Definition SemiData_to_Sigma11Model {D : RingData} {ctx}
    ; uniV_F := u
   |}.
 
+Theorem dep_prod_split {A} {B} (p : { n : A & B n }) : p = existT _ (projT1 p) (projT2 p).
+Proof. by destruct p. Qed.
+
+Theorem dep_let_split {A C} {B} (p : { n : A & B n }) (f : forall n, B n -> C) :
+  (let (x, y) := p in f x y) = f (projT1 p) (projT2 p).
+Proof. by destruct p. Qed.
 
 Theorem PolyConvertCorrect {D : RingData} {ctx} (r : @PolyTerm ctx) 
-  (inst : SemiCircuitInstance D {| subCtx := ctx; freeFC := newFreeFCalls (projT1 (PolyConvert r)); exiFC := newExiFCalls (projT1 (PolyConvert r)); indC := newIndCalls (projT1 (PolyConvert r)) |})
-  (adv : SemiCircuitAdvice D {| subCtx := ctx; freeFC := newFreeFCalls (projT1 (PolyConvert r)); exiFC := newExiFCalls (projT1 (PolyConvert r)); indC := newIndCalls (projT1 (PolyConvert r)) |}) :
+  (inst : SemiCircuitInstance D {| subCtx := ctx
+                                 ; freeFC := newFreeFCalls (projT1 (PolyConvert r))
+                                 ; exiFC := newExiFCalls (projT1 (PolyConvert r))
+                                 ; indC := newIndCalls (projT1 (PolyConvert r)) |})
+  (adv : SemiCircuitAdvice D {| subCtx := ctx
+                              ; freeFC := newFreeFCalls (projT1 (PolyConvert r))
+                              ; exiFC := newExiFCalls (projT1 (PolyConvert r))
+                              ; indC := newIndCalls (projT1 (PolyConvert r)) |}) :
   forall u, Poly_Denote (SemiData_to_Sigma11Model inst adv u) r
           = Some (PolyConvertDenotation D (PolyConvert r) inst adv u).
 Proof.
@@ -48,6 +81,129 @@ Proof.
   move=> i p IH adv inst u.
   simpl.
   unfold freeFInst.
+  unfold PolyConvertFreeCase.
+  unfold freeFC.
+  unfold PolyConvertDenotation.
+  simpl.
+  unfold freeFCallOut.
+
+
+  destruct adv.
+  (exist _
+        (newFreeFCalls
+           (projT1 (PolyCallSeqFuse [seq PolyConvert (p i0) | i0 <- cRange 0 (freeFA ctx i)])) i)
+        (SemiCircuitTranslation.PolyConvertFreeCase_obligation_2 ctx i
+           (fun x : {n : nat | n < freeFA ctx i} => PolyConvert (p x))))
+  destruct (PolyCallSeqFuse _).
+  remember (SemiCircuitTranslation.PolyConvertFreeCase_obligation_2 ctx i
+              (fun x : {n : nat | n < freeFA ctx i} => PolyConvert (p x))) as Y0; clear HeqY0.
+  simpl in Y0.
+
+(PolyConvertDenotation D
+     (existT (fun d : PolyConversionData => SemicircuitPolyConstraint)
+        (FreeCallIncorp
+           (projT1 (PolyCallSeqFuse [seq PolyConvert (p i0) | i0 <- cRange 0 (freeFA ctx i)])) i
+           (` (projT2 (PolyCallSeqFuse [seq PolyConvert (p i0) | i0 <- cRange 0 (freeFA ctx i)])))
+           (SemiCircuitTranslation.PolyConvertFreeCase_obligation_1 ctx i
+              (fun x : {n : nat | n < freeFA ctx i} => PolyConvert (p x))))
+        (PolyConsFreeF i
+           (exist _
+              (newFreeFCalls
+                 (projT1 (PolyCallSeqFuse [seq PolyConvert (p i0) | i0 <- cRange 0 (freeFA ctx i)])) i)
+              Y0))) inst adv u)
+
+
+
+
+
+
+
+
+
+  destruct ctx; simpl.
+  remember (SemiCircuitTranslation.PolyConvertFreeCase_obligation_1 _ _ _) as Y1; clear HeqY1.
+  destruct (PolyCallSeqFuse _).
+  remember (SemiCircuitTranslation.PolyConvertFreeCase_obligation_1 _ _ _) as Y1; clear HeqY1.
+  destruct (PolyCallSeqFuse _).
+  destruct polys.
+  transitivity (Some
+  (PolyConvertDenotation D
+     (
+      existT (fun d : PolyConversionData => SemicircuitPolyConstraint)
+        (FreeCallIncorp (projT1 (PolyCallSeqFuse [seq PolyConvert (p i0) | i0 <- cRange 0 (freeFA ctx i)])) i (` (projT2 (PolyCallSeqFuse [seq PolyConvert (p i0) | i0 <- cRange 0 (freeFA ctx i)])))
+           (SemiCircuitTranslation.PolyConvertFreeCase_obligation_1 ctx i
+              (fun x : {n : nat | n < freeFA ctx i} => PolyConvert (p x)) (projT1 (PolyCallSeqFuse [seq PolyConvert (p i0) | i0 <- cRange 0 (freeFA ctx i)])) (projT2 (PolyCallSeqFuse [seq PolyConvert (p i0) | i0 <- cRange 0 (freeFA ctx i)]))))
+        (PolyConsFreeF (ctx := {|
+                            subCtx := ctx;
+                            freeFC :=
+                              @newFreeFCalls ctx
+                                (@FreeCallIncorp ctx (projT1 (PolyCallSeqFuse [seq PolyConvert (p i0) | i0 <- cRange 0 (freeFA ctx i)])) i (` (projT2 (PolyCallSeqFuse [seq PolyConvert (p i0) | i0 <- cRange 0 (freeFA ctx i)])))
+                                   (SemiCircuitTranslation.PolyConvertFreeCase_obligation_1 ctx i
+                                      (fun x0 : {n : nat | n < freeFA ctx i} =>
+                                       @PolyConvert ctx (p x0)) (projT1 (PolyCallSeqFuse [seq PolyConvert (p i0) | i0 <- cRange 0 (freeFA ctx i)])) (projT2 (PolyCallSeqFuse [seq PolyConvert (p i0) | i0 <- cRange 0 (freeFA ctx i)]))));
+                            exiFC :=
+                              @newExiFCalls ctx
+                                (@FreeCallIncorp ctx (projT1 (PolyCallSeqFuse [seq PolyConvert (p i0) | i0 <- cRange 0 (freeFA ctx i)])) i (` (projT2 (PolyCallSeqFuse [seq PolyConvert (p i0) | i0 <- cRange 0 (freeFA ctx i)])))
+                                   (SemiCircuitTranslation.PolyConvertFreeCase_obligation_1 ctx i
+                                      (fun x0 : {n : nat | n < freeFA ctx i} =>
+                                       @PolyConvert ctx (p x0)) (projT1 (PolyCallSeqFuse [seq PolyConvert (p i0) | i0 <- cRange 0 (freeFA ctx i)])) (projT2 (PolyCallSeqFuse [seq PolyConvert (p i0) | i0 <- cRange 0 (freeFA ctx i)]))));
+                            indC :=
+                              @newIndCalls ctx
+                                (@FreeCallIncorp ctx (projT1 (PolyCallSeqFuse [seq PolyConvert (p i0) | i0 <- cRange 0 (freeFA ctx i)])) i (` (projT2 (PolyCallSeqFuse [seq PolyConvert (p i0) | i0 <- cRange 0 (freeFA ctx i)])))
+                                   (SemiCircuitTranslation.PolyConvertFreeCase_obligation_1 ctx i
+                                      (fun x0 : {n : nat | n < freeFA ctx i} =>
+                                       @PolyConvert ctx (p x0)) (projT1 (PolyCallSeqFuse [seq PolyConvert (p i0) | i0 <- cRange 0 (freeFA ctx i)])) (projT2 (PolyCallSeqFuse [seq PolyConvert (p i0) | i0 <- cRange 0 (freeFA ctx i)]))))
+                          |}) i
+           (exist
+              _
+              (newFreeFCalls (projT1 (PolyCallSeqFuse [seq PolyConvert (p i0) | i0 <- cRange 0 (freeFA ctx i)])) i)
+              (SemiCircuitTranslation.PolyConvertFreeCase_obligation_2 ctx i
+                 (fun x : {n : nat | n < freeFA ctx i} => PolyConvert (p x)) (projT1 (PolyCallSeqFuse [seq PolyConvert (p i0) | i0 <- cRange 0 (freeFA ctx i)])) (projT2 (PolyCallSeqFuse [seq PolyConvert (p i0) | i0 <- cRange 0 (freeFA ctx i)])))))) inst adv
+     u)
+).
+
+  remember (Some _) as RHS.
+  destruct RHS;[|fcrush].
+  injection HeqRHS;move=> RHS2; clear HeqRHS.
+  remember (SemiCircuitTranslation.PolyConvertFreeCase_obligation_1 ctx i
+                           (fun x : {n0 : nat | n0 < freeFA ctx i} => PolyConvert (p x))) as DDD. 
+  rewrite dep_let_split in RHS2.
+  remember (let (data, polys) := PolyCallSeqFuse [seq PolyConvert (p i0) | i0 <- cRange 0 (freeFA ctx i)] in
+      existT (fun d : PolyConversionData => SemicircuitPolyConstraint)
+        (FreeCallIncorp data i (` polys)
+           (SemiCircuitTranslation.PolyConvertFreeCase_obligation_1 ctx i
+              (fun x : {n : nat | n < freeFA ctx i} => PolyConvert (p x)) data polys))
+        (PolyConsFreeF _
+           _)) as DD.
+
+  destruct (PolyCallSeqFuse [seq PolyConvert (p i) | i <- cRange 0 (freeFA ctx i)]) in HeqRHS.
+
+  cbn in HeqRHS.
+  transitivity RHS.
+  2:{
+  Set Printing Implicit.
+  Check PolyConsFreeF.
+
+
+  assert (length (` (projT2 (PolyCallSeqFuse [seq PolyConvert (p i0) | i0 <- cRange 0 (freeFA ctx i)]))) = freeFA ctx i).
+  destruct (projT2 _).
+  simpl.
+  rewrite e; clear e.
+  by rewrite map_length (length_cRange (n := 0)).
+  Check (SemiCircuitTranslation.PolyConvertFreeCase_obligation_2 ctx i
+                 (fun x : {n : nat | n < freeFA ctx i} => PolyConvert (p x)) ).
+  rewrite dep_let_split.
+
+  rewrite (dep_prod_split (PolyCallSeqFuse [seq PolyConvert (p i0) | i0 <- cRange 0 (freeFA ctx i)])).
+  Search (_ = (projT1 _, _)).
+
+  assert (PolyCallSeqFuse [seq PolyConvert (p i0) | i0 <- cRange 0 (freeFA ctx i)] =
+          (projT1) )
+  remember (FreeCallIncorp data i _ _) as D0; clear HeqD0.
+  remember (SemiCircuitTranslation.PolyConvertFreeCase_obligation_2 _ _ _) as D0; clear HeqD0.
+  remember (SemiCircuitTranslation.PolyConvertFreeCase_obligation_1 _ _ _) as D0; clear HeqD0.
+  destruct (PolyCallSeqFuse [seq PolyConvert (p i0) | i0 <- cRange 0 (freeFA ctx i)]).
+
   transitivity (Poly_Denote (SemiData_to_Sigma11Model inst adv u) (p s)).
   replace (PolyConvertFreeCase i (fun x => PolyConvert (p x)))
     with (fun x => PolyConvert (p i)).
