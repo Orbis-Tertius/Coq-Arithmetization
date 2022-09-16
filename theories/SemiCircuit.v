@@ -13,36 +13,28 @@ Require Import Program.
 
 Section SemicircuitDef.
 
-Record SemicircuitCtx := mkSemicircuitCtx
-  { subCtx : Sigma11Ctx
-  ; freeVS := freeV subCtx
-  ; freeFS := freeF subCtx
-  ; freeFSA := freeFA subCtx
-  ; exiVS := exiV subCtx
-  ; exiFS := exiF subCtx
-  ; exiFSA := exiFA subCtx
-  ; uniVS := uniV subCtx
-  ; freeFC : |[freeF subCtx]| -> nat (*Number of free function calls*)
+Record SemicircuitCtx {subCtx : Sigma11Ctx} := mkSemicircuitCtx
+  { freeFC : |[freeF subCtx]| -> nat (*Number of free function calls*)
   ; exiFC : |[exiF subCtx]| -> nat (*Number of exi function calls*)
   ; indC : nat (*Number of ind function calls*)
   }.
 
 (* <P> in the paper *)
-Inductive SemicircuitPolyConstraint {ctx : SemicircuitCtx} : Type :=
+Inductive SemicircuitPolyConstraint {subCtx} {ctx : @SemicircuitCtx subCtx} : Type :=
 | PolyConsZero : SemicircuitPolyConstraint
 | PolyConsPlusOne : SemicircuitPolyConstraint
 | PolyConsMinusOne : SemicircuitPolyConstraint
 | PolyConsPlus : SemicircuitPolyConstraint -> SemicircuitPolyConstraint -> SemicircuitPolyConstraint
 | PolyConsTimes : SemicircuitPolyConstraint -> SemicircuitPolyConstraint -> SemicircuitPolyConstraint
 | PolyConsInd : |[indC ctx]| -> SemicircuitPolyConstraint
-| PolyConsFreeV : |[freeVS ctx]| -> SemicircuitPolyConstraint
-| PolyConsExiV : |[exiVS ctx]| -> SemicircuitPolyConstraint
-| PolyConsUniV : |[uniVS ctx]| -> SemicircuitPolyConstraint
-| PolyConsFreeF : forall x : |[freeFS ctx]|, |[freeFC ctx x]| -> SemicircuitPolyConstraint
-| PolyConsExiF : forall x : |[exiFS ctx]|, |[exiFC ctx x]| -> SemicircuitPolyConstraint.
+| PolyConsFreeV : |[freeV subCtx]| -> SemicircuitPolyConstraint
+| PolyConsExiV : |[exiV subCtx]| -> SemicircuitPolyConstraint
+| PolyConsUniV : |[uniV subCtx]| -> SemicircuitPolyConstraint
+| PolyConsFreeF : forall x : |[freeF subCtx]|, |[freeFC ctx x]| -> SemicircuitPolyConstraint
+| PolyConsExiF : forall x : |[exiF subCtx]|, |[exiFC ctx x]| -> SemicircuitPolyConstraint.
 
 (* <S> in the paper *)
-Inductive SemicircuitPropConstraint {ctx : SemicircuitCtx} : Type :=
+Inductive SemicircuitPropConstraint {subCtx} {ctx : @SemicircuitCtx subCtx} : Type :=
 | ZOConsNot : SemicircuitPropConstraint -> SemicircuitPropConstraint
 | ZOConsAnd : SemicircuitPropConstraint ->
               SemicircuitPropConstraint ->
@@ -53,69 +45,62 @@ Inductive SemicircuitPropConstraint {ctx : SemicircuitCtx} : Type :=
 | ZOConsImp : SemicircuitPropConstraint ->
               SemicircuitPropConstraint ->
               SemicircuitPropConstraint
-| ZOConsEq : @SemicircuitPolyConstraint ctx
-          -> @SemicircuitPolyConstraint ctx
+| ZOConsEq : @SemicircuitPolyConstraint _ ctx
+          -> @SemicircuitPolyConstraint _ ctx
           -> SemicircuitPropConstraint.
 
-Record SemiCircuit : Type :=
+Record SemiCircuit {ctx} : Type :=
   mkSemiCircuit {
-    Ctx : SemicircuitCtx;
-    freeVN := freeVS Ctx; (* n in paper *)
-    freeFN := freeFS Ctx; (* Number of free functions *)
-    freeFArity := freeFSA Ctx; (* a in paper *)
-    exiVN := exiVS Ctx; (* m in paper *)
-    exiFN := exiFS Ctx; (* Number of SO existential functions *)
-    exiFArity := exiFSA Ctx; (* b in paper *)
-    uniVN := uniVS Ctx; (* u in paper *)
+    Ctx : @SemicircuitCtx ctx;
     freeFCalls := freeFC Ctx; (* r in paper *)
     exiFCalls := exiFC Ctx; (* q in paper *)
     indCalls := indC Ctx; 
-    nu : {s : |[exiVN]| -> { m : nat | m <= uniVN } | forall i j : |[exiVN]|, (` i) <= (` j) -> (` (s j)) <= (` (s i))};
-    polyConstraints : seq (@SemicircuitPolyConstraint Ctx);
+    nu : {s : |[exiV ctx]| -> { m : nat | m <= uniV ctx } | forall i j : |[exiV ctx]|, (` i) <= (` j) -> (` (s j)) <= (` (s i))};
+    polyConstraints : seq (@SemicircuitPolyConstraint _ Ctx);
     indArgs : |[indCalls]| -> (|[length polyConstraints]| * |[length polyConstraints]|);
     (* w in paper *)
-    freeFArgs : forall (i : |[freeFN]|), |[freeFCalls i]| -> |[freeFArity i]| -> |[length polyConstraints]|;
+    freeFArgs : forall (i : |[freeF ctx]|), |[freeFCalls i]| -> |[freeFA ctx i]| -> |[length polyConstraints]|;
     (* omega in paper *)
-    exiFArgs : forall (i : |[exiFN]|), |[exiFCalls i]| -> |[exiFArity i]| -> |[length polyConstraints]|;
+    exiFArgs : forall (i : |[exiF ctx]|), |[exiFCalls i]| -> |[exiFA ctx i]| -> |[length polyConstraints]|;
     (* V in paper *)
-    uniVBounds : |[uniVN]| -> |[length polyConstraints]|;
+    uniVBounds : |[uniV ctx]| -> |[length polyConstraints]|;
     (* S in paper *)
-    exiVBounds : |[exiVN]| -> |[length polyConstraints]|;
+    exiVBounds : |[exiV ctx]| -> |[length polyConstraints]|;
     (* B in paper *)
-    exiFOutputBounds : |[exiFN]| -> |[length polyConstraints]|;
+    exiFOutputBounds : |[exiF ctx]| -> |[length polyConstraints]|;
     (* G in paper *)
-    exiFInputBounds : forall (i : |[exiFN]|), |[exiFArity i]| -> |[length polyConstraints]|;
-    formula : unit + @SemicircuitPropConstraint Ctx
+    exiFInputBounds : forall (i : |[exiF ctx]|), |[exiFA ctx i]| -> |[length polyConstraints]|;
+    formula : unit + @SemicircuitPropConstraint _ Ctx
   }.
 
-Record SemiCircuitInstance {R : RingData} {c : SemicircuitCtx} : Type :=
+Record SemiCircuitInstance {ctx} {R : RingData} {c : @SemicircuitCtx ctx} : Type :=
   mkSemiCircuitInstance { 
     (* v in paper *)
-    freeVInst : |[freeVS c]| -> T R;
+    freeVInst : |[freeV ctx]| -> T R;
     (* f in paper *)
-    freeFInst : forall i : |[freeFS c]|, (|[freeFSA c i]| -> T R) -> option (T R);
+    freeFInst : forall i : |[freeF ctx]|, (|[freeFA ctx i]| -> T R) -> option (T R);
   }.
 
-Record SemiCircuitAdvice {R : RingData} {c : SemicircuitCtx} : Type :=
+Record SemiCircuitAdvice {ctx} {R : RingData} {c : @SemicircuitCtx ctx} : Type :=
   mkSemiCircuitAdvice { 
     (* s in paper *)
-    exiVAdv : |[exiVS c]| -> (|[uniVS c]| -> T R) -> T R;
+    exiVAdv : |[exiV ctx]| -> (|[uniV ctx]| -> T R) -> T R;
     (* g in paper *)
-    exiFAdv : forall i : |[exiFS c]|, (|[exiFSA c i]| -> T R) -> option (T R);
+    exiFAdv : forall i : |[exiF ctx]|, (|[exiFA ctx i]| -> T R) -> option (T R);
     (* o in paper *)
-    freeFCallOut : forall i : |[freeFS c]|, |[freeFC c i]| -> (|[uniVS c]| -> T R) -> T R;
+    freeFCallOut : forall i : |[freeF ctx]|, |[freeFC c i]| -> (|[uniV ctx]| -> T R) -> T R;
     (* sigma in paper *)
-    exiFCallOut : forall i : |[exiFS c]|, |[exiFC c i]| -> (|[uniVS c]| -> T R) -> T R;
-    indCallOut : |[indC c]| -> (|[uniVS c]| -> T R) -> T R;
+    exiFCallOut : forall i : |[exiF ctx]|, |[exiFC c i]| -> (|[uniV ctx]| -> T R) -> T R;
+    indCallOut : |[indC c]| -> (|[uniV ctx]| -> T R) -> T R;
   }.
 
 Definition indFun (R : RingData) (x y : T R) : T R := if lt_dec R x y then 1%R else 0%R.
 
-Fixpoint SemicircuitPolyDenotation {R} {c}
-  (inst : @SemiCircuitInstance R c)
-  (adv : @SemiCircuitAdvice R c)
-  (p : @SemicircuitPolyConstraint c) :
-  (|[uniVS c]| -> T R) -> T R :=
+Fixpoint SemicircuitPolyDenotation {ctx} {R} {c}
+  (inst : @SemiCircuitInstance ctx R c)
+  (adv : @SemiCircuitAdvice ctx R c)
+  (p : @SemicircuitPolyConstraint ctx c) :
+  (|[uniV ctx]| -> T R) -> T R :=
   match p with
   | PolyConsZero => fun _ => 0%R
   | PolyConsPlusOne => fun _ => 1%R
@@ -136,11 +121,11 @@ Fixpoint SemicircuitPolyDenotation {R} {c}
   | PolyConsExiF i j => exiFCallOut adv i j
   end.
 
-Program Fixpoint SemicircuitPropDenotation {R} {c}
-  (inst : @SemiCircuitInstance R c)
-  (adv : @SemiCircuitAdvice R c)
-  (p : @SemicircuitPropConstraint c) :
-  (|[uniVS c]| -> T R) -> Prop :=
+Program Fixpoint SemicircuitPropDenotation {ctx} {R} {c}
+  (inst : @SemiCircuitInstance ctx R c)
+  (adv : @SemiCircuitAdvice ctx R c)
+  (p : @SemicircuitPropConstraint ctx c) :
+  (|[uniV ctx]| -> T R) -> Prop :=
   match p with
   | ZOConsNot p => fun u => 
     let r := SemicircuitPropDenotation inst adv p u in
@@ -163,78 +148,78 @@ Program Fixpoint SemicircuitPropDenotation {R} {c}
     r1 = r2
   end.
 
-Definition UProp {R} {c}
-                 (inst : @SemiCircuitInstance R (Ctx c)) (adv : @SemiCircuitAdvice R (Ctx c)) 
-                 (t : |[uniVN c]| -> T R) : Prop :=
+Definition UProp {ctx} {R} {c}
+                 (inst : @SemiCircuitInstance ctx R (Ctx c)) (adv : @SemiCircuitAdvice ctx R (Ctx c)) 
+                 (t : |[uniV ctx]| -> T R) : Prop :=
   let ev i := SemicircuitPolyDenotation inst adv (lnth (polyConstraints c) (uniVBounds c i)) in
   forall i, lt R (t i) (ev i t).
 
-Definition U {R} {c}
-             (inst : @SemiCircuitInstance R (Ctx c)) (adv : @SemiCircuitAdvice R (Ctx c)) : Type 
-  := { t : |[uniVN c]| -> T R | UProp inst adv t }.
+Definition U {ctx} {R} {c}
+             (inst : @SemiCircuitInstance ctx R (Ctx c)) (adv : @SemiCircuitAdvice ctx R (Ctx c)) : Type 
+  := { t : |[uniV ctx]| -> T R | UProp inst adv t }.
 
-Definition SemiCircuitFormulaCondition {R} {c}
-  (inst : @SemiCircuitInstance R (Ctx c))
-  (adv : @SemiCircuitAdvice R (Ctx c)) : Prop :=
+Definition SemiCircuitFormulaCondition {ctx} {R} {c}
+  (inst : @SemiCircuitInstance ctx R (Ctx c))
+  (adv : @SemiCircuitAdvice ctx R (Ctx c)) : Prop :=
   exists p, formula c = inr p /\ forall u, SemicircuitPropDenotation inst adv p u = true.
 
-Definition SemiCircuitFreeFunCondition {R} {c}
-  (inst : @SemiCircuitInstance R (Ctx c))
-  (adv : @SemiCircuitAdvice R (Ctx c)) : Prop :=
-  forall u : U inst adv, forall i : |[freeFN c]|, forall j : |[freeFCalls c i]|,
-  let t (a : |[freeFArity c i]|) : T R
+Definition SemiCircuitFreeFunCondition {ctx} {R} {c}
+  (inst : @SemiCircuitInstance ctx R (Ctx c))
+  (adv : @SemiCircuitAdvice ctx R (Ctx c)) : Prop :=
+  forall u : U inst adv, forall i : |[freeF ctx]|, forall j : |[freeFCalls c i]|,
+  let t (a : |[freeFA ctx i]|) : T R
       := SemicircuitPolyDenotation inst adv (lnth (polyConstraints c) (freeFArgs c i j a)) (` u) in
   freeFInst inst i t = Some (freeFCallOut adv i j (` u)).
 
-Definition SemiCircuitexiFCondition {R} {c}
-  (inst : @SemiCircuitInstance R (Ctx c))
-  (adv : @SemiCircuitAdvice R (Ctx c)) : Prop :=
-  forall u : U inst adv, forall i : |[exiFN c]|, forall j : |[exiFCalls c i]|,
-  let t (a : |[exiFArity c i]|) : T R
+Definition SemiCircuitexiFCondition {ctx} {R} {c}
+  (inst : @SemiCircuitInstance ctx R (Ctx c))
+  (adv : @SemiCircuitAdvice ctx R (Ctx c)) : Prop :=
+  forall u : U inst adv, forall i : |[exiF ctx]|, forall j : |[exiFCalls c i]|,
+  let t (a : |[exiFA ctx i]|) : T R
       := SemicircuitPolyDenotation inst adv (lnth (polyConstraints c) (exiFArgs c i j a)) (` u) in
   exiFAdv adv i t = Some (exiFCallOut adv i j (` u)).
 
-Definition SemiCircuitIndCondition {R} {c}
-  (inst : @SemiCircuitInstance R (Ctx c))
-  (adv : @SemiCircuitAdvice R (Ctx c)) : Prop :=
+Definition SemiCircuitIndCondition {ctx} {R} {c}
+  (inst : @SemiCircuitInstance ctx R (Ctx c))
+  (adv : @SemiCircuitAdvice ctx R (Ctx c)) : Prop :=
   forall u : U inst adv, forall i : |[indCalls c]|,
   let (a1, a2) := indArgs c i in
   let b1 : T R := SemicircuitPolyDenotation inst adv (lnth (polyConstraints c) a1) (` u) in
   let b2 : T R := SemicircuitPolyDenotation inst adv (lnth (polyConstraints c) a2) (` u) in
   indFun R b1 b2 = indCallOut adv i (` u).
 
-Definition SemiCircuitFOBoundCondition {R} {c}
-  (inst : @SemiCircuitInstance R (Ctx c))
-  (adv : @SemiCircuitAdvice R (Ctx c)) : Prop :=
-  forall u : U inst adv, forall i : |[exiVN c]|,
+Definition SemiCircuitFOBoundCondition {ctx} {R} {c}
+  (inst : @SemiCircuitInstance ctx R (Ctx c))
+  (adv : @SemiCircuitAdvice ctx R (Ctx c)) : Prop :=
+  forall u : U inst adv, forall i : |[exiV ctx]|,
   let B := SemicircuitPolyDenotation inst adv (lnth (polyConstraints c) (exiVBounds c i)) (` u) in
   lt R (exiVAdv adv i (` u)) B.
 
 (* Note: This covers both conditions 5 and 6 in the paper *)
-Definition SemiCircuitSOBoundCondition {R} {c}
-  (inst : @SemiCircuitInstance R (Ctx c))
-  (adv : @SemiCircuitAdvice R (Ctx c)) : Prop :=
-  forall u : U inst adv, forall i : |[exiFN c]|,
+Definition SemiCircuitSOBoundCondition {ctx} {R} {c}
+  (inst : @SemiCircuitInstance ctx R (Ctx c))
+  (adv : @SemiCircuitAdvice ctx R (Ctx c)) : Prop :=
+  forall u : U inst adv, forall i : |[exiF ctx]|,
   let B := SemicircuitPolyDenotation inst adv (lnth (polyConstraints c) (exiFOutputBounds c i)) (` u) in
-  let G (j : |[exiFArity c i]|) := SemicircuitPolyDenotation inst adv (lnth (polyConstraints c) (exiFInputBounds c i j)) (` u) in
-  forall (t : |[exiFArity c i]| -> T R) (out : T R),
+  let G (j : |[exiFA ctx i]|) := SemicircuitPolyDenotation inst adv (lnth (polyConstraints c) (exiFInputBounds c i j)) (` u) in
+  forall (t : |[exiFA ctx i]| -> T R) (out : T R),
   exiFAdv adv i t = Some out ->
   (forall x, lt R (t x) (G x)) /\ lt R out B.
 
-Program Definition SemiCircuitExiStratCondition {R} {c}
-  (inst : @SemiCircuitInstance R (Ctx c))
-  (adv : @SemiCircuitAdvice R (Ctx c)) : Prop :=
-  forall i : |[exiVN c]|, forall m : |[nu c i]| -> T R,
-  exists C, forall n : |[uniVN c - nu c i]| -> T R,
+Program Definition SemiCircuitExiStratCondition {ctx} {R} {c}
+  (inst : @SemiCircuitInstance ctx R (Ctx c))
+  (adv : @SemiCircuitAdvice ctx R (Ctx c)) : Prop :=
+  forall i : |[exiV ctx]|, forall m : |[nu c i]| -> T R,
+  exists C, forall n : |[uniV ctx - nu c i]| -> T R,
   exiVAdv adv i (TupConcat m n) = C.
 Next Obligation.
-  destruct ((` (nu c)) (exist (fun n : nat => n < exiVN c) i H0)); simpl in *.
-  replace (x0 + (uniVN c - x0)) with (uniVN c); auto.
-  remember (uniVN c) as U; clear HeqU H x n m H0 adv inst c i.
+  destruct ((` (nu c)) (exist (fun n : nat => n < _) i H0)); simpl in *.
+  replace (x0 + (uniV ctx - x0)) with (uniV ctx); auto.
+  remember (uniV ctx) as U; clear HeqU H x n m H0 adv inst c i.
   sfirstorder use: subnKC.
 Qed.
 
-Definition SemiCircuitDenotation {R} {c} (i : @SemiCircuitInstance R (Ctx c)) : Prop :=
+Definition SemiCircuitDenotation {ctx} {R} {c} (i : @SemiCircuitInstance ctx R (Ctx c)) : Prop :=
   exists (a : SemiCircuitAdvice),
     SemiCircuitFormulaCondition i a /\
     SemiCircuitFreeFunCondition i a /\
