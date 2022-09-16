@@ -15,13 +15,12 @@ Require Import Program.
 Section SemicircuitTranslation.
 
 (*Convert constraint to one over context with additional function calls*)
-Program Fixpoint PolyCallCastFree {ctx}
-  {newC : |[freeFS ctx]| -> nat}
-  (p : @SemicircuitPolyConstraint ctx) :
-  @SemicircuitPolyConstraint {| subCtx := subCtx ctx
-                              ; freeFC := fun x => freeFC ctx x + newC x 
-                              ; exiFC := exiFC ctx
-                              ; indC := indC ctx
+Program Fixpoint PolyCallCastFree {ctx} {c}
+  {newC : |[freeF ctx]| -> nat}
+  (p : @SemicircuitPolyConstraint ctx c) :
+  @SemicircuitPolyConstraint _ {| freeFC := fun x => freeFC c x + newC x 
+                               ; exiFC := exiFC c
+                               ; indC := indC c
   |} := 
   match p with
   | PolyConsZero => PolyConsZero
@@ -44,13 +43,12 @@ Program Fixpoint PolyCallCastFree {ctx}
   end.
 Next Obligation. qauto use: ltn_addr. Qed.
 
-Program Fixpoint PolyCallCastExi {ctx}
-  {newC : |[exiFS ctx]| -> nat}
-  (p : @SemicircuitPolyConstraint ctx) :
-  @SemicircuitPolyConstraint {| subCtx := subCtx ctx
-                              ; freeFC := freeFC ctx
-                              ; exiFC := fun x => exiFC ctx x + newC x
-                              ; indC := indC ctx
+Program Fixpoint PolyCallCastExi {ctx} {c}
+  {newC : |[exiF ctx]| -> nat}
+  (p : @SemicircuitPolyConstraint ctx c) :
+  @SemicircuitPolyConstraint _ {| freeFC := freeFC c
+                               ; exiFC := fun x => exiFC c x + newC x
+                               ; indC := indC c
   |} := 
   match p with
   | PolyConsZero => PolyConsZero
@@ -73,13 +71,12 @@ Program Fixpoint PolyCallCastExi {ctx}
   end.
 Next Obligation. qauto use: ltn_addr. Qed.
 
-Program Fixpoint PolyCallCastInd {ctx}
+Program Fixpoint PolyCallCastInd {ctx} {c}
   {newC : nat}
-  (p : @SemicircuitPolyConstraint ctx) :
-  @SemicircuitPolyConstraint {| subCtx := subCtx ctx
-                              ; freeFC := freeFC ctx
-                              ; exiFC := exiFC ctx
-                              ; indC := indC ctx + newC
+  (p : @SemicircuitPolyConstraint ctx c) :
+  @SemicircuitPolyConstraint _ {| freeFC := freeFC c
+                                ; exiFC := exiFC c
+                                ; indC := indC c + newC
   |} := 
   match p with
   | PolyConsZero => PolyConsZero
@@ -102,15 +99,14 @@ Program Fixpoint PolyCallCastInd {ctx}
   end.
 Next Obligation. qauto use: ltn_addr. Qed.
 
-Program Fixpoint PolyCallCast {ctx}
-    {newFC : |[freeFS ctx]| -> nat}
-    {newEC : |[exiFS ctx]| -> nat}
+Program Fixpoint PolyCallCast {ctx} {c}
+    {newFC : |[freeF ctx]| -> nat}
+    {newEC : |[exiF ctx]| -> nat}
     {newIC : nat}
-    (p : @SemicircuitPolyConstraint ctx) :
-  @SemicircuitPolyConstraint {| subCtx := subCtx ctx
-                              ; freeFC := fun x => freeFC ctx x + newFC x
-                              ; exiFC := fun x => exiFC ctx x + newEC x
-                              ; indC := indC ctx + newIC
+    (p : @SemicircuitPolyConstraint ctx c) :
+  @SemicircuitPolyConstraint _ {| freeFC := fun x => freeFC c x + newFC x
+                              ; exiFC := fun x => exiFC c x + newEC x
+                              ; indC := indC c + newIC
   |} := 
   match p with
   | PolyConsZero => PolyConsZero
@@ -134,15 +130,14 @@ Program Fixpoint PolyCallCast {ctx}
 Solve All Obligations with qauto use: ltn_addr.
 
 (*Lift new polynomial args so names don't conflict with arguments from other polynomials *)
-Program Fixpoint PolyCallLift {ctx}
-    {newFC : |[freeFS ctx]| -> nat}
-    {newEC : |[exiFS ctx]| -> nat}
+Program Fixpoint PolyCallLift {ctx} {c}
+    {newFC : |[freeF ctx]| -> nat}
+    {newEC : |[exiF ctx]| -> nat}
     {newIC : nat}
-    (p : @SemicircuitPolyConstraint ctx) :
-  @SemicircuitPolyConstraint {| subCtx := subCtx ctx
-                              ; freeFC := fun x => newFC x + freeFC ctx x
-                              ; exiFC := fun x => newEC x +  exiFC ctx x
-                              ; indC := newIC + indC ctx
+    (p : @SemicircuitPolyConstraint ctx c) :
+  @SemicircuitPolyConstraint _ {| freeFC := fun x => newFC x + freeFC c x
+                               ; exiFC := fun x => newEC x +  exiFC c x
+                               ; indC := newIC + indC c
   |} := 
   match p with
   | PolyConsZero => PolyConsZero
@@ -165,37 +160,36 @@ Program Fixpoint PolyCallLift {ctx}
   end.
 Solve All Obligations with qauto use: ltn_add2l.
 
-Definition ModelInstance {c} (M : Sigma11Model) : @SemiCircuitInstance (D M) c :=
+Definition ModelInstance {ctx} {c} (M : Sigma11Model) : @SemiCircuitInstance ctx (D M) c :=
   {| freeVInst := fun n => freeV_F M (` n)
-   ; freeFInst := fun i t => freeF_S M (` i) (freeFSA c i) t
+   ; freeFInst := fun i t => freeF_S M (` i) (freeFA ctx i) t
   |}.
 
 Record PolyConversionData {ctx : Sigma11Ctx} : Type := mkPolyConvertData {
   newFreeFCalls : |[freeF ctx]| -> nat ;
   newExiFCalls : |[exiF ctx]| -> nat ;
   newIndCalls : nat ;
-  newPolys : seq (@SemicircuitPolyConstraint {| subCtx := ctx; freeFC := newFreeFCalls; exiFC := newExiFCalls; indC := newIndCalls |}) ;
+  newPolys : seq (@SemicircuitPolyConstraint _ {| freeFC := newFreeFCalls; exiFC := newExiFCalls; indC := newIndCalls |}) ;
   newFreeArgs : forall (i : |[freeF ctx]|), |[newFreeFCalls i]| -> |[freeFA ctx i]| -> |[length newPolys]| ;
   newExiArgs : forall (i : |[exiF ctx]|), |[newExiFCalls i]| -> |[exiFA ctx i]| -> |[length newPolys]| ;
   newIndArgs : |[newIndCalls]| -> (|[length newPolys]| * |[length newPolys]|)
   }.
 
-Definition PolyConversionDataCtx {ctx} (data : @PolyConversionData ctx) : SemicircuitCtx :=
-  {| subCtx := ctx
-   ; freeFC := newFreeFCalls data 
+Definition PolyConversionDataCtx {ctx} (data : @PolyConversionData ctx) : @SemicircuitCtx ctx :=
+  {| freeFC := newFreeFCalls data 
    ; exiFC := newExiFCalls data
    ; indC := newIndCalls data
   |}.
 
-Definition SemiDenotation c exFN exVN := 
+Definition SemiDenotation {ctx} c exFN exVN := 
   forall M : Sigma11Model, 
-     (|[exFN]| -> forall i : |[exiFS c]|, (|[exiFSA c i]| -> R M) -> option (R M))
+     (|[exFN]| -> forall i : |[exiF ctx]|, (|[exiFA ctx i]| -> R M) -> option (R M))
   -> (|[exVN]| -> R M)
-  -> @SemiCircuitAdvice (D M) c.
+  -> @SemiCircuitAdvice ctx (D M) c.
 
-Definition emptyCtx c := {| subCtx := c; freeFC := fun _=> 0; exiFC := fun _=> 0; indC := 0|}.
+Definition emptyCtx ctx : @SemicircuitCtx ctx := {| freeFC := fun _=> 0; exiFC := fun _=> 0; indC := 0|}.
 
-Definition PolyConversionEmptyData {ctx}: 
+Definition PolyConversionEmptyData {ctx} : 
   @PolyConversionData ctx :=
   {| newFreeFCalls := fun _ => 0; newExiFCalls := fun _ => 0; newIndCalls := 0; newPolys := [::]
    ; newFreeArgs := fun x => emptyTuple; newExiArgs := fun x => emptyTuple; newIndArgs := emptyTuple|}.
@@ -297,17 +291,17 @@ Program Definition CombineDataDenotation {c i j}
   {| exiVAdv := exiVAdv (ad1 M X Y)
    ; exiFAdv := exiFAdv (ad1 M X Y)
    ; freeFCallOut := fun i j => (
-     if j < newFreeFCalls d1 i as b return j < newFreeFCalls d1 i = b -> (|[uniVS ctx']| -> R M) -> R M
+     if j < newFreeFCalls d1 i as b return j < newFreeFCalls d1 i = b -> (|[uniV c]| -> R M) -> R M
      then fun _ => freeFCallOut (ad1 M X Y) i j
      else fun _ => freeFCallOut (ad2 M X Y) i (j - newFreeFCalls d1 i)
    ) (erefl _)
    ; exiFCallOut := fun i j => (
-     if j < newExiFCalls d1 i as b return j < newExiFCalls d1 i = b -> (|[uniVS ctx']| -> R M) -> R M
+     if j < newExiFCalls d1 i as b return j < newExiFCalls d1 i = b -> (|[uniV c]| -> R M) -> R M
      then fun _ => exiFCallOut (ad1 M X Y) i j
      else fun _ => exiFCallOut (ad2 M X Y) i (j - newExiFCalls d1 i)
    ) (erefl _) 
    ; indCallOut := fun i => (
-     if i < newIndCalls d1 as b return i < newIndCalls d1 = b -> (|[uniVS ctx']| -> R M) -> R M
+     if i < newIndCalls d1 as b return i < newIndCalls d1 = b -> (|[uniV c]| -> R M) -> R M
      then fun _ => indCallOut (ad1 M X Y) i
      else fun _ => indCallOut (ad2 M X Y) (i - newIndCalls d1)
    ) (erefl _) 
@@ -324,22 +318,22 @@ Next Obligation.
 Qed.
 
 Program Definition PolyFuseCoerce {ctx : Sigma11Ctx} {d1 d2 : @PolyConversionData ctx} 
-  (s : @SemicircuitPolyConstraint {| subCtx := ctx; freeFC := fun x => newFreeFCalls d1 x + newFreeFCalls d2 x
+  (s : @SemicircuitPolyConstraint ctx {| freeFC := fun x => newFreeFCalls d1 x + newFreeFCalls d2 x
                                                   ; exiFC := fun x => newExiFCalls d1 x + newExiFCalls d2 x
                                                   ; indC := newIndCalls d1 + newIndCalls d2 |}) :
-  @SemicircuitPolyConstraint {| subCtx := ctx; freeFC := newFreeFCalls (PolyConversionCombineData d1 d2)
-                                             ; exiFC := newExiFCalls (PolyConversionCombineData d1 d2)
-                                             ; indC := newIndCalls (PolyConversionCombineData d1 d2) |} := s.
+  @SemicircuitPolyConstraint ctx {| freeFC := newFreeFCalls (PolyConversionCombineData d1 d2)
+                                    ; exiFC := newExiFCalls (PolyConversionCombineData d1 d2)
+                                    ; indC := newIndCalls (PolyConversionCombineData d1 d2) |} := s.
 Next Obligation. by f_equal; destruct d1, d2. Qed.
 
 (*Fuse sequence of poly conversion outputs into a single output. *)
 Program Fixpoint PolyCallSeqFuse {ctx X Y} 
   (s : seq { d : @PolyConversionData ctx & 
     prod (SemiDenotation (@PolyConversionDataCtx ctx d) X Y)
-         (@SemicircuitPolyConstraint (@PolyConversionDataCtx ctx d)) }) :
+         (@SemicircuitPolyConstraint _ (@PolyConversionDataCtx ctx d)) }) :
   { d : @PolyConversionData ctx & 
     prod (SemiDenotation (@PolyConversionDataCtx ctx d) X Y)
-         {t : seq (@SemicircuitPolyConstraint (@PolyConversionDataCtx ctx d)) | length t = length s} } :=
+         {t : seq (@SemicircuitPolyConstraint _ (@PolyConversionDataCtx ctx d)) | length t = length s} } :=
   match s with
   | [::] => existT _ PolyConversionEmptyData (EmptyDataAdvice, [::])
   | (existT b (a, x)) :: xs => 
@@ -406,7 +400,7 @@ Next Obligation. by destruct (k _); rewrite ltn_add2l. Qed.
 (*Add a list of circuit constraints associated to a free fun call to data*)
 Program Definition FreeCallIncorp {ctx}
   (d : @PolyConversionData ctx) (i : |[freeF ctx]|) :
-  forall s : seq (@SemicircuitPolyConstraint (@PolyConversionDataCtx ctx d)),
+  forall s : seq (@SemicircuitPolyConstraint _ (@PolyConversionDataCtx ctx d)),
   length s = freeFA ctx i -> @PolyConversionData ctx :=
   match d with
   | {| newFreeFCalls := nffc; newExiFCalls := nefc; newIndCalls := nic; newPolys := plys; newFreeArgs := farg; newExiArgs := earg; newIndArgs := iarg |} =>
@@ -440,19 +434,19 @@ Next Obligation.
   hauto use: ltnW, ltn_addr, ltnS.
 Qed.
 
-Program Definition FreeCallIncorpDenotation {c X Y} 
-  (d : @PolyConversionData c) {i} {s} {e}
-  (ad : SemiDenotation (@PolyConversionDataCtx c d) X Y) :
-  SemiDenotation (@PolyConversionDataCtx c (FreeCallIncorp d i s e)) X Y :=
+Program Definition FreeCallIncorpDenotation {ctx X Y} 
+  (d : @PolyConversionData ctx) {i} {s} {e}
+  (ad : SemiDenotation (@PolyConversionDataCtx ctx d) X Y) :
+  SemiDenotation (@PolyConversionDataCtx ctx (FreeCallIncorp d i s e)) X Y :=
   fun M X Y =>
   let data' := FreeCallIncorp d i s e in
   let ctx' := PolyConversionDataCtx data' in
   {| exiVAdv := exiVAdv (ad M X Y)
    ; exiFAdv := exiFAdv (ad M X Y)
    ; freeFCallOut := fun j => (
-     if j == i as b return j == i = b -> |[freeFC ctx' j]| -> (|[uniVS ctx']| -> R M) -> R M
+     if j == i as b return j == i = b -> |[freeFC ctx' j]| -> (|[uniV ctx]| -> R M) -> R M
      then fun _ c => (
-      if c == newFreeFCalls d i as b return (c == newFreeFCalls d i) = b -> (|[uniVS ctx']| -> R M) -> R M
+      if c == newFreeFCalls d i as b return (c == newFreeFCalls d i) = b -> (|[uniV ctx]| -> R M) -> R M
       then fun _ u => 
         match freeF_S M i _ (fun x => SemicircuitPolyDenotation (ModelInstance M) (ad M X Y) (lnth s x) u) with
         | None => 0%R
@@ -466,7 +460,7 @@ Program Definition FreeCallIncorpDenotation {c X Y}
    ; indCallOut := indCallOut (ad M X Y)
   |}.
 Next Obligation.
-  destruct d, c; cbn in *.
+  destruct d, ctx; cbn in *.
   unfold SingleCall in H.
   rewrite dep_if_case_false in H; auto.
   qauto use: addn1, addSnnS inv: nat.
@@ -475,15 +469,15 @@ Next Obligation. by destruct d. Qed.
 Next Obligation. by destruct d. Qed.
 Next Obligation.
   clear H c.
-  assert ((exist (fun n : nat => n < freeF c0) j H0) = (exist (fun n : nat => n < freeF c0) i H1)).
+  assert ((exist (fun n : nat => n < freeF ctx) j H0) = (exist (fun n : nat => n < freeF ctx) i H1)).
   by apply EEConvert.1 in e0; apply subset_eq_compat.
-  destruct d, c0; simpl; unfold AddCall, SingleCall; rewrite dep_if_case_true; auto; simpl.
+  destruct d, ctx; simpl; unfold AddCall, SingleCall; rewrite dep_if_case_true; auto; simpl.
   rewrite H; apply Utils.cRange_obligation_1.
 Qed.
 Next Obligation.
   change (exist _ ?x _ == exist _ ?y _) with (x == y) in *.
-  destruct d, c0; simpl in *.
-  unfold AddCall, PolyConversionDataCtx, freeFS, subCtx, SingleCall in *;
+  destruct d, ctx; simpl in *.
+  unfold AddCall, PolyConversionDataCtx, SingleCall in *;
   rewrite dep_if_case_true in H; auto.
   apply leq_neq_lt;[by rewrite addn1 in H|].
   simpl; rewrite <- EEFConvert.
@@ -494,7 +488,7 @@ Qed.
 (*Add a list of circuit constraints associated to an exi fun call to data*)
 Program Definition ExiCallIncorp {ctx}
   (d : @PolyConversionData ctx) (i : |[exiF ctx]|) :
-  forall s : seq (@SemicircuitPolyConstraint (@PolyConversionDataCtx ctx d)),
+  forall s : seq (@SemicircuitPolyConstraint _ (@PolyConversionDataCtx ctx d)),
   length s = exiFA ctx i ->
   @PolyConversionData ctx :=
   match d with
@@ -529,10 +523,10 @@ Next Obligation.
   hauto use: ltnW, ltn_addr, ltnS.
 Qed.
 
-Program Definition ExiCallIncorpDenotation {c X Y} 
-  (d : @PolyConversionData c) {i} {s} {e}
-  (ad : SemiDenotation (@PolyConversionDataCtx c d) X Y) :
-  SemiDenotation (@PolyConversionDataCtx c (ExiCallIncorp d i s e)) X Y :=
+Program Definition ExiCallIncorpDenotation {ctx X Y} 
+  (d : @PolyConversionData ctx) {i} {s} {e}
+  (ad : SemiDenotation (@PolyConversionDataCtx ctx d) X Y) :
+  SemiDenotation (@PolyConversionDataCtx ctx (ExiCallIncorp d i s e)) X Y :=
   fun M X Y =>
   let data' := ExiCallIncorp d i s e in
   let ctx' := PolyConversionDataCtx data' in
@@ -540,9 +534,9 @@ Program Definition ExiCallIncorpDenotation {c X Y}
    ; exiFAdv := exiFAdv (ad M X Y)
    ; freeFCallOut := freeFCallOut (ad M X Y)
    ; exiFCallOut := fun j => (
-     if j == i as b return j == i = b -> |[exiFC ctx' j]| -> (|[uniVS ctx']| -> R M) -> R M
+     if j == i as b return j == i = b -> |[exiFC ctx' j]| -> (|[uniV ctx]| -> R M) -> R M
      then fun _ c => (
-      if c == newExiFCalls d i as b return (c == newExiFCalls d i) = b -> (|[uniVS ctx']| -> R M) -> R M
+      if c == newExiFCalls d i as b return (c == newExiFCalls d i) = b -> (|[uniV ctx]| -> R M) -> R M
       then fun _ u => 
         match exiF_S M i _ (fun x => SemicircuitPolyDenotation (ModelInstance M) (ad M X Y) (lnth s x) u) with
         | None => 0%R
@@ -556,7 +550,7 @@ Program Definition ExiCallIncorpDenotation {c X Y}
   |}.
 Next Obligation. by destruct d. Qed.
 Next Obligation.
-  destruct d, c; cbn in *.
+  destruct d, ctx; cbn in *.
   unfold SingleCall in H.
   rewrite dep_if_case_false in H; auto.
   qauto use: addn1, addSnnS inv: nat.
@@ -564,15 +558,15 @@ Qed.
 Next Obligation. by destruct d. Qed.
 Next Obligation.
   clear H c.
-  assert ((exist (fun n : nat => n < exiF c0) j H0) = (exist (fun n : nat => n < exiF c0) i H1)).
+  assert ((exist (fun n : nat => n < exiF ctx) j H0) = (exist (fun n : nat => n < exiF ctx) i H1)).
   by apply EEConvert.1 in e0; apply subset_eq_compat.
-  destruct d, c0; simpl; unfold AddCall, SingleCall; rewrite dep_if_case_true; auto; simpl.
+  destruct d, ctx; simpl; unfold AddCall, SingleCall; rewrite dep_if_case_true; auto; simpl.
   rewrite H; apply Utils.cRange_obligation_1.
 Qed.
 Next Obligation.
   change (exist _ ?x _ == exist _ ?y _) with (x == y) in *.
-  destruct d, c0; simpl in *.
-  unfold AddCall, PolyConversionDataCtx, exiFS, subCtx, SingleCall in *;
+  destruct d, ctx; simpl in *.
+  unfold AddCall, PolyConversionDataCtx, SingleCall in *;
   rewrite dep_if_case_true in H; auto.
   apply leq_neq_lt;[by rewrite addn1 in H|].
   simpl; rewrite <- EEFConvert.
@@ -585,10 +579,10 @@ Program Definition PolyConvertFreeCase {ctx X Y}
   (t : |[freeFA ctx i]| ->
     { d : @PolyConversionData ctx &  
       prod (SemiDenotation (@PolyConversionDataCtx ctx d) X Y)
-          (@SemicircuitPolyConstraint (@PolyConversionDataCtx ctx d)) }) :
+          (@SemicircuitPolyConstraint _ (@PolyConversionDataCtx ctx d)) }) :
   { d : @PolyConversionData ctx &  
     prod (SemiDenotation (@PolyConversionDataCtx ctx d) X Y)
-         (@SemicircuitPolyConstraint (@PolyConversionDataCtx ctx d)) } := 
+         (@SemicircuitPolyConstraint _ (@PolyConversionDataCtx ctx d)) } := 
   let (data, D) := PolyCallSeqFuse [seq t i | i <- cRange 0 (freeFA ctx i) ] in let (ad, polys) := D in
   let data2 : @PolyConversionData ctx := FreeCallIncorp data i polys _ in
   existT _ data2 (FreeCallIncorpDenotation _ ad, PolyConsFreeF i (newFreeFCalls data i)).
@@ -605,10 +599,10 @@ Program Definition PolyConvertExiCase {ctx X Y}
   (t : |[exiFA ctx i]| ->
     { d : @PolyConversionData ctx &  
       prod (SemiDenotation (@PolyConversionDataCtx ctx d) X Y)
-           (@SemicircuitPolyConstraint (@PolyConversionDataCtx ctx d)) }) :
+           (@SemicircuitPolyConstraint _ (@PolyConversionDataCtx ctx d)) }) :
   { d : @PolyConversionData ctx &  
     prod (SemiDenotation (@PolyConversionDataCtx ctx d) X Y)
-         (@SemicircuitPolyConstraint (@PolyConversionDataCtx ctx d)) } :=
+         (@SemicircuitPolyConstraint _ (@PolyConversionDataCtx ctx d)) } :=
   let (data, D) := PolyCallSeqFuse [seq t i | i <- cRange 0 (exiFA ctx i) ] in let (ad, polys) := D in
   let data2 : @PolyConversionData ctx := ExiCallIncorp data i polys _ in
   existT _ data2 (ExiCallIncorpDenotation _ ad, PolyConsExiF i (newExiFCalls data i)).
@@ -624,8 +618,8 @@ Qed.
 (*Add a list of circuit constraints associated to an ind call to data*)
 Program Definition IndCallIncorp {ctx}
   (d : @PolyConversionData ctx) :
-  (@SemicircuitPolyConstraint (@PolyConversionDataCtx ctx d)) ->
-  (@SemicircuitPolyConstraint (@PolyConversionDataCtx ctx d)) ->
+  (@SemicircuitPolyConstraint _ (@PolyConversionDataCtx ctx d)) ->
+  (@SemicircuitPolyConstraint _ (@PolyConversionDataCtx ctx d)) ->
   @PolyConversionData ctx :=
   match d with
   | {| newFreeFCalls := nffc; newExiFCalls := nefc; newIndCalls := nic; newPolys := plys; newFreeArgs := farg; newExiArgs := earg; newIndArgs := iarg |} =>
@@ -692,7 +686,7 @@ Program Definition IndCallIncorpAdvice {c X Y}
    ; freeFCallOut := freeFCallOut (ad M X Y)
    ; exiFCallOut := exiFCallOut (ad M X Y)
    ; indCallOut := fun i => (
-      if i == newIndCalls d as b return (i == newIndCalls d) = b -> (|[uniVS ctx']| -> R M) -> R M
+      if i == newIndCalls d as b return (i == newIndCalls d) = b -> (|[uniV c]| -> R M) -> R M
       then fun _ u => 
         let x1 := SemicircuitPolyDenotation (ModelInstance M) (ad M X Y) x u in
         let y1 := SemicircuitPolyDenotation (ModelInstance M) (ad M X Y) y u in
@@ -715,13 +709,13 @@ Qed.
 Program Definition PolyConvertIndCase {ctx X Y} 
   (x : { d : @PolyConversionData ctx &  
           prod (SemiDenotation (@PolyConversionDataCtx ctx d) X Y)
-              (@SemicircuitPolyConstraint (@PolyConversionDataCtx ctx d)) })
+              (@SemicircuitPolyConstraint _ (@PolyConversionDataCtx ctx d)) })
   (y : { d : @PolyConversionData ctx &  
           prod (SemiDenotation (@PolyConversionDataCtx ctx d) X Y)
-              (@SemicircuitPolyConstraint (@PolyConversionDataCtx ctx d)) }) :
+              (@SemicircuitPolyConstraint _ (@PolyConversionDataCtx ctx d)) }) :
   { d : @PolyConversionData ctx &  
     prod (SemiDenotation (@PolyConversionDataCtx ctx d) X Y)
-         (@SemicircuitPolyConstraint (@PolyConversionDataCtx ctx d)) } :=
+         (@SemicircuitPolyConstraint _ (@PolyConversionDataCtx ctx d)) } :=
   let (data, D) := PolyCallSeqFuse (cons x (cons y nil)) in let (ad, polys) := D in
   let data2 : @PolyConversionData ctx := IndCallIncorp data (lnth polys 0) (lnth polys 1) in
   existT _ data2 (IndCallIncorpAdvice _ ad, PolyConsInd (newIndCalls data)).
@@ -732,7 +726,7 @@ Next Obligation. by destruct data; apply Utils.cRange_obligation_1. Qed.
 Program Fixpoint PolyConvert {ctx X Y} (r : @PolyTerm ctx) :
   { d : @PolyConversionData ctx &  
     prod (SemiDenotation (@PolyConversionDataCtx ctx d) X Y)
-         (@SemicircuitPolyConstraint (@PolyConversionDataCtx ctx d)) } := 
+         (@SemicircuitPolyConstraint _ (@PolyConversionDataCtx ctx d)) } := 
   match r with
   | PolyFVar m => existT _ PolyConversionEmptyData (EmptyDataAdvice, PolyConsFreeV m)
   | PolyEVar m => existT _ PolyConversionEmptyData (EmptyDataAdvice, PolyConsExiV m)
@@ -764,15 +758,14 @@ Next Obligation. by destruct d1, d2; unfold PolyConversionDataCtx; f_equal; appl
 Next Obligation. by destruct d1, d2; unfold PolyConversionDataCtx; f_equal; apply functional_extensionality;move=>[x ltx]. Qed.
 
 (*Convert constraint to one with new function with no calls*)
-Fixpoint PropCallCast {ctx}
-    {newFC : |[freeFS ctx]| -> nat}
-    {newEC : |[exiFS ctx]| -> nat}
+Fixpoint PropCallCast {ctx c}
+    {newFC : |[freeF ctx]| -> nat}
+    {newEC : |[exiF ctx]| -> nat}
     {newIC : nat}
-    (p : @SemicircuitPropConstraint ctx) :
-    @SemicircuitPropConstraint {| subCtx := subCtx ctx
-                               ; freeFC := fun x => freeFC ctx x + newFC x
-                               ; exiFC := fun x => exiFC ctx x + newEC x
-                               ; indC := indC ctx + newIC|} := 
+    (p : @SemicircuitPropConstraint ctx c) :
+    @SemicircuitPropConstraint _ {| freeFC := fun x => freeFC c x + newFC x
+                               ; exiFC := fun x => exiFC c x + newEC x
+                               ; indC := indC c + newIC|} := 
   match p with
   | ZOConsNot p =>
     let r := PropCallCast p in
@@ -795,15 +788,14 @@ Fixpoint PropCallCast {ctx}
     ZOConsEq r1 r2
   end.
 
-Fixpoint PropCallLift {ctx}
-    {newFC : |[freeFS ctx]| -> nat}
-    {newEC : |[exiFS ctx]| -> nat}
+Fixpoint PropCallLift {ctx c}
+    {newFC : |[freeF ctx]| -> nat}
+    {newEC : |[exiF ctx]| -> nat}
     {newIC : nat}
-    (p : @SemicircuitPropConstraint ctx) :
-    @SemicircuitPropConstraint {| subCtx := subCtx ctx
-                               ; freeFC := fun x => newFC x + freeFC ctx x
-                               ; exiFC := fun x => newEC x + exiFC ctx x
-                               ; indC := newIC + indC ctx|} := 
+    (p : @SemicircuitPropConstraint ctx c) :
+    @SemicircuitPropConstraint _ {|freeFC := fun x => newFC x + freeFC c x
+                               ; exiFC := fun x => newEC x + exiFC c x
+                               ; indC := newIC + indC c|} := 
   match p with
   | ZOConsNot p =>
     let r := PropCallLift p in
@@ -830,7 +822,7 @@ Fixpoint PropCallLift {ctx}
 Program Fixpoint PropConvert {ctx X Y} (r : @ZerothOrderFormula ctx) :
   { d : @PolyConversionData ctx &  
         prod (SemiDenotation (@PolyConversionDataCtx ctx d) X Y)
-             (@SemicircuitPropConstraint (@PolyConversionDataCtx ctx d)) } := 
+             (@SemicircuitPropConstraint _ (@PolyConversionDataCtx ctx d)) } := 
   match r with
   | ZONot f => 
     let (d, D) := PropConvert f in let (ad, p) := D in
@@ -874,11 +866,10 @@ Next Obligation. by destruct d1, d2; unfold PolyConversionDataCtx; f_equal; appl
 Next Obligation. by destruct d1, d2; unfold PolyConversionDataCtx; f_equal; apply functional_extensionality;move=>[x ltx]. Qed.
 
 (*Integrate generated polynomial constraint data into a semicircuit*)
-Program Definition IntegrateConversionDataC
-  (c : SemiCircuit)
-  (d : @PolyConversionData (subCtx (Ctx c))) : SemiCircuit :=
-  let Ctx' := {| subCtx := subCtx (Ctx c) 
-              ; freeFC := fun x => freeFCalls c x + newFreeFCalls d x
+Program Definition IntegrateConversionDataC {ctx}
+  (c : @SemiCircuit ctx)
+  (d : @PolyConversionData ctx) : SemiCircuit :=
+  let Ctx' := {|freeFC := fun x => freeFCalls c x + newFreeFCalls d x
               ; exiFC := fun x => exiFCalls c x + newExiFCalls d x
               ; indC := indCalls c + newIndCalls d |} in
   let poly' := map (PolyCallCast) (polyConstraints c) ++ map PolyCallLift (newPolys d) in
@@ -891,12 +882,12 @@ Program Definition IntegrateConversionDataC
       else fun _ => let (a, b) := newIndArgs d (i - indCalls c) in
         (length (polyConstraints c) + a, length (polyConstraints c) + b)) (erefl _)
    ; freeFArgs := fun i (j : |[freeFCalls c i + newFreeFCalls d i]|) =>
-     (if j < freeFCalls c i as b return (j < freeFCalls c i) = b -> |[freeFArity c i]| -> |[length poly']|
+     (if j < freeFCalls c i as b return (j < freeFCalls c i) = b -> |[freeFA ctx i]| -> |[length poly']|
      then fun _ => freeFArgs c i j
      else fun _ x => length (polyConstraints c) 
                    + newFreeArgs d i (j - freeFCalls c i) x) (erefl _)
    ; exiFArgs := fun i (j : |[exiFCalls c i + newExiFCalls d i]|) =>
-     (if j < exiFCalls c i as b return (j < exiFCalls c i) = b -> |[exiFArity c i]| -> |[length poly']|
+     (if j < exiFCalls c i as b return (j < exiFCalls c i) = b -> |[exiFA ctx i]| -> |[length poly']|
      then fun _ => exiFArgs c i j
      else fun _ x => length (polyConstraints c) 
                    + newExiArgs d i (j - exiFCalls c i) x) (erefl _)
@@ -988,9 +979,9 @@ Next Obligation.
   by apply ltn_addr.
 Qed.
 
-Program Definition IntegrateConversionDataA {X Y}
+Program Definition IntegrateConversionDataA {ctx X Y}
   {s} (ad1 : SemiDenotation (Ctx s) X Y)
-  {d} (ad2 : SemiDenotation (@PolyConversionDataCtx (subCtx (Ctx s)) d) X Y) :
+  {d} (ad2 : SemiDenotation (@PolyConversionDataCtx ctx d) X Y) :
   SemiDenotation (Ctx (IntegrateConversionDataC s d)) X Y :=
   fun M X Y =>
   let data' := IntegrateConversionDataC s d in
@@ -998,17 +989,17 @@ Program Definition IntegrateConversionDataA {X Y}
   {| exiVAdv := exiVAdv (ad1 M X Y)
    ; exiFAdv := exiFAdv (ad1 M X Y)
    ; freeFCallOut := fun i j => (
-     if j < freeFCalls s i as b return j < freeFCalls s i = b -> (|[uniVS ctx']| -> R M) -> R M
+     if j < freeFCalls s i as b return j < freeFCalls s i = b -> (|[uniV ctx]| -> R M) -> R M
      then fun _ => freeFCallOut (ad1 M X Y) i j
      else fun _ => freeFCallOut (ad2 M X Y) i (j - freeFCalls s i)
     ) (erefl _)
    ; exiFCallOut := fun i j => (
-     if j < exiFCalls s i as b return j < exiFCalls s i = b -> (|[uniVS ctx']| -> R M) -> R M
+     if j < exiFCalls s i as b return j < exiFCalls s i = b -> (|[uniV ctx]| -> R M) -> R M
      then fun _ => exiFCallOut (ad1 M X Y) i j
      else fun _ => exiFCallOut (ad2 M X Y) i (j - exiFCalls s i)
       ) (erefl _)
    ; indCallOut := fun i => (
-     if i < indCalls s as b return i < indCalls s = b -> (|[uniVS ctx']| -> R M) -> R M
+     if i < indCalls s as b return i < indCalls s = b -> (|[uniV ctx]| -> R M) -> R M
      then fun _ => indCallOut (ad1 M X Y) i
      else fun _ => indCallOut (ad2 M X Y) (i - indCalls s)
       ) (erefl _)
@@ -1025,20 +1016,20 @@ Next Obligation.
   assert (indCalls s <= i);[hecrush use: contraFltn|qauto use: ltn_subLR].
 Qed.
 
-Definition IntegrateConversionData {X Y}
-  (c : {s : SemiCircuit & SemiDenotation (Ctx s) X Y})
-  (d : {d : @PolyConversionData (subCtx (Ctx (projT1 c))) & 
-            SemiDenotation (@PolyConversionDataCtx (subCtx (Ctx (projT1 c))) d) X Y}) : 
-  {s : SemiCircuit & SemiDenotation (Ctx s) X Y} :=
+Definition IntegrateConversionData {ctx X Y}
+  (c : {s : @SemiCircuit ctx & SemiDenotation (Ctx s) X Y})
+  (d : {d : @PolyConversionData ctx & 
+            SemiDenotation (@PolyConversionDataCtx ctx d) X Y}) : 
+  {s : @SemiCircuit ctx & SemiDenotation (Ctx s) X Y} :=
   match c, d with
   | existT c adc, existT d add =>
     existT _ (IntegrateConversionDataC c d) (IntegrateConversionDataA adc add) 
   end.
 
-Definition Translate_ZerothOrderFormula {X Y}
-  (s : { s : SemiCircuit & SemiDenotation (Ctx s) X Y})
-  (f : @ZerothOrderFormula (subCtx (Ctx (projT1 s)))) : 
-  { s : SemiCircuit & SemiDenotation (Ctx s) X Y} :=
+Definition Translate_ZerothOrderFormula {ctx X Y}
+  (s : { s : @SemiCircuit ctx & SemiDenotation (Ctx s) X Y})
+  (f : @ZerothOrderFormula ctx) : 
+  { s : @SemiCircuit ctx & SemiDenotation (Ctx s) X Y} :=
   match PropConvert f with
   | existT d (ad, p) => 
     let c0 := IntegrateConversionDataC (projT1 s) d in
@@ -1057,16 +1048,41 @@ Definition Translate_ZerothOrderFormula {X Y}
     existT _ c' (IntegrateConversionDataA (projT2 s) ad)
   end.
 
-Program Definition incExiCC (ctx : SemicircuitCtx) : SemicircuitCtx :=
-  {| subCtx := incExiV (subCtx ctx)
-   ; freeFC := freeFC ctx
-   ; exiFC := exiFC ctx
-   ; indC := indC ctx
-  |}.
-Next Obligation. by destruct (subCtx ctx). Qed. Next Obligation. by destruct (subCtx ctx). Qed.
+Check PropConvert.
 
-Program Definition incExiAd {ctx X Y}
-  (ad : SemiDenotation ctx X Y) : SemiDenotation (incExiCC ctx) X (Y.+1) :=
+Definition PropInt {ctx X Y}
+  (s : { s : @SemiCircuit ctx & SemiDenotation (Ctx s) X Y})
+
+  (d : @PolyConversionData ctx)
+  (ad : SemiDenotation (@PolyConversionDataCtx ctx d) X Y)
+  (p : @SemicircuitPropConstraint _ (@PolyConversionDataCtx ctx d)) :
+  { s : @SemiCircuit ctx & SemiDenotation (Ctx s) X Y} :=
+  let c0 := IntegrateConversionDataC (projT1 s) d in
+  let c' := {| Ctx := Ctx c0
+            ; nu := nu c0
+            ; polyConstraints := polyConstraints c0
+            ; indArgs := indArgs c0
+            ; freeFArgs := freeFArgs c0
+            ; exiFArgs := exiFArgs c0
+            ; uniVBounds := uniVBounds c0
+            ; exiVBounds := exiVBounds c0
+            ; exiFOutputBounds := exiFOutputBounds c0
+            ; exiFInputBounds := exiFInputBounds c0
+            ; formula := inr (PropCallLift p)
+            |} in
+  existT _ c' (IntegrateConversionDataA (projT2 s) ad).
+
+
+Program Definition incExiCC {ctx} (c : @SemicircuitCtx ctx) : @SemicircuitCtx (incExiV ctx) :=
+  {| freeFC := freeFC c
+   ; exiFC := exiFC c
+   ; indC := indC c
+  |}.
+Next Obligation. by destruct ctx. Qed.
+Next Obligation. by destruct ctx. Qed.
+
+Program Definition incExiAd {ctx} {X Y} {c}
+  (ad : @SemiDenotation ctx c X Y) : SemiDenotation (incExiCC c) X (Y.+1) :=
   fun M X Y =>
   {| exiVAdv := fun x => (
       if x == 0 as b return ((x == 0) = b -> _ -> R M)
@@ -1078,46 +1094,46 @@ Program Definition incExiAd {ctx X Y}
     ; exiFCallOut := exiFCallOut (ad M X (fun y => Y (y.+1)))
     ; indCallOut := indCallOut (ad M X (fun y => Y (y.+1)))
    |}.
-Next Obligation. by destruct ctx, subCtx. Qed.
-Next Obligation. by destruct ctx, subCtx. Qed.
+Next Obligation. by destruct ctx, c. Qed.
+Next Obligation. by destruct ctx, c. Qed.
 Next Obligation. 
-  remember (incExiAd_obligation_2 _ _ _ _ _ _ _ _) as P; clear HeqP; simpl in P.
-  destruct ctx, subCtx; replace H0 with P;[auto|apply eq_irrelevance].
+  remember (incExiAd_obligation_2 _ _ _ _ _ _ _ _ _) as P; clear HeqP; simpl in P.
+  destruct ctx, c; replace H0 with P;[auto|apply eq_irrelevance].
 Qed.
-Next Obligation. by destruct ctx, subCtx. Qed.
+Next Obligation. by destruct ctx, c. Qed.
 Next Obligation.
-  remember (incExiAd_obligation_5 _ _ _ _ _ _ _) as P; clear HeqP; simpl in P.
-  destruct ctx, subCtx; replace H0 with P;[auto|apply eq_irrelevance].
+  remember (incExiAd_obligation_5 _ _ _ _ _ _ _ _) as P; clear HeqP; simpl in P.
+  destruct ctx, c; replace H0 with P;[auto|apply eq_irrelevance].
 Qed.
-Next Obligation. by destruct ctx, subCtx. Qed.
+Next Obligation. by destruct ctx, c. Qed.
 Next Obligation.
-  remember (incExiAd_obligation_7 _ _ _ _ _ _ _ _) as P; clear HeqP; simpl in P.
-  destruct ctx, subCtx; replace H0 with P;[auto|apply eq_irrelevance].
+  remember (incExiAd_obligation_7 _ _ _ _ _ _ _ _ _) as P; clear HeqP; simpl in P.
+  destruct ctx, c; replace H0 with P;[auto|apply eq_irrelevance].
 Qed.
-Next Obligation. by destruct ctx, subCtx. Qed.
-Next Obligation. by destruct ctx, subCtx. Qed.
+Next Obligation. by destruct ctx, c. Qed.
+Next Obligation. by destruct ctx, c. Qed.
 Next Obligation. 
-  remember (incExiAd_obligation_11 _ _ _ _ _ _ _ _) as P; clear HeqP; simpl in P.
-  destruct ctx, subCtx; replace H0 with P;[auto|apply eq_irrelevance].
+  remember (incExiAd_obligation_11 _ _ _ _ _ _ _ _ _) as P; clear HeqP; simpl in P.
+  destruct ctx, c; replace H0 with P;[auto|apply eq_irrelevance].
 Qed.
-Next Obligation. by destruct ctx, subCtx. Qed.
-Next Obligation. by destruct ctx, subCtx. Qed.
+Next Obligation. by destruct ctx, c. Qed.
+Next Obligation. by destruct ctx, c. Qed.
 Next Obligation. 
-  remember (incExiAd_obligation_15 _ _ _ _ _ _ _ _) as P; clear HeqP; simpl in P.
-  destruct ctx, subCtx; replace H0 with P;[auto|apply eq_irrelevance].
+  remember (incExiAd_obligation_15 _ _ _ _ _ _ _ _ _) as P; clear HeqP; simpl in P.
+  destruct ctx, c; replace H0 with P;[auto|apply eq_irrelevance].
 Qed.
-Next Obligation. by destruct ctx, subCtx. Qed.
-Next Obligation. by destruct ctx, subCtx. Qed.
-Next Obligation. destruct x;[fcrush|by destruct ctx, subCtx]. Qed.
-Next Obligation. by destruct ctx, subCtx. Qed.
+Next Obligation. by destruct ctx, c. Qed.
+Next Obligation. by destruct ctx, c. Qed.
+Next Obligation. destruct x;[fcrush|by destruct ctx, c]. Qed.
+Next Obligation. by destruct ctx, c. Qed.
 Next Obligation. 
-  remember (incExiAd_obligation_22 _ _ _ _ _ _ _ _ _ _) as P; clear HeqP; simpl in P.
-  destruct ctx, subCtx; replace H0 with P;[auto|apply eq_irrelevance].
+  remember (incExiAd_obligation_22 _ _ _ _ _ _ _ _ _ _ _) as P; clear HeqP; simpl in P.
+  destruct ctx, c; replace H0 with P;[auto|apply eq_irrelevance].
 Qed.
 
-Program Fixpoint PolyLiftExiV {ctx}
-  (p : @SemicircuitPolyConstraint ctx) :
-  @SemicircuitPolyConstraint (incExiCC ctx) := 
+Program Fixpoint PolyLiftExiV {ctx c}
+  (p : @SemicircuitPolyConstraint ctx c) :
+  @SemicircuitPolyConstraint _ (incExiCC c) := 
   match p with
   | PolyConsZero => PolyConsZero
   | PolyConsPlusOne => PolyConsPlusOne
@@ -1137,25 +1153,21 @@ Program Fixpoint PolyLiftExiV {ctx}
   | PolyConsFreeF i j => PolyConsFreeF i j
   | PolyConsExiF i j => PolyConsExiF i j
   end.
-Next Obligation. by unfold freeVS in *; simpl; destruct (subCtx ctx). Qed. 
-Next Obligation. by unfold exiVS in *; simpl; destruct (subCtx ctx). Qed.
-Next Obligation. by unfold uniVS in *; simpl; destruct (subCtx ctx). Qed.
-Next Obligation. by clear H; unfold freeFS in *; simpl; destruct (subCtx ctx). Qed.
+Next Obligation. by destruct ctx. Qed. Next Obligation. by destruct ctx. Qed.
+Next Obligation. by destruct ctx. Qed. Next Obligation. by destruct ctx. Qed. 
 Next Obligation.
-  remember (incExiCC_obligation_1 _ _) as P; clear HeqP; simpl in P.
-  replace P with H0; auto.
-  apply eq_irrelevance.
+  remember (incExiCC_obligation_1 _ _ _) as P; clear HeqP; simpl in P.
+  replace P with H0;[auto|apply eq_irrelevance].
 Qed.
-Next Obligation. by clear H; unfold exiFS in *; simpl; destruct (subCtx ctx). Qed.
+Next Obligation. by destruct ctx. Qed.
 Next Obligation.
-  remember (incExiCC_obligation_2 _ _) as P; clear HeqP; simpl in P.
-  replace P with H0; auto.
-  apply eq_irrelevance.
+  remember (incExiCC_obligation_2 _ _ _) as P; clear HeqP; simpl in P.
+  replace P with H0;[auto|apply eq_irrelevance].
 Qed.
 
-Fixpoint PropLiftExiV {ctx}
-  (p : @SemicircuitPropConstraint ctx) :
-  @SemicircuitPropConstraint (incExiCC ctx) := 
+Fixpoint PropLiftExiV {ctx c}
+  (p : @SemicircuitPropConstraint ctx c) :
+  @SemicircuitPropConstraint _ (incExiCC c) := 
   match p with
   | ZOConsNot p =>
     let r := PropLiftExiV p in
@@ -1178,16 +1190,15 @@ Fixpoint PropLiftExiV {ctx}
     ZOConsEq r1 r2
   end.
 
-Program Definition incUniCC (ctx : SemicircuitCtx) : SemicircuitCtx :=
-  {| subCtx := incUniV (subCtx ctx)
-   ; freeFC := freeFC ctx
-   ; exiFC := exiFC ctx
-   ; indC := indC ctx
+Program Definition incUniCC {ctx} (c : @SemicircuitCtx ctx) : @SemicircuitCtx (incUniV ctx) :=
+  {| freeFC := freeFC c
+   ; exiFC := exiFC c
+   ; indC := indC c
   |}.
-Next Obligation. by destruct (subCtx ctx). Qed. Next Obligation. by destruct (subCtx ctx). Qed.
+Next Obligation. by destruct ctx. Qed. Next Obligation. by destruct ctx. Qed.
 
-Program Definition incUniAd {ctx X Y}
-  (ad : SemiDenotation ctx X Y) : SemiDenotation (incUniCC ctx) X Y :=
+Program Definition incUniAd {ctx c X Y}
+  (ad : @SemiDenotation ctx c X Y) : SemiDenotation (incUniCC c) X Y :=
   fun M X Y =>
   {| exiVAdv := fun x t => exiVAdv (ad M X Y) x (fun y => t (y.+1))
    ; exiFAdv := exiFAdv (ad M X Y)
@@ -1195,57 +1206,57 @@ Program Definition incUniAd {ctx X Y}
    ; exiFCallOut := fun i n t => exiFCallOut (ad M X Y) i n (fun y => t (y.+1))
    ; indCallOut := fun n t => indCallOut (ad M X Y) n (fun y => t (y.+1))
   |}.
-Next Obligation. destruct ctx, subCtx; assumption. Qed.
+Next Obligation. destruct ctx, c; assumption. Qed.
 Next Obligation.
-  remember (incUniAd_obligation_1 _ _ _ _ _ _ _ _ _ _) as Q; clear HeqQ;
-  destruct ctx, subCtx;
+  remember (incUniAd_obligation_1 _ _ _ _ _ _ _ _ _ _ _) as Q; clear HeqQ;
+  destruct ctx, c;
   unfold incUniCC in *; cbn in *;
   replace Q with H0 in H;[auto|apply eq_irrelevance].
 Qed.
-Next Obligation. by destruct ctx, subCtx. Qed.
-Next Obligation. by destruct ctx, subCtx. Qed.
-Next Obligation. by destruct ctx, subCtx. Qed.
+Next Obligation. by destruct ctx, c. Qed.
+Next Obligation. by destruct ctx, c. Qed.
+Next Obligation. by destruct ctx, c. Qed.
 Next Obligation.
-  remember (incUniAd_obligation_5  _ _ _ _ _ _ _ _) as Q; clear HeqQ.
-  destruct ctx, subCtx.
+  remember (incUniAd_obligation_5  _ _ _ _ _ _ _ _ _) as Q; clear HeqQ.
+  destruct ctx, c.
   unfold incUniCC in *; cbn in *.
   replace Q with H0 in H;[auto|apply eq_irrelevance].
 Qed.
-Next Obligation. by destruct ctx, subCtx. Qed.
+Next Obligation. by destruct ctx, c. Qed.
 Next Obligation. 
-  remember (incUniAd_obligation_7  _ _ _ _ _ _ _) as Q; clear HeqQ.
-  destruct ctx, subCtx.
+  remember (incUniAd_obligation_7  _ _ _ _ _ _ _ _) as Q; clear HeqQ.
+  destruct ctx, c.
   unfold incUniCC in *; cbn in *.
   replace Q with H0 in H;[auto|apply eq_irrelevance].
 Qed.
-Next Obligation. by destruct ctx, subCtx. Qed.
+Next Obligation. by destruct ctx, c. Qed.
 Next Obligation.
-  remember (incUniAd_obligation_9  _ _ _ _ _ _ _ _ _ _ _) as Q; clear HeqQ.
-  destruct ctx, subCtx.
+  remember (incUniAd_obligation_9  _ _ _ _ _ _ _ _ _ _ _ _) as Q; clear HeqQ.
+  destruct ctx, c.
   unfold incUniCC in *; cbn in *.
   replace Q with H0 in H;[auto|apply eq_irrelevance].
 Qed.
-Next Obligation. by destruct ctx, subCtx. Qed.
-Next Obligation. by destruct ctx, subCtx. Qed.
+Next Obligation. by destruct ctx, c. Qed.
+Next Obligation. by destruct ctx, c. Qed.
 Next Obligation.
-  remember (incUniAd_obligation_12  _ _ _ _ _ _ _ _ _ _ _) as Q; clear HeqQ.
-  destruct ctx, subCtx.
+  remember (incUniAd_obligation_12  _ _ _ _ _ _ _ _ _ _ _ _) as Q; clear HeqQ.
+  destruct ctx, c.
   unfold incUniCC in *; cbn in *.
   replace Q with H0 in H;[auto|apply eq_irrelevance].
 Qed.
-Next Obligation. by destruct ctx, subCtx. Qed.
-Next Obligation. by destruct ctx, subCtx. Qed.
+Next Obligation. by destruct ctx, c. Qed.
+Next Obligation. by destruct ctx, c. Qed.
 Next Obligation.
-  remember (incUniAd_obligation_15  _ _ _ _ _ _ _ _ _ _) as Q; clear HeqQ.
-  destruct ctx, subCtx.
+  remember (incUniAd_obligation_15  _ _ _ _ _ _ _ _ _ _ _) as Q; clear HeqQ.
+  destruct ctx, c.
   unfold incUniCC in *; cbn in *.
   replace Q with H0 in H;[auto|apply eq_irrelevance].
 Qed.
-Next Obligation. by destruct ctx, subCtx. Qed.
+Next Obligation. by destruct ctx, c. Qed.
 
-Program Fixpoint PolyLiftUniV {ctx}
-  (p : @SemicircuitPolyConstraint ctx) :
-    @SemicircuitPolyConstraint (incUniCC ctx) := 
+Program Fixpoint PolyLiftUniV {ctx c}
+  (p : @SemicircuitPolyConstraint ctx c) :
+    @SemicircuitPolyConstraint _ (incUniCC c) := 
   match p with
   | PolyConsZero => PolyConsZero
   | PolyConsPlusOne => PolyConsPlusOne
@@ -1265,25 +1276,23 @@ Program Fixpoint PolyLiftUniV {ctx}
   | PolyConsFreeF i j => PolyConsFreeF i j
   | PolyConsExiF i j => PolyConsExiF i j
   end.
-Next Obligation. by unfold freeVS in *; simpl; destruct (subCtx ctx). Qed. 
-Next Obligation. by unfold exiVS in *; simpl; destruct (subCtx ctx). Qed.
-Next Obligation. by unfold uniVS in *; simpl; destruct (subCtx ctx). Qed.
-Next Obligation. by clear H; unfold freeFS in *; simpl; destruct (subCtx ctx). Qed.
+Next Obligation. by destruct ctx. Qed. Next Obligation. by destruct ctx. Qed.
+Next Obligation. by destruct ctx. Qed. Next Obligation. by destruct ctx. Qed.
 Next Obligation.
-  remember (incUniCC_obligation_1 _ _) as P; clear HeqP; simpl in P.
+  remember (incUniCC_obligation_1 _ _ _) as P; clear HeqP; simpl in P.
   replace P with H0; auto.
   apply eq_irrelevance.
 Qed.
-Next Obligation. by clear H; unfold exiFS in *; simpl; destruct (subCtx ctx). Qed.
+Next Obligation. by destruct ctx. Qed.
 Next Obligation.
-  remember (incUniCC_obligation_2 _ _) as P; clear HeqP; simpl in P.
+  remember (incUniCC_obligation_2 _ _ _) as P; clear HeqP; simpl in P.
   replace P with H0; auto.
   apply eq_irrelevance.
 Qed.
 
-Fixpoint PropLiftUniV {ctx}
-  (p : @SemicircuitPropConstraint ctx) :
-  @SemicircuitPropConstraint (incUniCC ctx) := 
+Fixpoint PropLiftUniV {ctx c}
+  (p : @SemicircuitPropConstraint ctx c) :
+  @SemicircuitPropConstraint _ (incUniCC c) := 
   match p with
   | ZOConsNot p =>
     let r := PropLiftUniV p in
@@ -1307,11 +1316,12 @@ Fixpoint PropLiftUniV {ctx}
   end.
 
 (*Add a new existentially quantified first order variable to semicircuit *)
-Program Definition SemicircuitExiInc (c : SemiCircuit) (p : @SemicircuitPolyConstraint (Ctx c)): SemiCircuit :=
+Program Definition SemicircuitExiInc {ctx} (c : @SemiCircuit ctx)
+  (p : @SemicircuitPolyConstraint _ (Ctx c)): SemiCircuit :=
   {| Ctx := incExiCC (Ctx c)
   ; nu := fun i =>
     (if i == 0 as b return (i == 0) = b -> nat
-     then fun _ => uniV (subCtx (Ctx c))
+     then fun _ => uniV ctx
      else fun _ => nu c (i.-1)) (erefl _)
   ; polyConstraints := map PolyLiftExiV (rcons (polyConstraints c) p)
   ; freeFArgs := freeFArgs c
@@ -1335,78 +1345,47 @@ Next Obligation.
   rewrite map_length length_rcons; sfirstorder.
 Qed.
 Next Obligation.
-  remember (incExiCC_obligation_1 _ _) as P; clear HeqP; simpl in P.
-  destruct c, Ctx, subCtx; simpl in *.
-  replace P with H1;auto.
-  apply eq_irrelevance.
+  remember (incExiCC_obligation_1 _ _ _) as P; clear HeqP; simpl in P.
+  destruct ctx; simpl in *.
+  replace P with H1;[auto|apply eq_irrelevance].
 Qed.
 Next Obligation.
   destruct (freeFArgs _ _).
   rewrite map_length length_rcons; sfirstorder.
 Qed.
 Next Obligation.
-  remember (incExiCC_obligation_2 _ _) as P; clear HeqP; simpl in P.
-  destruct c, Ctx, subCtx; simpl in *.
-  replace P with H1;auto.
-  apply eq_irrelevance.
+  remember (incExiCC_obligation_2 _ _ _) as P; clear HeqP; simpl in P.
+  destruct ctx; simpl in *.
+  replace P with H1;[auto|apply eq_irrelevance].
 Qed.
 Next Obligation.
   destruct (exiFArgs _).
   rewrite map_length length_rcons; sfirstorder.
 Qed.
-Next Obligation. by destruct c, Ctx, subCtx. Qed.
+Next Obligation. by destruct ctx. Qed.
 Next Obligation.
   destruct (uniVBounds _ _).
   rewrite map_length length_rcons; sfirstorder.
 Qed.
-Next Obligation. by destruct c, Ctx, subCtx. Qed.
+Next Obligation. by destruct ctx. Qed.
 Next Obligation.
   destruct (exiFOutputBounds _ _).
   rewrite map_length length_rcons; sfirstorder.
 Qed.
-Next Obligation. by destruct c, Ctx, subCtx. Qed.
+Next Obligation. by destruct ctx. Qed.
 Next Obligation.
-  remember (SemicircuitExiInc_obligation_11 _ _ _) as P; clear HeqP; simpl in P.
-  destruct c, Ctx, subCtx; simpl in *.
-  replace P with H0;auto.
-  apply eq_irrelevance.
+  remember (SemicircuitExiInc_obligation_11 _ _ _ _) as P; clear HeqP; simpl in P.
+  destruct ctx; simpl in *.
+  replace P with H0;[auto|apply eq_irrelevance].
 Qed.
 Next Obligation.
   destruct (exiFInputBounds _ _).
   rewrite map_length length_rcons; sfirstorder.
 Qed.
-Next Obligation. by destruct c, Ctx, subCtx. Qed.
+Next Obligation. by destruct ctx. Qed.
 Next Obligation.
   assert ((i == 0) = false);[exact e|clear e].
-  destruct c, Ctx, subCtx; simpl in *.
-  unfold exiVS, exiVN, Ctx, exiVS, subCtx, Sigma_1_1.exiV in *.
-  assert (i <> 0);[by rewrite <- EEFConvert|].
-  by destruct i;[fcrush|].
-Qed.
-Next Obligation.
-  change (exist _ ?x _ == exist _ ?y _) with (x == y).
-  dep_if_case (i == 0); auto.
-  by destruct (Ctx c), subCtx.
-  destruct ((` (nu c)) _).
-  clear H.
-  by destruct c, Ctx, subCtx.
-Qed.
-Next Obligation.
-  change (exist _ ?x _ == exist _ ?y _) with (x == y).
-  dep_if_case (j == 0); auto.
-  assert (j = 0);[by rewrite <- EEConvert|].
-  assert (i = 0). rewrite H3 in H;destruct i;[auto|fcrush].
-  rewrite <- EEConvert in H4.
-  rewrite dep_if_case_true; auto.
-  by dep_if_case (i == 0); auto;[
-    destruct (` (nu c) _), c, Ctx, subCtx
-  | destruct (nu c); apply i0; destruct i, j].
-Qed.
-Next Obligation. by destruct (exiVS _);[fcrush|]. Qed.
-Next Obligation. 
-  assert ((i == 0) = false);[exact e|clear e].
-  destruct c, Ctx, subCtx; simpl in *.
-  unfold exiVS, exiVN, Ctx, exiVS, subCtx, Sigma_1_1.exiV in *.
+  destruct ctx; simpl in *.
   assert (i <> 0);[by rewrite <- EEFConvert|].
   by destruct i;[fcrush|].
 Qed.
@@ -1415,17 +1394,56 @@ Next Obligation.
   rewrite map_length length_rcons; sfirstorder.
 Qed.
 Next Obligation. rewrite map_length length_rcons; sfirstorder. Qed.
+Next Obligation. by destruct (exiV _). Qed.
+Next Obligation. by destruct i, ctx. Qed.
+Next Obligation. 
+  dep_if_case (i == 0); auto.
+  by destruct ctx.
+  by destruct ((` (nu c)) _), ctx.
+Qed.
+Next Obligation. 
+  dep_if_case (j == 0); auto.
+  rewrite dep_if_case_true; auto.
+  by destruct i, j.
+  dep_if_case (i == 0); auto.
+  by destruct ((` (nu c)) _), ctx. 
+  destruct (nu c).
+  apply i0.
+  by destruct i, j.
+Qed.
 
-Definition SemicircuitExiIncWA {X Y}
-  (c : {s : SemiCircuit & SemiDenotation (Ctx s) X Y}) :
-  @SemicircuitPolyConstraint (Ctx (projT1 c)) ->
+Definition SemicircuitExiIncWA {ctx X Y}
+  (c : {s : @SemiCircuit ctx & SemiDenotation (Ctx s) X Y}) :
+  @SemicircuitPolyConstraint ctx (Ctx (projT1 c)) ->
   {s : SemiCircuit & SemiDenotation (Ctx s) X (Y.+1)} :=
 match c with
 | existT s ad => fun p => existT _ (SemicircuitExiInc s p) (incExiAd ad)
 end.
 
+(*What is going on? Why do these need to be separate functions?*)
+Definition PolyIntExi {ctx X Y}
+  (c : @SemiCircuit ctx)
+  (adc : SemiDenotation (Ctx c) X Y)
+
+  (d : @PolyConversionData ctx)
+  (ad : SemiDenotation (@PolyConversionDataCtx ctx d) X Y)
+  (p : @SemicircuitPolyConstraint _ (@PolyConversionDataCtx ctx d)) :=
+
+  SemicircuitExiIncWA (IntegrateConversionData (existT _ c adc) (existT _ d ad)) (PolyCallLift p).
+
+Definition IntegrateNewPolyExi {ctx X Y}
+  (s : {s' : @SemiCircuit ctx & SemiDenotation (Ctx s') X Y })
+
+  (p : { d : @PolyConversionData ctx &  
+        prod (SemiDenotation (@PolyConversionDataCtx ctx d) X Y)
+            (@SemicircuitPolyConstraint _ (@PolyConversionDataCtx ctx d)) }) :
+  {s0 : SemiCircuit & SemiDenotation (Ctx s0) X Y.+1} :=
+  match s, p with
+  | existT c adc, existT d (ad, p) => PolyIntExi c adc d ad p
+  end.
+
 (*Add a new universally quantified first order variable to semicircuit *)
-Program Definition SemicircuitUniInc (c : SemiCircuit) (p : @SemicircuitPolyConstraint (Ctx c)): SemiCircuit :=
+Program Definition SemicircuitUniInc {ctx} (c : SemiCircuit) (p : @SemicircuitPolyConstraint ctx (Ctx c)): SemiCircuit :=
   {| Ctx := incUniCC (Ctx c)
   ; nu := nu c
   ; polyConstraints := map PolyLiftUniV (rcons (polyConstraints c) p)
@@ -1441,16 +1459,9 @@ Program Definition SemicircuitUniInc (c : SemiCircuit) (p : @SemicircuitPolyCons
   ; exiFInputBounds := exiFInputBounds c
   ; formula := inrMap PropLiftUniV (formula c)
   |}.
-Next Obligation. by destruct c, Ctx, subCtx. Qed.
-Next Obligation.
-  destruct ((` (nu c)) _).
-  clear H.  
-  by destruct c, Ctx, subCtx; apply leqW.
-Qed.
-Next Obligation.
-  destruct (nu c).
-  by apply i0.
-Qed.
+Next Obligation. by destruct ctx. Qed.
+Next Obligation. by destruct ((` (nu c)) _), ctx; apply leqW. Qed.
+Next Obligation. by destruct (nu c); apply i0. Qed.
 Next Obligation.
   destruct (indArgs _ _).
   rewrite map_length length_rcons; sfirstorder.
@@ -1460,8 +1471,8 @@ Next Obligation.
   rewrite map_length length_rcons; sfirstorder.
 Qed.
 Next Obligation.
-  remember (incUniCC_obligation_1 _ _) as P; clear HeqP; simpl in P.
-  destruct c, Ctx, subCtx; simpl in *.
+  remember (incUniCC_obligation_1 _ _ _) as P; clear HeqP; simpl in P.
+  destruct ctx; simpl in *.
   replace P with H1;auto.
   apply eq_irrelevance.
 Qed.
@@ -1470,8 +1481,8 @@ Next Obligation.
   rewrite map_length length_rcons; sfirstorder.
 Qed.
 Next Obligation.
-  remember (incUniCC_obligation_2 _ _) as P; clear HeqP; simpl in P.
-  destruct c, Ctx, subCtx; simpl in *.
+  remember (incUniCC_obligation_2 _ _ _) as P; clear HeqP; simpl in P.
+  destruct ctx; simpl in *.
   replace P with H1;auto.
   apply eq_irrelevance.
 Qed.
@@ -1479,20 +1490,20 @@ Next Obligation.
   destruct (exiFArgs _).
   rewrite map_length length_rcons; sfirstorder.
 Qed.
-Next Obligation. by destruct c, Ctx, subCtx. Qed.
+Next Obligation. by destruct ctx. Qed.
 Next Obligation.
   destruct (exiVBounds _ _).
   rewrite map_length length_rcons; sfirstorder.
 Qed.
-Next Obligation. by destruct c, Ctx, subCtx. Qed.
+Next Obligation. by destruct ctx. Qed.
 Next Obligation.
   destruct (exiFOutputBounds _ _).
   rewrite map_length length_rcons; sfirstorder.
 Qed.
-Next Obligation. by destruct c, Ctx, subCtx. Qed.
+Next Obligation. by destruct ctx. Qed.
 Next Obligation.
-  remember (SemicircuitUniInc_obligation_14 _ _ _) as P; clear HeqP; simpl in P.
-  destruct c, Ctx, subCtx; simpl in *.
+  remember (SemicircuitUniInc_obligation_14 _ _ _ _) as P; clear HeqP; simpl in P.
+  destruct ctx; simpl in *.
   replace P with H0;auto.
   apply eq_irrelevance.
 Qed.
@@ -1500,11 +1511,10 @@ Next Obligation.
   destruct (exiFInputBounds _ _).
   rewrite map_length length_rcons; sfirstorder.
 Qed.
-Next Obligation. by destruct c, Ctx, subCtx. Qed.
+Next Obligation. by destruct ctx. Qed.
 Next Obligation.
   assert ((i == 0) = false);[exact e|clear e].
-  destruct c, Ctx, subCtx; simpl in *.
-  unfold exiVS, exiVN, Ctx, exiVS, subCtx, Sigma_1_1.exiV in *.
+  destruct ctx; simpl in *.
   assert (i <> 0);[by rewrite <- EEFConvert|].
   by destruct i;[fcrush|].
 Qed.
@@ -1514,102 +1524,66 @@ Next Obligation.
 Qed.
 Next Obligation. rewrite map_length length_rcons; sfirstorder. Qed.
 
-Definition SemicircuitUniIncWA {X Y}
-  (c : {s : SemiCircuit & SemiDenotation (Ctx s) X Y}) :
-  @SemicircuitPolyConstraint (Ctx (projT1 c)) ->
+Definition SemicircuitUniIncWA {ctx} {X Y}
+  (c : {s : @SemiCircuit ctx & SemiDenotation (Ctx s) X Y}) :
+  @SemicircuitPolyConstraint _ (Ctx (projT1 c)) ->
   {s : SemiCircuit & SemiDenotation (Ctx s) X Y} :=
   match c with
   | existT s ad => fun p => existT _ (SemicircuitUniInc s p) (incUniAd ad)
   end.
 
+(*What is going on? Why do these need to be separate functions?*)
+Definition PolyIntUni {ctx X Y}
+  (c : @SemiCircuit ctx)
+  (adc : SemiDenotation (Ctx c) X Y)
+
+  (d : @PolyConversionData ctx)
+  (ad : SemiDenotation (@PolyConversionDataCtx ctx d) X Y)
+  (p : @SemicircuitPolyConstraint _ (@PolyConversionDataCtx ctx d)) :=
+
+  SemicircuitUniIncWA (IntegrateConversionData (existT _ c adc) (existT _ d ad)) (PolyCallLift p).
+
+Definition IntegrateNewPolyUni {ctx X Y}
+  (s : {s' : @SemiCircuit ctx & SemiDenotation (Ctx s') X Y })
+
+  (p : { d : @PolyConversionData ctx &  
+        prod (SemiDenotation (@PolyConversionDataCtx ctx d) X Y)
+            (@SemicircuitPolyConstraint _ (@PolyConversionDataCtx ctx d)) }) :
+  {s0 : SemiCircuit & SemiDenotation (Ctx s0) X Y} :=
+  match s, p with
+  | existT c adc, existT d (ad, p) => PolyIntUni c adc d ad p
+  end.
+
+Fixpoint newBounds {c} (f : @FirstOrderFormula c) : nat :=
+  match f with
+  | ZO f => 0
+  | FOExists b f => (newBounds f).+1
+  | FOForall b f => newBounds f
+  end.
+
+Fixpoint newCtx {c} (f : @FirstOrderFormula c) : Sigma11Ctx :=
+  match f with
+  | ZO f => c
+  | FOExists b f => (newCtx f)
+  | FOForall b f => (newCtx f)
+  end.
+
+Fixpoint Translate_FirstOrderFormula {ctx X Y}
+  (s : {s' : @SemiCircuit ctx & SemiDenotation (Ctx s') X Y })
+  (f : @FirstOrderFormula ctx) : 
+  {s' : @SemiCircuit (newCtx f) & SemiDenotation (Ctx s') X (newBounds f + Y)} :=
+  match f with
+  | ZO f => Translate_ZerothOrderFormula s f
+  | FOExists b f =>
+    let c1 := IntegrateNewPolyExi s (PolyConvert b) in
+    eq_rect _ (fun x => {s' : SemiCircuit & SemiDenotation (Ctx s') X x}) (Translate_FirstOrderFormula c1 f) _ (esym (addSnnS _ _))
+  | FOForall b f =>
+    let c1 := IntegrateNewPolyUni s (PolyConvert b) in
+    Translate_FirstOrderFormula c1 f
+  end.
+
+
 Definition Hole {A} : A. Admitted.
-
-Program Fixpoint Translate_FirstOrderFormula {X} {Y}
-  (s : {s : SemiCircuit & SemiDenotation (Ctx s) X Y})
-  (f : @FirstOrderFormula (subCtx (Ctx (projT1 s)))) : 
-  { Y : nat & { s : SemiCircuit & SemiDenotation (Ctx s) X Y} } :=
-  match f with
-  | ZO f => existT _ Y (Translate_ZerothOrderFormula s f)
-  | FOExists b f => 
-    match PolyConvert b with
-    | existT da (ad, bo) =>
-      let c0 := IntegrateConversionData s (existT _ da ad) in
-      let c1 := SemicircuitExiIncWA c0 (PolyCallLift bo) in
-      let (z, c4) := Translate_FirstOrderFormula c1 f in
-      existT _ (z.+1) c4
-    end
-  | FOForall b f =>
-    match PolyConvert b with
-    | existT da (ad, bo) =>
-      let c0 := IntegrateConversionData s (existT _ da ad) in
-      let c1 := SemicircuitUniIncWA c0 (PolyCallLift bo) in
-      Translate_FirstOrderFormula c1 f
-    end
-  end.
-
-Program Fixpoint Translate_FirstOrderFormula {X Y}
-  (s : {s : SemiCircuit & SemiDenotation (Ctx s) X Y })
-  (f : @FirstOrderFormula (subCtx (Ctx (projT1 s)))) : 
-  { Z : nat & { s : SemiCircuit & SemiDenotation (Ctx s) X (Z + Y)} } :=
-  match f with
-  | ZO f => existT _ 0 (Translate_ZerothOrderFormula s f)
-  | FOExists b f => 
-    match PolyConvert b with
-    | existT da (ad, bo) =>
-      let c0 : {s : SemiCircuit & SemiDenotation (Ctx s) X Y} 
-            := IntegrateConversionData s (existT _ da ad) in
-      let c1 : {s : SemiCircuit & SemiDenotation (Ctx s) X (Y.+1)}
-            := IntegrateConversionData s (existT _ da ad) in
-      let c3 : { Z : nat & { s : SemiCircuit & SemiDenotation (Ctx s) X (Z + (Y.+1))} }
-             := Translate_FirstOrderFormula c1 f in
-      let (z, c4) := c3 in
-      existT _ (z.+1) c3
-    end
-  | FOForall b f =>
-    match PolyConvert b with
-    | existT da (ad, bo) =>
-      let c0 := IntegrateConversionData s (existT _ da ad) in
-      let c1 := SemicircuitUniIncWA c0 (PolyCallLift bo) in
-      Translate_FirstOrderFormula c1 f
-    end
-  end.
-Next Obligation.
-
-
-Fixpoint Translate_FirstOrderFormula 
-  (c : SemiCircuit)
-  (f : @FirstOrderFormula (subCtx (Ctx c))) : SemiCircuit :=
-  match f with
-  | ZO f => Translate_ZerothOrderFormula c f
-  | FOExists b f =>
-    let (da, bo) := PolyConvert b in
-    let c0 := IntegrateConversionData c da in
-    let c1 := SemicircuitExiInc c0 (PolyCallLift bo) in
-    Translate_FirstOrderFormula c1 f
-  | FOForall b f => 
-    let (da, bo) := PolyConvert b in
-    let c0 := IntegrateConversionData c da in
-    let c1 := SemicircuitUniInc c0 (PolyCallLift bo) in
-    Translate_FirstOrderFormula c1 f
-  end.
-
-
-Fixpoint Translate_FirstOrderFormula 
-  (c : SemiCircuit)
-  (f : @FirstOrderFormula (subCtx (Ctx c))) : SemiCircuit :=
-  match f with
-  | ZO f => Translate_ZerothOrderFormula c f
-  | FOExists b f =>
-    let (da, bo) := PolyConvert b in
-    let c0 := IntegrateConversionData c da in
-    let c1 := SemicircuitExiInc c0 (PolyCallLift bo) in
-    Translate_FirstOrderFormula c1 f
-  | FOForall b f => 
-    let (da, bo) := PolyConvert b in
-    let c0 := IntegrateConversionData c da in
-    let c1 := SemicircuitUniInc c0 (PolyCallLift bo) in
-    Translate_FirstOrderFormula c1 f
-  end.
 
 Program Fixpoint PolyLiftAddExiF {ctx}
   (a : nat)
@@ -1702,7 +1676,7 @@ Program Definition SemicircuitExiFAdd
   (c : SemiCircuit) 
   (y : @SemicircuitPolyConstraint (Ctx c))
   (bs : seq (@SemicircuitPolyConstraint (Ctx c))) : SemiCircuit :=
-  let Ctx' := {| subCtx := addExiF (length bs) (subCtx (Ctx c))
+  let Ctx' := {| subCtx := addExiF (length bs) ctx
               ; freeFC := freeFC (Ctx c)
               ; exiFC := fun i =>
               ( if i == 0 as b return (i == 0) = b -> nat
@@ -1732,11 +1706,11 @@ Program Definition SemicircuitExiFAdd
     else fun _ => exiFInputBounds c (i.-1)) (erefl _)
   ; formula := inrMap (PropLiftAddExiF (length bs)) (formula c)
   |}.
-Next Obligation. by destruct c, Ctx, subCtx. Qed.
+Next Obligation. by destruct ctx. Qed.
 Next Obligation.
   destruct ((` (nu c))_).
   clear H.
-  by destruct c, Ctx, subCtx; simpl in *.
+  by destruct ctx; simpl in *.
 Qed.
 Next Obligation.
   destruct (nu c); simpl.
@@ -1760,7 +1734,7 @@ Next Obligation.
 Qed.
 Next Obligation. 
   remember (PolyLiftAddExiF_obligation_1 _ _ _) as P; clear HeqP; simpl in P.
-  destruct c, Ctx, subCtx; simpl in *;
+  destruct ctx; simpl in *;
   replace P with H1;auto;apply eq_irrelevance.
 Qed.
 Next Obligation. 
@@ -1771,7 +1745,7 @@ Next Obligation.
   remember (length bs) as b; clear Heqb bs y c x x0 x1.
   hauto use: leq_addl, ltn_addr, addSnnS.
 Qed.
-Next Obligation. by destruct c, Ctx, subCtx. Qed.
+Next Obligation. by destruct ctx. Qed.
 Next Obligation. 
   destruct (uniVBounds _ _); clear H.
   rewrite map_length length_rcons length_cat.
@@ -1780,7 +1754,7 @@ Next Obligation.
   remember (length bs) as b; clear Heqb bs y c x.
   hauto use: leq_addl, ltn_addr, addSnnS.
 Qed.
-Next Obligation. by destruct c, Ctx, subCtx. Qed.
+Next Obligation. by destruct ctx. Qed.
 Next Obligation. 
   destruct (exiVBounds _ _); clear H.
   rewrite map_length length_rcons length_cat.
@@ -1793,12 +1767,12 @@ Next Obligation. destruct (exiFS _); auto. Qed.
 Next Obligation.
   assert (i <> 0);[by rewrite <- EEFConvert|clear e].
   destruct i;[fcrush|].
-  by destruct c, Ctx, subCtx.
+  by destruct ctx.
 Qed.
 Next Obligation.
   change (exist _ ?x _ == exist _ ?y _) with (x == y) in e.
   clear H0.
-  destruct c, Ctx, subCtx; cbn; cbn in H.
+  destruct ctx; cbn; cbn in H.
   rewrite dep_if_case_false in H.
   remember (SemicircuitExiFAdd_obligation_13 _ _ _ _ _) as P; clear HeqP; simpl in P.
   cbn in P.
@@ -1810,7 +1784,7 @@ Next Obligation.
 Qed.
 Next Obligation.
   change (exist _ ?x _ == exist _ ?y _) with (x == y) in e.
-  destruct c, Ctx, subCtx; cbn in *.
+  destruct ctx; cbn in *.
   rewrite dep_if_case_false in H.
   remember (SemicircuitExiFAdd_obligation_13 _ _ _ _ _) as P; clear HeqP; simpl in P.
   replace (exist _ i.-1 _)
@@ -1827,12 +1801,12 @@ Next Obligation.
   hauto use: leq_addl, ltn_addr, addSnnS.
 Qed.
 Next Obligation.
-  destruct c, Ctx, subCtx; cbn in *.
+  destruct ctx; cbn in *.
   rewrite dep_if_case_true in H; auto.
 Qed.
-Next Obligation. by destruct c, Ctx, subCtx. Qed.
+Next Obligation. by destruct ctx. Qed.
 Next Obligation.
-  destruct c, Ctx, subCtx; cbn in *.
+  destruct ctx; cbn in *.
   destruct i; auto.
 Qed.
 Next Obligation.
@@ -1847,13 +1821,13 @@ Next Obligation.
   rewrite map_length length_rcons length_cat.
   apply ltnSn.
 Qed.
-Next Obligation. by destruct c, Ctx, subCtx. Qed.
+Next Obligation. by destruct ctx. Qed.
 Next Obligation. 
-  destruct c, Ctx, subCtx; cbn in *.
+  destruct ctx; cbn in *.
   destruct i; auto.
 Qed.
 Next Obligation. 
-  destruct c, Ctx, subCtx; cbn in *.
+  destruct ctx; cbn in *.
   rewrite dep_if_case_false in H; auto.
   remember (SemicircuitExiFAdd_obligation_23 _ _ _ _ _) as P; clear HeqP; simpl in P.
   replace (exist _ i.-1 _)
@@ -1870,7 +1844,7 @@ Next Obligation.
 Qed.
 Next Obligation.
   rewrite map_length length_rcons length_cat.
-  destruct c, Ctx, subCtx; cbn in *.
+  destruct ctx; cbn in *.
   rewrite dep_if_case_true in H; auto.
   assert (j < length bs);[auto|clear H].
   assert (length polyConstraints + j <= length polyConstraints + length bs);[|auto].
@@ -1880,7 +1854,7 @@ Qed.
 
 Program Fixpoint Translate_SecondOrderFormula 
   (c : SemiCircuit)
-  (f : @SecondOrderFormula (subCtx (Ctx c))) : SemiCircuit :=
+  (f : @SecondOrderFormula ctx) : SemiCircuit :=
   match f with
   | FO f => Translate_FirstOrderFormula c f
   | SOExists y bs f => 
