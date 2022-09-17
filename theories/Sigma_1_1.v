@@ -31,16 +31,11 @@ Definition incUniV (ctx : Sigma11Ctx) : Sigma11Ctx :=
   | {| freeV := a; freeF := b; freeFA := f; exiV := c; exiF := d; exiFA := g; uniV := e |} =>
     {| freeV := a; freeF := b; freeFA := f; exiV := c; exiF := d; exiFA := g; uniV := e.+1 |}
   end.
-Program Definition addExiF (newA : nat) (ctx : Sigma11Ctx) : Sigma11Ctx := 
+Definition addExiF (newA : nat) (ctx : Sigma11Ctx) : Sigma11Ctx := 
   match ctx with
   | {| freeV := a; freeF := b; freeFA := f; exiV := c; exiF := d; exiFA := g; uniV := e |} =>
-    let g' := fun x : |[d.+1]| => (if x == 0 as b return (x == 0) = b -> nat then fun _ => newA else fun _ => g (x.-1)) (erefl _) in
-    {| freeV := a; freeF := b; freeFA := f; exiV := c; exiF := d.+1; exiFA := g'; uniV := e |}
+    {| freeV := a; freeF := b; freeFA := f; exiV := c; exiF := d.+1; exiFA := ExtendAt0N newA g; uniV := e |}
   end.
-Next Obligation.
-  apply EEFConvert in e0; simpl in e0.
-  by destruct x.
-Qed.
 
 Inductive PolyTerm {ctx : Sigma11Ctx} : Type :=
 | PolyFVar : |[freeV ctx]| -> PolyTerm
@@ -112,18 +107,18 @@ Record RingData : Type :=
     least_elem : forall x, lt min x;
   }.
 
+Variable D : RingData.
+
 Record Sigma11Model : Type :=
   mkSigma11Model {
-      D : RingData;
-      R := T D;
-      freeV_F : nat -> R;
-      freeF_S : forall i a : nat, (|[a]| -> R) -> option (R);
-      exiV_F : nat -> R;
-      exiF_S : forall i a : nat, (|[a]| -> R) -> option (R);
-      uniV_F : nat -> R;
+      freeV_F : nat -> T D;
+      freeF_S : forall i a : nat, (|[a]| -> (T D)) -> option (T D);
+      exiV_F : nat -> (T D);
+      exiF_S : forall i a : nat, (|[a]| -> (T D)) -> option (T D);
+      uniV_F : nat -> (T D);
     }.
 
-Fixpoint Poly_Denote {ctx} (r : @PolyTerm ctx) (M : Sigma11Model) : option (R M) :=
+Fixpoint Poly_Denote {ctx} (r : @PolyTerm ctx) (M : Sigma11Model) : option (T D) :=
   match r with
   | PolyFVar m => Some (freeV_F M (` m))
   | PolyEVar m => Some (exiV_F M (` m))
@@ -147,7 +142,7 @@ Fixpoint Poly_Denote {ctx} (r : @PolyTerm ctx) (M : Sigma11Model) : option (R M)
     let d1 := Poly_Denote r1 M in
     let d2 := Poly_Denote r2 M in
     (obind (fun r1 => obind (fun r2 => 
-      match lt_total (D M) r1 r2 with
+      match lt_total D r1 r2 with
       | inl _ => Some 1%R
       | inr _ => Some 0%R
       end) d2) d1)
@@ -172,22 +167,11 @@ Fixpoint ZerothOrder_Denote {ctx} (f : @ZerothOrderFormula ctx)  (M : Sigma11Mod
     end
   end.
 
-Definition AddModelExi (M : Sigma11Model) (r : R M) : Sigma11Model :=
-  let d' := fun x : nat => (
-      if x == 0 as b return ((x == 0) = b -> R M)
-      then fun _ => r
-      else fun _ => exiV_F M (x.-1)
-    ) (erefl _) 
-  in {| freeV_F := freeV_F M; freeF_S := freeF_S M; exiV_F := d'; exiF_S := exiF_S M; uniV_F := uniV_F M |}.
+Definition AddModelExi (M : Sigma11Model) (r : T D) : Sigma11Model :=
+  {| freeV_F := freeV_F M; freeF_S := freeF_S M; exiV_F := ExtendAt0 r (exiV_F M); exiF_S := exiF_S M; uniV_F := uniV_F M |}.
 
-
-Definition AddModelUni (M : Sigma11Model) (r : R M) : Sigma11Model :=
-  let d' := fun x : nat => (
-      if x == 0 as b return ((x == 0) = b -> R M)
-      then fun _ => r
-      else fun _ => uniV_F M (x.-1)
-    ) (erefl _) 
-  in {| freeV_F := freeV_F M; freeF_S := freeF_S M; exiV_F := exiV_F M; exiF_S := exiF_S M; uniV_F := d' |}.
+Definition AddModelUni (M : Sigma11Model) (r : T D) : Sigma11Model :=
+  {| freeV_F := freeV_F M; freeF_S := freeF_S M; exiV_F := exiV_F M; exiF_S := exiF_S M; uniV_F := ExtendAt0 r (uniV_F M) |}.
 
 Fixpoint FirstOrder_Denote {ctx} (f : @FirstOrderFormula ctx) (M : Sigma11Model) : Prop :=
   match f with
@@ -196,46 +180,50 @@ Fixpoint FirstOrder_Denote {ctx} (f : @FirstOrderFormula ctx) (M : Sigma11Model)
     let op := Poly_Denote p M in
     match op with
     | None => False
-    | Some p' => exists (r : R M), lt (D M) r p' /\ FirstOrder_Denote f (AddModelExi M r)
+    | Some p' => exists (r : T D), lt D r p' /\ FirstOrder_Denote f (AddModelExi M r)
     end
   | FOForall p f =>
     let op := Poly_Denote p M in
     match op with
     | None => False
-    | Some p' => forall (r : R M),  lt (D M) r p' -> FirstOrder_Denote f (AddModelUni M r)
+    | Some p' => forall (r : T D),  lt D r p' -> FirstOrder_Denote f (AddModelUni M r)
     end
   end.
 
 Definition SO_Bound_Check 
   (M : Sigma11Model)
   (n : nat)
-  (y : R M)
-  (bs : |[n]| -> R M)
-  (f : (|[n]| -> R M) -> option (R M)) : Prop :=
-forall (ins : |[n]| -> R M) (out : R M),
+  (y : T D)
+  (bs : |[n]| -> T D)
+  (f : (|[n]| -> T D) -> option (T D)) : Prop :=
+forall (ins : |[n]| -> T D) (out : T D),
   f ins = Some out ->
-  (forall x : |[n]|, lt (D M) (ins x) (bs x)) /\ lt (D M) out y.
+  (forall x : |[n]|, lt D (ins x) (bs x)) /\ lt D out y.
 
-Program Definition AddModelExiF (newA : nat) (M : Sigma11Model) (f : (|[newA]| -> R M) -> option (R M))  :
-  Sigma11Model :=
-  let d' := fun i a : nat => (
-      if i == 0 as b return ((i == 0) = b -> (|[a]| -> R M) -> option (R M))
+Program Definition AddExiF (newA : nat) (f : (|[newA]| -> T D) -> option (T D)) 
+  (e : nat -> forall a : nat, (|[a]| -> T D) -> option (T D)):
+  forall i a : nat, (|[a]| -> T D) -> option (T D):=
+  fun i a : nat => (
+      if i == 0 as b return ((i == 0) = b -> (|[a]| -> T D) -> option (T D))
       then fun _ => (
-        if a == newA as b return ((a == newA) = b -> (|[a]| -> R M) -> option (R M))
+        if a == newA as b return ((a == newA) = b -> (|[a]| -> T D) -> option (T D))
         then fun _ => f
         else fun _ _ => None
       ) (erefl _)
-      else fun _ t => exiF_S M (i.-1) a t
-    ) (erefl _) 
-  in {| freeV_F := freeV_F M; freeF_S := freeF_S M; exiV_F := exiV_F M; exiF_S := d'; uniV_F := uniV_F M |}.
+      else fun _ t => e (i.-1) a t
+    ) (erefl _).
 Next Obligation. by assert (a = newA);[rewrite <- EEConvert|rewrite H0]. Qed.
+
+Program Definition AddModelExiF (newA : nat) (f : (|[newA]| -> T D) -> option (T D)) (M : Sigma11Model)  :
+  Sigma11Model :=
+  {| freeV_F := freeV_F M; freeF_S := freeF_S M; exiV_F := exiV_F M; exiF_S := AddExiF newA f (exiF_S M); uniV_F := uniV_F M |}.
 
 Fixpoint SecondOrder_Denote {ctx} (f : @SecondOrderFormula ctx) (M : Sigma11Model) : Prop :=
   match f with
   | FO f => FirstOrder_Denote f M
   | SOExists y bs f => 
-    let y' : option (R M) := Poly_Denote y M in
-    let bs' : option (|[length bs]| -> R M) := 
+    let y' : option (T D) := Poly_Denote y M in
+    let bs' : option (|[length bs]| -> T D) := 
         option_tuple (fun m => Poly_Denote (lnth bs m) M) in
     match y' with
     | None => false
@@ -243,9 +231,9 @@ Fixpoint SecondOrder_Denote {ctx} (f : @SecondOrderFormula ctx) (M : Sigma11Mode
       match bs' with
       | None => false
       | Some bs' =>
-        exists a : ({m : nat | m < length bs} -> R M) -> option (R M),
+        exists a : ({m : nat | m < length bs} -> T D) -> option (T D),
           SO_Bound_Check M (length bs) y' bs' a 
-          /\ SecondOrder_Denote f (AddModelExiF (length bs) M a)
+          /\ SecondOrder_Denote f (AddModelExiF (length bs) a M)
       end
     end
   end.

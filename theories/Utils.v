@@ -22,6 +22,18 @@ Definition inrMap {A B C} (f : B -> C) (c : A + B) : A + C :=
   | inr b => inr (f b)
   end.
 
+Program Definition ExtendAt0 {A} (a : A) (f : nat -> A) (i : nat) : A := (
+  if i == 0 as b return i == 0 = b -> A
+  then fun _ => a
+  else fun _ => f (i.-1)
+) (erefl _).
+
+Program Definition ExtendAt0N {A n} (a : A) (f : |[n]| -> A) (i : |[n.+1]|) : A := (
+  if i == 0 as b return i == 0 = b -> A
+  then fun _ => a
+  else fun _ => f (i.-1)
+) (erefl _).
+Next Obligation. by destruct i. Qed.
 
 Theorem PolymorphicEqElim 
   {T S}  {fam : Type -> Type}
