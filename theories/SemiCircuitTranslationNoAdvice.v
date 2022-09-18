@@ -203,17 +203,19 @@ Program Definition PolyConversionCombineData {ctx}
     ; newFreeArgs := fun i j => (
       if j < nffc1 i as b return j < nffc1 i = b -> |[freeFA ctx i]| -> |[length poly']|
       then fun _ => farg1 i j
-      else fun _ => farg2 i (j - nffc1 i)
+      else fun _ k => length polys1 + farg2 i (j - nffc1 i) k
     ) (erefl _)
     ; newExiArgs := fun i j => (
       if j < nefc1 i as b return j < nefc1 i = b -> |[exiFA ctx i]| -> |[length poly']|
       then fun _ => earg1 i j
-      else fun _ => earg2 i (j - nefc1 i)
+      else fun _ k => length polys1 + earg2 i (j - nefc1 i) k
     ) (erefl _) 
     ; newIndArgs := fun i => (
       if i < nic1 as b return i < nic1 = b -> (|[length poly']| * |[length poly']|)
       then fun _ => iarg1 i
-      else fun _ => iarg2 (i - nic1)
+      else fun _ => 
+        let (u, v) := iarg2 (i - nic1)
+        in (length polys1 + u, length polys1 + v)
     ) (erefl _) 
   |}
   end.
@@ -222,26 +224,26 @@ Next Obligation.
   by destruct (farg1 _); apply ltn_addr.
 Qed.
 Next Obligation.
-  assert (~ (j < nffc1 (exist _ i H0)));[hauto|].
-  assert (nffc1 (exist _ i H0) <= j);[by apply (contra_not_leq (P := j < nffc1 (exist _ i H0)))|].
+  assert (~ (j < nffc1 (exist _ i H1)));[hauto|].
+  assert (nffc1 (exist _ i H1) <= j);[by apply (contra_not_leq (P := j < nffc1 (exist _ i H1)))|].
   qauto use: ltn_subLR, ltn_addr.
 Qed.
 Next Obligation.
   rewrite length_cat map_length map_length.
-  by destruct (farg2 _); apply ltn_addl.
+  by destruct (farg2 _); rewrite ltn_add2l.
 Qed.
 Next Obligation.
   rewrite length_cat map_length map_length.
   by destruct (earg1 _); apply ltn_addr.
 Qed.
 Next Obligation.
-  assert (~ (j < nefc1 (exist _ i H0)));[hauto|].
-  assert (nefc1 (exist _ i H0) <= j);[by apply (contra_not_leq (P := j < nefc1 (exist _ i H0)))|].
+  assert (~ (j < nefc1 (exist _ i H1)));[hauto|].
+  assert (nefc1 (exist _ i H1) <= j);[by apply (contra_not_leq (P := j < nefc1 (exist _ i H1)))|].
   qauto use: ltn_subLR, ltn_addr.
 Qed.
 Next Obligation.
   rewrite length_cat map_length map_length.
-  by destruct (earg2 _); apply ltn_addl.
+  by destruct (earg2 _); rewrite ltn_add2l.
 Qed.
 Next Obligation.
   rewrite length_cat map_length map_length.
@@ -257,11 +259,11 @@ Next Obligation.
 Qed.
 Next Obligation.
   rewrite length_cat map_length map_length.
-  by destruct ((iarg2 _).1); apply ltn_addl.
+  by rewrite ltn_add2l.
 Qed.
 Next Obligation.
   rewrite length_cat map_length map_length.
-  by destruct ((iarg2 _).2); apply ltn_addl.
+  by rewrite ltn_add2l.
 Qed.
 
 

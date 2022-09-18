@@ -35,6 +35,24 @@ Program Definition ExtendAt0N {A n} (a : A) (f : |[n]| -> A) (i : |[n.+1]|) : A 
 ) (erefl _).
 Next Obligation. by destruct i. Qed.
 
+Program Definition NoneMap {A n} (f : |[n]| -> option A) (i : nat) : option A :=
+  ( if i < n as b return i < n = b -> option A
+    then fun _ => f i
+    else fun _ => None
+  ) _.
+
+Program Definition NoneMap2 {A B n} (f : |[n]| -> B -> option A) (i : nat) (bb : B) : option A :=
+  ( if i < n as b return i < n = b -> option A
+    then fun _ => f i bb
+    else fun _ => None
+  ) _.
+
+Program Definition NoneMap3 {A B C n} (f : |[n]| -> B -> C -> option A) (i : nat) (bb : B) (c : C): option A :=
+  ( if i < n as b return i < n = b -> option A
+    then fun _ => f i bb c
+    else fun _ => None
+  ) _.
+
 Theorem PolymorphicEqElim 
   {T S}  {fam : Type -> Type}
   {P : S -> Type} 
@@ -354,6 +372,10 @@ Next Obligation.
   hauto use: contra_ltn_leq.
 Qed.
 
+Theorem ZeroCanc {i : nat} : i + 0 = i.
+Proof.
+	hauto use: addn1, addSn, addnS inv: nat.
+Qed.
 
 Theorem EEConvert {i j : nat} : (i == j) = true <-> i = j.
 Proof.
@@ -467,3 +489,34 @@ Ltac dep_if_case b :=
   pose t := b;assert (b = t);
   [trivial|destruct t;[rewrite dep_if_case_true|rewrite dep_if_case_false]].
 
+
+Program Fixpoint option_tuple {A} {l : nat} (t : |[l]| -> option A) : option (|[l]| -> A) := 
+  match l with
+  | 0 => Some emptyTuple
+  | m.+1 =>
+    let most : |[m]| -> option A := fun x => t x in
+    let r : option (|[m]| -> A) := option_tuple most in
+    let last : option A := t m in
+    obind (fun last => obind (fun r => Some (
+      fun x : {n : nat | n < m.+1} => 
+      (if x < m as b return x < m = b -> A 
+       then (fun _ => r (x : |[m]|) )
+       else (fun _ => last)) (erefl _)
+    )) r) last
+  end.
+
+Record RingData : Type :=
+  mkRingData {
+    T : ringType;
+    (*lt should be a strict, total order with a least element*)
+    lt : relation T;
+    so : StrictOrder lt;
+    lt_total : forall x y, (lt x y) + ((x==y) + (lt y x));
+    lt_dec x y :=
+      match lt_total x y with
+      | inl _ => true
+      | inr _ => false
+      end;
+    min : T;
+    least_elem : forall x, lt min x;
+  }.

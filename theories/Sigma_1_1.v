@@ -76,37 +76,6 @@ End Sigma_1_1_Internal.
 
 Section Sigma_1_1_Denotation.
 
-Program Fixpoint option_tuple {A} {l : nat} (t : |[l]| -> option A) : option (|[l]| -> A) := 
-  match l with
-  | 0 => Some emptyTuple
-  | m.+1 =>
-    let most : |[m]| -> option A := fun x => t x in
-    let r : option (|[m]| -> A) := option_tuple most in
-    let last : option A := t m in
-    obind (fun last => obind (fun r => Some (
-      fun x : {n : nat | n < m.+1} => 
-      (if x < m as b return x < m = b -> A 
-       then (fun _ => r (x : |[m]|) )
-       else (fun _ => last)) (erefl _)
-    )) r) last
-  end.
-
-Record RingData : Type :=
-  mkRingData {
-    T : ringType;
-    (*lt should be a strict, total order with a least element*)
-    lt : relation T;
-    so : StrictOrder lt;
-    lt_total : forall x y, (lt x y) + ((x==y) + (lt y x));
-    lt_dec x y :=
-      match lt_total x y with
-      | inl _ => true
-      | inr _ => false
-      end;
-    min : T;
-    least_elem : forall x, lt min x;
-  }.
-
 Variable D : RingData.
 
 Record Sigma11Model : Type :=
