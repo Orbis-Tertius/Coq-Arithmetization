@@ -387,7 +387,7 @@ Proof.
   split; move: j; elim: i; cbn; destruct j; hauto.
 Qed.
 
-Definition emptyTuple {A} : |[0]| -> A. fcrush. Defined.
+Definition emptyTuple {A} : forall (i : |[0]|), A i. fcrush. Defined.
 
 Program Fixpoint TupConcat {T} {a b} (m : |[a]| -> T) (n : |[b]| -> T) (i : |[a + b]|) : T :=
   (if i < a as b return i < a = b -> T
