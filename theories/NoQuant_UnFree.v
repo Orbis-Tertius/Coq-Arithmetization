@@ -561,6 +561,46 @@ Proof.
   unfold H0.
   by rewrite FO_NoQuant_Correct_Lem_0_0.
 Qed.
+(* 
+Lemma FO_NoQuant_Correct_Lem_3
+  {exiV uniV}
+  (p : @PolyTermVS 0 0 0 emptyTuple)
+  (q : @NoQuant exiV 0 uniV emptyTuple)
+  (i : nat) (H : (i == 0) = false) (lti : i < exiV.+1) (lti2 : i.-1 < exiV) :
+  ` ((` (nu q)) (exist _ i.-1 lti2)) =
+  ` ((` (nu (NoQuantAddExi p q))) (exist _ i lti)).
+Proof.
+  destruct q; simpl.
+  unfold ExtendAt0N.
+  rewrite dep_if_case_false.
+  simpl.
+  do 3 f_equal; apply eq_irrelevance.
+Qed.
+
+Lemma FO_NoQuant_Correct_Lem_4
+  {exiV uniV}
+  (q : @NoQuant exiV 0 uniV emptyTuple)
+  (i : nat) (H : (i == 0) = false) (lti : i < exiV.+1) (lti2 : i.-1 < exiV) :
+  uniV - ` ((` (nu q)) (exist _ i.-1 lti2)) =
+  uniV - ExtendAt0N 0
+          (fun x : {n0 : nat | n0 < exiV} => ` ((` (nu q)) x))
+          (exist _ i lti).
+Proof.
+  unfold ExtendAt0N.
+  rewrite dep_if_case_false; auto.
+  simpl.
+  remember (Utils.ExtendAt0N_obligation_2 _ _ _) as D0.
+  simpl in D0.
+  by replace D0 with lti2;[|apply eq_irrelevance].
+Qed. *)
+
+(*
+n < uniV - ` ((` (nu q)) (exist _ i.-1 lti2))
+uniV - ExtendAt0N 0
+        (fun x : {n0 : nat | n0 < exiV} => ` ((` (nu q)) x))
+        (exist _ i lti)
+ *)
+
 
 (* Lemma FO_NoQuant_Correct_Lem_1
   {exiV uniV}
@@ -618,7 +658,125 @@ Proof.
       * clear H0 H1 H3; unfold NoQuantSOBoundCondition in *.
         move=> u [i lti]; fcrush.
       * clear H0 H1 H2; unfold NoQuantExiStratCondition in *.
-        
+        move=> i m.
+        destruct i as [i lti]; simpl.
+        destruct (i == 0) eqn:ei0.
+        ++ exists r;move=> n.
+           unfold ExtendAt0N; simpl; rewrite dep_if_case_true; auto.
+        ++ assert (i.-1 < FOExi f) as lti2. destruct i;[fcrush|auto].
+           remember (H3 (exist _ (i.-1) lti2)) as H3'; clear HeqH3' H3.
+           assert (ExtendAt0N 0 (fun x => ` ((` (nu (FO_NoQuant f))) x)) (exist _ i lti) =
+                   ` ((` (nu (FO_NoQuant f))) (exist (fun n0 : nat => n0 < FOExi f) i.-1 lti2))).
+              unfold ExtendAt0N.
+              rewrite dep_if_case_false.
+              do 3 f_equal; apply eq_irrelevance.
+           remember (H3' (eq_rect _ (fun x => |[x]| -> T D) m _ H)) as H3; clear HeqH3 H3'.
+           destruct H3 as [C H3].
+           exists C; move=> n.
+           unfold ExtendAt0N; rewrite dep_if_case_false; auto; simpl.
+           remember (H3 (eq_rect _ (fun x => |[FOUni f - x]| -> T D) n _ H)) as H3'; clear HeqH3' H3.
+           destruct adv; simpl in *.
+           change (exist _ ?x _ == exist _ ?y _) with (x == y) in *.
+           remember (exiVAdv0 _ _) as A1.
+           remember (exiVAdv0 (exist _ i.-1 (Utils.ExtendAt0N_obligation_2 _ (exist _ i lti) _)) _) as A2.
+           replace A2 with A1; auto.
+           rewrite HeqA1; rewrite HeqA2; clear HeqA1 HeqA2.
+           f_equal;[f_equal; apply eq_irrelevance|].
+           apply functional_extensionality;move=> x.
+           remember (NoQuantExiStratCondition_obligation_1 _ _ _ _ _ _ _ _ _ _) as DD0; clear HeqDD0.
+           remember (NoQuantExiStratCondition_obligation_1 _ _ _ _ _ _ _ _ _ _) as DD1; clear HeqDD1.
+           destruct H.
+           f_equal.
+           by apply subset_eq_compat.
+    + move=> H.
+      simpl.
+      remember (Poly_Denote D p M) as PM;destruct PM.
+      destruct H as [adv [H0 [H1 [H2 H3]]]].
+
+      simpl in H; unfold NoQuantDenotation in H.
+      unfold NoQuantDenotation in *.
+           simpl.
+
+           destruct (FO_NoQuant f)
+           remember (ExtendAt0N 0 (fun x0 => ` ((` nu0) x0)) (exist _ i lti)) as G.
+           remember ((fun x0 => m
+     (exist
+        (fun n0 : nat =>
+         n0 <
+         ExtendAt0N 0
+           (fun x1 : {n1 : nat | n1 < FOExi f} => ` ((` (nu (FO_NoQuant f))) x1))
+           (exist (fun n1 : nat => n1 < (FOExi f).+1) i lti)) 
+        (` x0)
+        (FO_NoQuant_Correct_Lem_3 (PolyTerm_PolyTermVS p) 
+           (FO_NoQuant f) i ei0 lti lti2 (` x0) (ssrfun.svalP x0))))) as m2.
+           f_equal.
+           f_equal.
+           Check TupConcat.
+           cbn.
+           unfold TupConcat.
+           f_equal.
+           rewrite ei0.
+           f_equal.
+           rewrite HeqA2; clear HeqA2.
+           unfold exiVAdv0.
+           remember (Utils.ExtendAt0N_obligation_2 _ _).
+           unfold exiVAdv.
+           move: n.
+           unfold ExtendAt0N.
+           change (exist _ ?x _ == exist _ ?y _) with (x == y).
+           rewrite dep_if_case_false.
+           Check (fun x : {n : nat
+            | n <
+              `
+              ((` (nu (FO_NoQuant f)))
+                 (exist (fun n0 : nat => n0 < FOExi f) i.-1 lti2))}
+          => m (exist _ (projT1 x) (FO_NoQuant_Correct_Lem_3 _ _ i lti lti2 (projT1 x) (projT2 x)))).
+           apply le
+           simpl in *.
+
+
+unfold ExtendAt0N; simpl; rewrite dep_if_case_false; auto.
+        destruct m.
+        rewrite EEConvert in ei0.
+        Check (FO_NoQuant_Correct_Lem_3 (n := FOExi f)
+          (P := fun b n i m =>
+            forall n : {n : nat | n < FOUni f - ` ((` (nu (FO_NoQuant f))) i)} -> T D,
+                  exiVAdv D adv i
+                    (fun x : {n0 : nat | n0 < FOUni f} =>
+                      TupConcat m n
+                        (exist
+                          (fun n0 : nat =>
+                            n0 <
+                            ` ((` (nu (FO_NoQuant f))) i) +
+                            (FOUni f - ` ((` (nu (FO_NoQuant f))) i))) 
+                          (` x)
+                          (NoQuantExiStratCondition_obligation_1 D (FOExi f) 0 emptyTuple
+                              (FOUni f) (FO_NoQuant f) i m n x))) = b)
+          r H3).
+        Search (_ -> ex _).
+        Search ex.
+        remember (fun x y => ex_proj1 (H3 x y) : forall (i : {n : nat | n < FOExi f})
+       (m : {n : nat | n < ` ((` (nu (FO_NoQuant f))) i)} -> T D), T D).
+        Check (fun x y => exists_inhabited _ (H3 x y)).
+        Check (FO_NoQuant_Correct_Lem_3 r (fun x y => ex_proj1 (H3 x y))).
+
+
+
+
+        Check (ExtendAt0N 
+                (fun _ => r) 
+                (fun (i0 : {n : nat | n < FOExi f}) 
+                     (m0 : {n : nat | n < ` ((` (nu (FO_NoQuant f))) i0)} -> T D) 
+                => ` (H3 i0 m0)) i m).
+        exists r.
+        move=> n.
+        simpl.
+        unfold ExtendAt0N.
+        destruct i as [i lti].
+        dep_if_case (i == 0); auto.
+        simpl.
+        unfold exiVAdv.
+
 
 
           destruct u; simpl.
