@@ -12,15 +12,9 @@ Require Import Program.
 
 Section Sigma_1_1_Internal.
 
-Inductive PolyTerm 
-  {freeV freeF} {freeFA : |[freeF]| -> nat} 
-  {exiV exiF} {exiFA : |[exiF]| -> nat}
-  {uniV} : Type :=
-| PolyFVar : |[freeV]| -> PolyTerm
-| PolyEVar : |[exiV]| -> PolyTerm
-| PolyUVar : |[uniV]| -> PolyTerm
-| PolyFFun : forall (i : |[freeF]|), (|[freeFA i]| -> PolyTerm) -> PolyTerm
-| PolyEFun : forall (i : |[exiF]|), (|[exiFA i]| -> PolyTerm) -> PolyTerm
+Inductive PolyTerm : Type :=
+| PolyVar : nat -> PolyTerm
+| PolyFun : forall (i a : nat), (|[a]| -> PolyTerm) -> PolyTerm
 | PolyMinusOne : PolyTerm
 | PolyPlusOne : PolyTerm
 | PolyZero : PolyTerm
@@ -28,41 +22,29 @@ Inductive PolyTerm
 | PolyTimes : PolyTerm -> PolyTerm -> PolyTerm
 | PolyInd : PolyTerm -> PolyTerm -> PolyTerm.
 
-Inductive ZerothOrderFormula
-  {freeV freeF} {freeFA : |[freeF]| -> nat} 
-  {exiV exiF} {exiFA : |[exiF]| -> nat}
-  {uniV} : Type :=
+Inductive ZerothOrderFormula : Type :=
 | ZONot : ZerothOrderFormula -> ZerothOrderFormula
 | ZOAnd : ZerothOrderFormula -> ZerothOrderFormula -> ZerothOrderFormula
 | ZOOr : ZerothOrderFormula -> ZerothOrderFormula -> ZerothOrderFormula
 | ZOImp : ZerothOrderFormula -> ZerothOrderFormula -> ZerothOrderFormula
-| ZOEq : @PolyTerm freeV freeF freeFA exiV exiF exiFA uniV
-      -> @PolyTerm freeV freeF freeFA exiV exiF exiFA uniV
-      -> ZerothOrderFormula.
+| ZOEq : PolyTerm -> PolyTerm -> ZerothOrderFormula.
 
-Inductive FirstOrderFormula 
-  {freeV freeF} {freeFA : |[freeF]| -> nat} 
-  {exiV exiF} {exiFA : |[exiF]| -> nat}
-  {uniV} : Type :=
-| ZO : @ZerothOrderFormula freeV freeF freeFA exiV exiF exiFA uniV
+Inductive FirstOrderFormula : Type :=
+| ZO : ZerothOrderFormula
     -> FirstOrderFormula
-| FOExists : @PolyTerm freeV freeF freeFA exiV exiF exiFA uniV
-          -> @FirstOrderFormula freeV freeF freeFA (exiV.+1) exiF exiFA uniV
+| FOExists : PolyTerm
           -> FirstOrderFormula
-| FOForall : @PolyTerm freeV freeF freeFA exiV exiF exiFA uniV
-          -> @FirstOrderFormula freeV freeF freeFA exiV exiF exiFA (uniV.+1)
+          -> FirstOrderFormula
+| FOForall : PolyTerm
+          -> FirstOrderFormula
           -> FirstOrderFormula.
 
-Inductive SecondOrderFormula 
-  {freeV freeF} {freeFA : |[freeF]| -> nat} 
-  {exiF} {exiFA : |[exiF]| -> nat}: Type :=
-| FO : @FirstOrderFormula freeV freeF freeFA 0 exiF exiFA 0
-    -> SecondOrderFormula
+Inductive SecondOrderFormula : Type :=
+| FO : FirstOrderFormula -> SecondOrderFormula
 | SOExists : 
-  forall (y : @PolyTerm freeV freeF freeFA 0 exiF exiFA 0) 
-         (bs : seq (@PolyTerm freeV freeF freeFA 0 exiF exiFA 0)), 
-  @SecondOrderFormula freeV freeF freeFA (exiF.+1) (ExtendAt0N (length bs) exiFA) ->
-  SecondOrderFormula.
+  forall (y : PolyTerm) 
+         (bs : seq (PolyTerm)), 
+  SecondOrderFormula -> SecondOrderFormula.
 
 End Sigma_1_1_Internal.
 
@@ -74,27 +56,19 @@ Variable D : RingData.
 
 Record Sigma11Model : Type :=
   mkSigma11Model {
-      freeV_F : nat -> T D;
-      freeF_S : forall i a : nat, (|[a]| -> (T D)) -> option (T D);
-      exiV_F : nat -> (T D);
-      exiF_S : forall i a : nat, (|[a]| -> (T D)) -> option (T D);
-      uniV_F : nat -> (T D);
+      V_F : nat -> T D;
+      F_S : forall i a : nat, (|[a]| -> T D) -> option (T D);
   }.
 
 Definition indFun (x y : T D) : T D := if lt_dec D x y then 1%R else 0%R.
 
 Fixpoint Poly_Denote
-  {freeV freeF freeFA exiV exiF exiFA uniV}
-  (r : @PolyTerm freeV freeF freeFA exiV exiF exiFA uniV) 
+  (r : PolyTerm) 
   (M : Sigma11Model) : option (T D) :=
   match r with
-  | PolyFVar m => Some (freeV_F M (` m))
-  | PolyEVar m => Some (exiV_F M (` m))
-  | PolyUVar m => Some (uniV_F M (` m))
-  | PolyFFun i t => 
-    obind (fun t => freeF_S M (` i) (freeFA i) t) (option_tuple (fun x => Poly_Denote (t x) M))
-  | PolyEFun i t => 
-    obind (fun t => exiF_S M (` i) (exiFA i) t) (option_tuple (fun x => Poly_Denote (t x) M))
+  | PolyVar m => Some (V_F M m)
+  | PolyFun i a t => 
+    obind (fun t => F_S M i a t) (option_tuple (fun x => Poly_Denote (t x) M))
   | PolyMinusOne => Some (-1)%R
   | PolyPlusOne => Some 1%R
   | PolyZero => Some 0%R
@@ -113,8 +87,7 @@ Fixpoint Poly_Denote
   end.
 
 Fixpoint ZerothOrder_Denote
-  {freeV freeF freeFA exiV exiF exiFA uniV}
-  (f : @ZerothOrderFormula freeV freeF freeFA exiV exiF exiFA uniV)
+  (f : ZerothOrderFormula)
   (M : Sigma11Model) : Prop :=
   match f with
   (* | ZOTrue => true
@@ -134,29 +107,23 @@ Fixpoint ZerothOrder_Denote
     end
   end.
 
-Definition AddModelExi (M : Sigma11Model) (r : T D) : Sigma11Model :=
-  {| freeV_F := freeV_F M; freeF_S := freeF_S M; exiV_F := ExtendAt0 r (exiV_F M); exiF_S := exiF_S M; uniV_F := uniV_F M |}.
+Definition AddModelV (M : Sigma11Model) (r : T D) : Sigma11Model :=
+  {| V_F := ExtendAt0 r (V_F M); F_S := F_S M |}.
 
-Definition AddModelUni (M : Sigma11Model) (r : T D) : Sigma11Model :=
-  {| freeV_F := freeV_F M; freeF_S := freeF_S M; exiV_F := exiV_F M; exiF_S := exiF_S M; uniV_F := ExtendAt0 r (uniV_F M) |}.
-
-Fixpoint FirstOrder_Denote
-  {freeV freeF freeFA exiV exiF exiFA uniV}
-  (f : @FirstOrderFormula freeV freeF freeFA exiV exiF exiFA uniV)
-  (M : Sigma11Model) : Prop :=
+Fixpoint FirstOrder_Denote (f : FirstOrderFormula) (M : Sigma11Model) : Prop :=
   match f with
   | ZO z => ZerothOrder_Denote z M
   | FOExists p f => 
     let op := Poly_Denote p M in
     match op with
-    | None => False
-    | Some p' => exists (r : T D), lt D r p' /\ FirstOrder_Denote f (AddModelExi M r)
+    | None => false
+    | Some p' => exists (r : T D), lt D r p' /\ FirstOrder_Denote f (AddModelV M r)
     end
   | FOForall p f =>
     let op := Poly_Denote p M in
     match op with
-    | None => False
-    | Some p' => forall (r : T D),  lt D r p' -> FirstOrder_Denote f (AddModelUni M r)
+    | None => false
+    | Some p' => forall (r : T D),  lt D r p' -> FirstOrder_Denote f (AddModelV M r)
     end
   end.
 
@@ -185,13 +152,9 @@ Program Definition AddExiF (newA : nat) (f : (|[newA]| -> T D) -> option (T D))
 Next Obligation. by assert (a = newA);[rewrite <- EEConvert|rewrite H0]. Qed.
 
 Program Definition AddModelExiF (newA : nat) (f : (|[newA]| -> T D) -> option (T D)) (M : Sigma11Model)  :
-  Sigma11Model :=
-  {| freeV_F := freeV_F M; freeF_S := freeF_S M; exiV_F := exiV_F M; exiF_S := AddExiF newA f (exiF_S M); uniV_F := uniV_F M |}.
+  Sigma11Model := {| V_F := V_F M; F_S := AddExiF newA f (F_S M) |}.
 
-Fixpoint SecondOrder_Denote
-  {freeV freeF freeFA exiF exiFA}
-  (f : @SecondOrderFormula freeV freeF freeFA exiF exiFA)
-  (M : Sigma11Model) : Prop :=
+Fixpoint SecondOrder_Denote (f : SecondOrderFormula) (M : Sigma11Model) : Prop :=
   match f with
   | FO f => FirstOrder_Denote f M
   | SOExists y bs f => 

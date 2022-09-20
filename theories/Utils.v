@@ -489,6 +489,9 @@ Ltac dep_if_case b :=
   pose t := b;assert (b = t);
   [trivial|destruct t;[rewrite dep_if_case_true|rewrite dep_if_case_false]].
 
+Program Definition fSeqMost {A n} (f : |[n.+1]| -> A) (x : |[n]|) : A := f x.
+
+Program Definition fSeqRest {A n} (f : |[n.+1]| -> A) (x : |[n]|) : A := f (x.+1).
 
 Program Fixpoint option_tuple {A} {l : nat} (t : |[l]| -> option A) : option (|[l]| -> A) := 
   match l with
