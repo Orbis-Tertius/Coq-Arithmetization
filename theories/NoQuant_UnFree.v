@@ -158,15 +158,13 @@ Next Obligation.
 Qed.
 
 Definition NoQuantFormulaCondition
-  {exiV exiF} {exiFA : |[exiF]| -> nat}
-  {uniV}
+  {exiV exiF uniV} {exiFA : |[exiF]| -> nat}
   (f : @NoQuant exiV exiF uniV exiFA) 
   (M : Sigma11Model D) (adv : NoQuantAdvice) : Prop :=
   forall u, NoQuantZODenotation (formula f) M adv u.
 
 Program Definition NoQuantFOBoundCondition 
-  {exiV exiF} {exiFA : |[exiF]| -> nat}
-  {uniV}
+  {exiV exiF uniV} {exiFA : |[exiF]| -> nat}
   (f : @NoQuant exiV exiF uniV exiFA) 
   (M : Sigma11Model D) (adv : NoQuantAdvice) : Prop :=
   forall i : |[exiV]|,
@@ -176,8 +174,7 @@ Program Definition NoQuantFOBoundCondition
 
 (* Note: This covers both conditions 5 and 6 in the paper *)
 Definition NoQuantSOBoundCondition
-  {exiV exiF} {exiFA : |[exiF]| -> nat}
-  {uniV}
+  {exiV exiF uniV} {exiFA : |[exiF]| -> nat}
   (f : @NoQuant exiV exiF uniV exiFA) 
   (M : Sigma11Model D) (adv : NoQuantAdvice) : Prop :=
   forall u : |[uniV]| -> T D, forall i : |[exiF]|,
@@ -195,8 +192,7 @@ Definition NoQuantSOBoundCondition
   end.
 
 Program Definition NoQuantExiStratCondition 
-  {exiV exiF} {exiFA : |[exiF]| -> nat}
-  {uniV}
+  {exiV exiF uniV} {exiFA : |[exiF]| -> nat}
   (f : @NoQuant exiV exiF uniV exiFA) 
   (M : Sigma11Model D)
   (adv : @NoQuantAdvice exiV exiF uniV exiFA) : Prop :=
@@ -205,8 +201,7 @@ Program Definition NoQuantExiStratCondition
   exiVAdv adv i (MakeU m n) = C.
 
 Definition NoQuantDenotation
-  {exiV exiF} {exiFA : |[exiF]| -> nat}
-  {uniV}
+  {exiV exiF uniV} {exiFA : |[exiF]| -> nat}
   (f : @NoQuant exiV exiF uniV exiFA) 
   (i : Sigma11Model D): Prop :=
   exists (a : NoQuantAdvice),
@@ -317,7 +312,7 @@ Qed.
 Lemma ZO_NoQuant_Correct_NoQuantFOBoundCondition
   (f : ZerothOrderFormula) (M : Sigma11Model D) :
   forall a, NoQuantFOBoundCondition D (ZO_NoQuant f) M a.
-Proof. move=> a u [i lti]; fcrush. Qed.
+Proof. move=> a [u ltu]; fcrush. Qed.
 
 Lemma ZO_NoQuant_Correct_NoQuantSOBoundCondition
   (f : ZerothOrderFormula) (M : Sigma11Model D) :
@@ -553,16 +548,218 @@ Proof.
   by do 2 rewrite FO_NoQuant_Correct_Lem_0_0.
 Qed.
 
+
+Lemma FO_NoQuant_Correct_Lem_1
+  {exiV uniV}
+  (adv : @NoQuantAdvice D exiV 0 uniV emptyTuple)
+  (p : @PolyTermVS 0 0 0 emptyTuple)
+  (M : Sigma11Model D) :
+  forall u, 
+  PolyVSDenotation D (PolyTermVSCastFO p) M adv u
+  = (PolyVSDenotation0 p M).
+Proof.
+  move=> u; elim p; try qauto.
+  - move=> [n ltn]; fcrush.
+  - move=> [n ltn]; fcrush.
+  - move=> i a t IH.
+    unfold PolyVSDenotation0; simpl.
+    do 2 f_equal.
+    apply functional_extensionality;move=> x.
+    qauto.
+  - move=> [i lti]; fcrush.
+Qed.
+
+(* Lemma FO_NoQuant_Correct_Lem_2
+  (p : PolyTerm) (f : FirstOrderFormula) (M : Sigma11Model D) a r
+  (t : {n : nat | n < FOUni f} -> T D) :
+  UProp D (FO_NoQuant f) (AddModelV D M r) a t <->
+  UProp D (FO_NoQuant (FOExists p f)) M (AdviceExiExtend r a) t.
+Proof.
+  unfold UProp; simpl; split=> H i.
+  - rewrite <- FO_NoQuant_Correct_Lem_0_0.
+    apply (H i).
+  - rewrite FO_NoQuant_Correct_Lem_0_0.
+    apply (H i).
+Qed. *)
+
+Lemma FO_NoQuant_Correct_NoQuantSOBoundCondition
+  (p : PolyTerm) (f : FirstOrderFormula) (M : Sigma11Model D) a :
+  NoQuantSOBoundCondition D (FO_NoQuant f) M a.
+Proof. move=> u [i lti]; fcrush. Qed. 
+
 Lemma FO_NoQuant_Correct_NoQuantFormulaCondition_Exi
   (p : PolyTerm) (f : FirstOrderFormula) (M : Sigma11Model D) a r :
   NoQuantFormulaCondition D (FO_NoQuant f) (AddModelV D M r) a <-> 
   NoQuantFormulaCondition D (FO_NoQuant (FOExists p f)) M (AdviceExiExtend r a).
 Proof. split; move=> H u; by apply FO_NoQuant_Correct_Lem_0. Qed.
 
-Lemma FO_NoQuant_Correct_NoQuantSOBoundCondition_Exi
-  (p : PolyTerm) (f : FirstOrderFormula) (M : Sigma11Model D) a :
-  NoQuantSOBoundCondition D (FO_NoQuant f) M a.
-Proof. move=> u [i lti]; fcrush. Qed. 
+(* 
+Lemma FO_NoQuant_Correct_NoQuantFOBoundCondition_Exi
+  (p : PolyTerm) (f : FirstOrderFormula) (M : Sigma11Model D) a r :
+  (NoQuantFOBoundCondition D (FO_NoQuant f) (AddModelV D M r) a) <->
+  NoQuantFOBoundCondition D (FO_NoQuant (FOExists p f)) M (AdviceExiExtend r a).
+Proof.
+  split.
+  - move=> H0 [i lti] u n0.
+    destruct (i == 0) eqn:ei0.
+    + simpl; unfold ExtendAt0N.
+      do 2 (rewrite dep_if_case_true; auto).
+      unfold NoQuantFOBoundCondition in H0.
+       *)
+
+Program Definition FO_NoQuant_Correct_Lem_2
+  (p : PolyTerm) (f : FirstOrderFormula) (M : Sigma11Model D) a r i
+  (lti : i.+1 < (FOExi f).+1)
+  (t : {n : nat | n < FOUni f} -> T D)
+  (u : U D (FO_NoQuant (FOExists p f)) M (AdviceExiExtend r a)
+      (exist (fun n : nat => n < (FOExi f).+1) i.+1 lti)) :
+  U D (FO_NoQuant f) (AddModelV D M r) a
+      (exist (fun n : nat => n < FOExi f) i lti) := u.
+Next Obligation.
+  unfold ExtendAt0N; simpl.
+  replace (` ((` (nu (FO_NoQuant f))) _)) 
+     with (` ((` (nu (FO_NoQuant f))) (exist _ i lti))); auto.
+  do 3 f_equal; apply proof_irrelevance.
+Qed.
+Next Obligation.
+  destruct u as [u pu]; simpl in *.
+  unfold ExtendAt0N in *; simpl in *.
+  pose lti2 := (Utils.ExtendAt0N_obligation_2 (FOExi f) (exist _ i.+1 lti) (erefl _)).
+  assert (lti2 = lti) as e;[apply proof_irrelevance|].
+  assert (j < ` ((` (nu (FO_NoQuant f))) (exist _ i lti2))) as ltj;[by rewrite e|].
+  remember (pu (exist _ j ltj)) as pu'; clear Heqpu' pu.
+  rewrite e in v.
+  destruct v as [v ltv].
+  rewrite e in H.
+
+
+Lemma FO_NoQuant_Correct_NoQuantFOBoundCondition_Exi
+  (p : PolyTerm) (f : FirstOrderFormula) (M : Sigma11Model D) a r :
+  ((forall n, InBound D M (AdviceExiExtend r a) r (PolyTermVSCastFO (PolyTerm_PolyTermVS p)) n)
+   /\ NoQuantFOBoundCondition D (FO_NoQuant f) (AddModelV D M r) a) <->
+  NoQuantFOBoundCondition D (FO_NoQuant (FOExists p f)) M (AdviceExiExtend r a).
+Proof.
+  split.
+  - move=> [H0 H1] [i lti] u n0.
+    destruct (i == 0) eqn:ei0.
+    + simpl; unfold ExtendAt0N.
+      do 2 (rewrite dep_if_case_true; auto).
+    + destruct i;[fcrush|clear ei0].
+      simpl in n0; unfold ExtendAt0N in n0; simpl in n0.
+      remember (H0 (MakeU (` u) n0)) as H0'; clear HeqH0' H0; simpl in H0'.
+      unfold NoQuantFOBoundCondition in H1.
+      remember (H1 (exist _ i lti)) as H1'; clear HeqH1' H1.
+      simpl in lti.
+      unfold U in u; simpl in u.
+      unfold ExtendAt0N in *; simpl in *.
+      assert (lti = (Utils.ExtendAt0N_obligation_2 (FOExi f) (exist _ i.+1 lti) (erefl
+        (exist _ i.+1 lti == exist _ 0 is_true_true)))) as e;[apply eq_irrelevance|].
+      clear H0'.
+      rewrite e in u.
+      destruct u as [u pu]; simpl in *.
+      rewrite e in n0.
+      unfold InBound in *.
+      destruct u as [u pu]; simpl in *.
+      unfold ExtendAt0N; simpl.
+      change (exist _ ?x _ == exist _ ?y _) with (x == y) in *.
+      rewrite FO_NoQuant_Correct_Lem_1 in H0'.
+      rewrite <- FO_NoQuant_Correct_Lem_0_0.
+      destruct (FO_NoQuant f); simpl.
+      remember (Utils.ExtendAt0N_obligation_2 (FOExi f)
+             (exist (fun n : nat => n < (FOExi f).+1) i.+1 lti)
+             (erefl (i.+1 == 0))) as DD0.
+
+      assert (lti = (Utils.ExtendAt0N_obligation_2 (FOExi f) (exist _ i.+1 lti) (erefl
+        (exist _ i.+1 lti == exist _ 0 is_true_true)))) as e;[apply eq_irrelevance|].
+
+
+(exist (fun n1 : nat => n1 < FOExi f) i
+          (Utils.ExtendAt0N_obligation_2 (FOExi f)
+             (exist (fun n : nat => n < (FOExi f).+1) i.+1 lti)
+             (erefl (i.+1 == 0))))) (AddModelV D M r) a 
+      destruct M; unfold AddModelV.
+      unfold ExtendAt0.
+      simpl.
+      auto.
+      apply
+      simpl in n1.
+      remember (` ((` (nu (FO_NoQuant f))) _)) as nn.
+      assert (nn <= FOUni f);[by destruct ((` (nu (FO_NoQuant f))) _); rewrite Heqnn|].
+      assert ({n : nat | n < FOUni f} -> T D) as n1.
+        move=>[n ltn].
+        destruct (n < FOUni f - nn) eqn:nlt2.
+        apply n0.
+        exists n.
+        clear Heqnn u lti H0 H1; sfirstorder.
+        exact 0%R.
+      remember (H0 n1) as H0'. ; clear HeqH0' H0; simpl in H0'.
+      
+      remember (MakeU n0 (fun x => 0%R)) as n1.
+
+      assert (forall n, n < FOUni f - nn -> n < FOUni f) as d.
+        clear u; hecrush use: leq_trans, ltn_subrR, contraFltn unfold: is_true.
+      assert ({n : nat | n < FOUni f} -> T D) as n1.
+      move=> [n ltn].
+      assert (n < FOUni f - nn).
+    
+      simpl; unfold ExtendAt0N; simpl.
+
+      remember (fun x : {n : nat | n < FOUni f} => 
+                )
+        exists 0.
+        unfold ExtendAt0N; simpl.
+      cbn.
+      auto.
+      simpl in *.
+      destruct u as [u ltu]; simpl in *.
+      unfold ExtendAt0N in *; simpl in *.
+      remember (exist (fun n1 : nat => n1 < FOExi f) i
+        (Utils.ExtendAt0N_obligation_2 (FOExi f)
+           (exist (fun n : nat => n < (FOExi f).+1) i.+1 lti)
+           (erefl
+              (exist (fun n : nat => n < (FOExi f).+1) i.+1 lti ==
+               exist (fun x : nat => x < (FOExi f).+1) 0 is_true_true)))) as e1.
+
+      unfold U in u; simpl in u.
+      unfold ExtendAt0N in *; simpl in *.
+      destruct ((` (nu (FO_NoQuant f)))
+           (exist (fun n0 : nat => n0 < FOExi f) i
+              (Utils.ExtendAt0N_obligation_2 (FOExi f)
+                 (exist (fun n0 : nat => n0 < (FOExi f).+1) i.+1 lti)
+                 (erefl
+                    (exist (fun n0 : nat => n0 < (FOExi f).+1) i.+1 lti ==
+                     exist (fun x : nat => x < (FOExi f).+1) 0 is_true_true)))))
+
+
+      remember (Utils.ExtendAt0N_obligation_2 
+                        (FOExi f)
+                        (exist (fun n0 : nat => n0 < (FOExi f).+1) i.+1 lti)
+                        (erefl
+                           (exist (fun n0 : nat => n0 < (FOExi f).+1) i.+1
+                              lti ==
+                            exist (fun x : nat => x < (FOExi f).+1) 0
+                              is_true_true))) as DDD.
+      unfold InBound.
+      simpl.
+      unfold ExtendAt0N; rewrite dep_if_case_true; auto.
+; rewrite FO_NoQuant_Correct_Lem_1.
+      clear n u.
+      destruct u as [u ltu]; simpl.
+      destruct (FO_NoQuant f); simpl in *.
+      unfold ExtendAt0N in ltu.
+      change (exist _ ?x _ == exist _ ?y _) with (x == y) in *.
+      rewrite FO_NoQuant_Correct_Lem_1.
+      destruct u as [u ltu].
+      simpl in *.
+
+      assert i < 
+
+      rewrite
+    destruct n as [n ltn].
+    rewrite dep_if_case_true; auto.
+
+    move
+
 
 Lemma FO_NoQuant_Correct_NoQuantExiStratCondition_Exi
   (p : PolyTerm) (f : FirstOrderFormula) (M : Sigma11Model D) a r :
@@ -627,127 +824,6 @@ Proof.
     by f_equal; apply subset_eq_compat.
 Qed.
 
-Lemma FO_NoQuant_Correct_Lem_1
-  {exiV uniV}
-  (adv : @NoQuantAdvice D exiV 0 uniV emptyTuple)
-  (p : @PolyTermVS 0 0 0 emptyTuple)
-  (M : Sigma11Model D) :
-  forall u, 
-  PolyVSDenotation D (PolyTermVSCastFO p) M adv u
-  = (PolyVSDenotation0 p M).
-Proof.
-  move=> u; elim p; try qauto.
-  - move=> [n ltn]; fcrush.
-  - move=> [n ltn]; fcrush.
-  - move=> i a t IH.
-    unfold PolyVSDenotation0; simpl.
-    do 2 f_equal.
-    apply functional_extensionality;move=> x.
-    qauto.
-  - move=> [i lti]; fcrush.
-Qed.
-
-Lemma FO_NoQuant_Correct_Lem_2
-  (p : PolyTerm) (f : FirstOrderFormula) (M : Sigma11Model D) a r
-  (t : {n : nat | n < FOUni f} -> T D) :
-  UProp D (FO_NoQuant f) (AddModelV D M r) a t <->
-  UProp D (FO_NoQuant (FOExists p f)) M (AdviceExiExtend r a) t.
-Proof.
-  unfold UProp; simpl; split=> H i.
-  - rewrite <- FO_NoQuant_Correct_Lem_0_0.
-    apply (H i).
-  - rewrite FO_NoQuant_Correct_Lem_0_0.
-    apply (H i).
-Qed.
-
-Lemma FO_NoQuant_Correct_NoQuantFOBoundCondition_Exi
-  (p : PolyTerm) (f : FirstOrderFormula) (M : Sigma11Model D) a r :
-  NoQuantFOBoundCondition D (FO_NoQuant f) (AddModelV D M r) a <->
-  NoQuantFOBoundCondition D (FO_NoQuant (FOExists p f)) M (AdviceExiExtend r a).
-Proof.
-  split;move=> H.
-  - move=> [u pu] i; simpl.
-    apply (FO_NoQuant_Correct_Lem_2 p f M a r u).2 in pu.
-    remember (H u).
-    simpl.
-    unfold NoQuantFOBoundCondition in H.
-    unfold ExtendAt0N.
-    destruct i as [i lti].
-    dep_if_case (i == 0); auto.
-    ++ rewrite dep_if_case_true; simpl; auto.
-        rewrite FO_NoQuant_Correct_Lem_1.
-        rewrite <- PolyTerm_PolyTermVS_Correct.
-        by rewrite <- PM.
-    ++ rewrite <- FO_NoQuant_Correct_Lem_0_0.
-        rewrite dep_if_case_false; simpl.
-        remember (exist (fun n0 : nat => n0 < FOExi f) i.-1 _) as i'.
-        destruct u as [u uH]; simpl.
-        apply FO_NoQuant_Correct_Lem_2 in uH.
-        apply (H (exist _ u uH) i').
-  - unfold NoQuantFOBoundCondition in H.
-    unfold U in H.
-    assert (
-      {t : {n : nat | n < FOUni (FOExists p f)} -> T D | 
-      UProp D (FO_NoQuant (FOExists p f)) M (AdviceExiExtend r a) t} =
-      {t : {n : nat | n < FOUni (FOExists p f)} -> T D | 
-      UProp D (FO_NoQuant f) (AddModelV D M r) a t}
-    ) as e.
-    apply f_equal.
-    Search (
-    Search (sig _ _).
-    f_equal; apply functional_extensionality; intro.
-    simpl in x.
-    rewrite FO_NoQuant_Correct_Lem_2.
-    rewrite <- FO_NoQuant_Correct_Lem_2 in H.
-    simpl in H.
- split.
-
-    dep_if_case (i == 0); auto.
-    ++ rewrite dep_if_case_true; simpl; auto.
-       rewrite FO_NoQuant_Correct_Lem_1.
-       rewrite <- PolyTerm_PolyTermVS_Correct.
-       remember 
-       by rewrite <- HeqPM.
-    ++ rewrite <- FO_NoQuant_Correct_Lem_0_0.
-       rewrite dep_if_case_false; simpl.
-       remember (exist (fun n0 : nat => n0 < FOExi f) i.-1 _) as i'.
-       destruct u as [u uH]; simpl.
-       apply FO_NoQuant_Correct_Lem_2 in uH.
-       apply (H1 (exist _ u uH) i').
-
-  2:{
-    apply (FO_NoQuant_Correct_Lem_2 p f M a r u) in pu.
-    assert (lti2 : i < (FOExi f).+1);[by apply ltnW|].
-    remember (H (exist _ u pu) (exist _ i lti2)) as H'; clear HeqH' H.
-    simpl in H'; unfold ExtendAt0N in H'; simpl in H'.
-    destruct (i == 0) eqn:ei0.
-    do 2 (rewrite dep_if_case_true in H'; auto).
-    rewrite FO_NoQuant_Correct_Lem_1 in H'.
-    destruct a; simpl in *.
-    simpl.
-    auto.
-
-  unfold U.
-
-
-
-
-  split; move=> H u [i lti]; simpl in *.
-  - unfold NoQuantFOBoundCondition in H.
-    unfold U in u; simpl in u.
-    unfold U in H; simpl in H.
-    destruct u.
-
-    unfold ExtendAt0N.
-    dep_if_case (i == 0); auto.
-    simpl.
-    rewrite FO_NoQuant_Correct_Lem_1.
-    remember (PolyVSDenotation0 (PolyTerm_PolyTermVS p) M) as PM.
-    destruct PM.
-    rewrite dep_if_case_true; auto.
-  
-    remember (H u) as H'; clear HeqH' H.
-    rewrite <- FO_NoQuant_Correct_Lem_0_0.  *)
 
 (* 
 Lemma FO_NoQuant_Correct_NoQuantFormulaCondition_Uni

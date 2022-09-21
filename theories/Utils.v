@@ -523,3 +523,13 @@ Record RingData : Type :=
     min : T;
     least_elem : forall x, lt min x;
   }.
+
+Theorem emptyTupleUnique {A} : forall e, e = emptyTuple (A := A).
+Proof. move=> e; apply functional_extensionality_dep;move=> [i lti]; fcrush. Qed. 
+
+Theorem das a b : (a < b = true -> a < b).
+sfirstorder.
+hecrush use: leq_trans, ltn_subrR, contraFltn unfold: is_true.
+hammer.
+
+
