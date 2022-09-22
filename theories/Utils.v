@@ -28,6 +28,13 @@ Program Definition ExtendAt0 {A} (a : A) (f : nat -> A) (i : nat) : A := (
   else fun _ => f (i.-1)
 ) (erefl _).
 
+Program Definition ExtendAt0_dep {A} (a : A 0) (f : forall i, A i) (i : nat) : A (i.-1) := (
+  if i == 0 as b return i == 0 = b -> A (i.-1) 
+  then fun _ => a
+  else fun _ => f (i.-1)
+) (erefl _).
+Next Obligation. by destruct i. Qed.
+
 Program Definition ExtendAt0N {A n} (a : A) (f : |[n]| -> A) (i : |[n.+1]|) : A := (
   if i == 0 as b return i == 0 = b -> A
   then fun _ => a
@@ -527,3 +534,6 @@ Record RingData : Type :=
 Theorem emptyTupleUnique {A} : forall e, e = emptyTuple (A := A).
 Proof. move=> e; apply functional_extensionality_dep;move=> [i lti]; fcrush. Qed. 
 
+Theorem projT1_eq_rect {A B} {Q : B -> A -> Prop} {a b} {s : {z : A | Q a z}} {e : a = b} : 
+  ` (eq_rect _ (fun x => {z : A | Q x z}) s _ e) = ` s.
+Proof. by destruct e. Qed.
