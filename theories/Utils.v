@@ -194,15 +194,6 @@ Theorem tnth_tuple_index {T} {s : seq T} (x : T) {i} (lti : i < length s) :
   tnth (in_tuple s) (Ordinal lti).
 Proof. by do 2 rewrite (tnth_nth x). Qed.
 
-
-(*tnth : forall (n : nat) (T : Type), n.-tuple T -> {m : m < n} -> T*)
-
-Definition lnth {T} (s : seq T) (i : {m | m < length s}) : T.
-  apply (tnth (in_tuple s)).
-  destruct i as [i lti].
-  by exists i.
-Defined.
-
 Theorem map_length {A B} (f : A -> B) (s : seq A) : length [seq f i | i <- s] = length s.
 Proof. move: s; elim; hauto q:on. Qed.
 
@@ -229,20 +220,6 @@ Proof.
   rewrite IH.
   rewrite Ordinal_Rect.
   by rewrite (tnth_nth a).
-Qed.
-
-Theorem map_lnth {A B} (f : A -> B) (s : seq A) (o : {m | m < length [seq f i | i <- s]}) :
-  lnth [seq f i | i <- s] o = 
-  f (lnth (in_tuple s) (eq_rect _ (fun x => {m : nat | m < x}) o _ (map_length _ _))).
-Proof.
-  unfold lnth.
-  rewrite map_nth.
-  do 2 f_equal.
-  destruct o; simpl.
-  apply ord_inj.
-  by transitivity (Ordinal 
-     (proj2_sig (eq_rect _ (fun x0 : nat => {m : nat | m < x0}) (exist _ x i) 
-     (length s) (map_length f s))));[destruct (map_length f s)|destruct (eq_rect _ _ _ _)].
 Qed.
 
 Theorem map_nth_2 {A B} (f : A -> B) (s : seq A) (o : 'I_(length s)) :
@@ -396,6 +373,41 @@ Qed.
 
 Definition emptyTuple {A} : forall (i : |[0]|), A i. fcrush. Defined.
 
+Program Fixpoint lnth {T} (s : seq T) : |[length s]| -> T :=
+  match s with
+  | [::] => emptyTuple
+  | x :: xs => fun n =>
+    match n with
+    | 0 => x
+    | n.+1 => lnth xs n
+    end
+  end.
+
+
+Theorem projT1_eq_rect {A B} {Q : B -> A -> Prop} {a b} {s : {z : A | Q a z}} {e : a = b} : 
+  ` (eq_rect _ (fun x => {z : A | Q x z}) s _ e) = ` s.
+Proof. by destruct e. Qed.
+
+
+Theorem map_lnth {A B} (f : A -> B) (s : seq A) (o : {m | m < length [seq f i | i <- s]}) :
+  lnth [seq f i | i <- s] o = 
+  f (lnth (in_tuple s) (eq_rect _ (fun x => {m : nat | m < x}) o _ (map_length _ _))).
+Proof.
+  induction s;[fcrush|].
+  simpl.
+  destruct o; simpl.
+  remember (eq_rect _ _ _ _ _) as y;destruct y.
+  apply proj1_sig_eq in Heqy.
+  rewrite projT1_eq_rect in Heqy; simpl in Heqy.
+  destruct Heqy.
+  destruct x0; auto.
+  rewrite IHs.
+  simpl.
+  do 2 f_equal.
+  apply eq_sig_hprop;[move=> F;apply eq_irrelevance|].
+  by rewrite projT1_eq_rect.
+Qed.
+
 Program Fixpoint TupConcat {T} {a b} (m : |[a]| -> T) (n : |[b]| -> T) (i : |[a + b]|) : T :=
   (if i < a as b return i < a = b -> T
    then fun _ => m i
@@ -533,7 +545,3 @@ Record RingData : Type :=
 
 Theorem emptyTupleUnique {A} : forall e, e = emptyTuple (A := A).
 Proof. move=> e; apply functional_extensionality_dep;move=> [i lti]; fcrush. Qed. 
-
-Theorem projT1_eq_rect {A B} {Q : B -> A -> Prop} {a b} {s : {z : A | Q a z}} {e : a = b} : 
-  ` (eq_rect _ (fun x => {z : A | Q x z}) s _ e) = ` s.
-Proof. by destruct e. Qed.
