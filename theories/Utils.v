@@ -408,6 +408,10 @@ Proof.
   by rewrite projT1_eq_rect.
 Qed.
 
+Theorem lnth_nth {A} {l i} (def : A) :
+  lnth l i = nth def l (` i).
+Proof. induction l;[by destruct i|qauto]. Qed.
+
 Program Fixpoint TupConcat {T} {a b} (m : |[a]| -> T) (n : |[b]| -> T) (i : |[a + b]|) : T :=
   (if i < a as b return i < a = b -> T
    then fun _ => m i

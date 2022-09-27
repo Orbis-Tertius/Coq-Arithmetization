@@ -607,6 +607,15 @@ Proof.
       unfold NoQuantFOBoundCondition in H0.
        *)
 
+Program Definition FO_NoQuant_Correct_Lem_2_0 {exiV uniV i}
+  {lti lti2 : i < exiV}
+  {nuF : {n : nat | n < exiV} -> {m : nat | m <= uniV}}
+  (v : {n : nat | n < uniV - ` (nuF (exist _ i lti))} -> T D) :
+  {n : nat | n < uniV - ` (nuF (exist _ i lti2))} -> T D := v.
+Next Obligation.
+  by replace lti with lti2;[|apply eq_irrelevance].
+Qed.
+
 Program Definition FO_NoQuant_Correct_Lem_2
   (p : PolyTerm) (f : FirstOrderFormula) (M : Sigma11Model D) a r i
   (lti : i.+1 < (FOExi f).+1)
@@ -627,7 +636,75 @@ Next Obligation.
   pose lti2 := (Utils.ExtendAt0N_obligation_2 (FOExi f) (exist _ i.+1 lti) (erefl _)).
   assert (lti2 = lti) as e;[apply proof_irrelevance|].
   assert (j < ` ((` (nu (FO_NoQuant f))) (exist _ i lti2))) as ltj;[by rewrite e|].
-  remember (pu (exist _ j ltj)) as pu'; clear Heqpu' pu.
+  remember (pu (exist _ j ltj) (FO_NoQuant_Correct_Lem_2_0 v)) as pu'; clear Heqpu' pu.
+  remember (InBound _ _ _ _ _ _) as A1.
+  replace (InBound _ _ _ _ _ _) with A1;[auto|].
+  rewrite HeqA1; clear pu' HeqA1 A1.
+  f_equal.
+  unfold InBound; simpl.
+  remember (U_obligation_1 _ _ _ _ _ _ _ _ _ _) as DD0; clear HeqDD0.
+  remember (U_obligation_1 _ _ _ _ _ _ _ _ _ _) as DD1; clear HeqDD1.
+  simpl in *.
+  rewrite <- FO_NoQuant_Correct_Lem_0_0.
+  remember (PolyVSDenotation _ _ _ _ _) as P1.
+  remember (PolyVSDenotation D (uniVBounds (FO_NoQuant f) (exist _ j DD1)) _ a _) as P2.
+  replace P1 with P2.
+  destruct P2; simpl; auto.
+  by do 2 f_equal; apply subset_eq_compat.
+  rewrite HeqP1 HeqP2; clear HeqP1 HeqP2 P1 P2.
+  f_equal.
+  by f_equal; apply subset_eq_compat.
+  unfold MakeU.
+  apply functional_extensionality=> x.
+  simpl.
+  f_equal.
+  unfold TupConcat.
+  remember (Utils.ExtendAt0N_obligation_2 _ _ _ ) as DD2.
+  
+  destruct e. 
+  reflexivity.
+  f_equal.
+  rewrite <- e.
+  f_equal.
+  replace (MakeU (fun x => u (exist _ (` x)
+             (FO_NoQuant_Correct_Lem_2_obligation_1 p f i lti x))) v)
+  with (MakeU u (FO_NoQuant_Correct_Lem_2_0 v)).
+  replace DD0 with DD1;[|apply eq_irrelevance].
+  remember (PolyVSDenotation _ _ _ _ _) as P1.
+  remember (PolyVSDenotation D
+    (uniVBounds (FO_NoQuant f) (exist (fun n : nat => n < FOUni f) j DD1))
+    (AddModelV D M r) a (MakeU u (FO_NoQuant_Correct_Lem_2_0 v))) as P2.
+  rewrite <- HeqP1.
+  remember (PolyVSDenotation _ _ _ _ _) as P2. 
+  rewrite PM.
+
+PolyVSDenotation D
+  (uniVBounds (FO_NoQuant f) (exist (fun n : nat => n < FOUni f) j DD1))
+  (AddModelV D M r) a (MakeU u (FO_NoQuant_Correct_Lem_2_0 v))
+PolyVSDenotation D
+  (uniVBounds (FO_NoQuant f) (exist (fun n : nat => n < FOUni f) j DD1))
+  (AddModelV D M r) a (MakeU u (FO_NoQuant_Correct_Lem_2_0 v))
+
+  f_equal.
+  simpl.
+  unfold PolyTermVSLiftExi.
+  destruct e.
+
+  f_equal.
+  unfold InBound in *.
+
+
+Check (exist (fun n0 : nat => n0 < FOExi f) i lti).
+
+Program Definition FO_NoQuant_Correct_Lem_2_0 {exiV} {uniV}
+  {lti lti2 : i.+1 < eviV}
+  (nuF : {n : nat | n < exiV} -> {m : nat | m <= uniV})
+  (v : {n : nat | n < uniV - ` (nuF (exist _ i lti))} -> T D) :
+  {n : nat | n < uniV - ` (nuF (exist _ i lti2))} -> T D := v.
+
+  unfold InBound.
+  remember (U_obligation_1 _ _ _ _ _ _ _ _ _ _) as DD0; clear HeqDD0.
+  simpl.
   rewrite e in v.
   destruct v as [v ltv].
   rewrite e in H.
