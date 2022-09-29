@@ -412,6 +412,20 @@ Theorem lnth_nth {A} {l i} (def : A) :
   lnth l i = nth def l (` i).
 Proof. induction l;[by destruct i|qauto]. Qed.
 
+Program Definition lnth_map {T S} {f : T -> S} {s : seq T} {i} :
+  lnth (map f s) i = f (lnth s i) := (erefl _).
+Next Obligation. by rewrite map_length in H. Qed.
+Next Obligation.
+  move: i H.
+  induction s;[by destruct i|].
+  simpl.
+  destruct i; auto; simpl.
+  move=> H.
+  rewrite IHs.
+  do 2 f_equal.
+  by apply subset_eq_compat.
+Qed.
+
 Program Fixpoint TupConcat {T} {a b} (m : |[a]| -> T) (n : |[b]| -> T) (i : |[a + b]|) : T :=
   (if i < a as b return i < a = b -> T
    then fun _ => m i

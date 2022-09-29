@@ -133,7 +133,7 @@ Program Definition MakeU {A} {n}
   nat -> A := fun i => (
   if i < n as b return i < n = b -> A
   then fun _ => a i
-  else fun _ => b i
+  else fun _ => b (i - n)
   ) (erefl _).
 
 Program Definition U
@@ -770,7 +770,10 @@ Proof.
       simpl in H.
       unfold NoQuantFOBoundCondition in H.
       simpl in H.
-      exact (H (exist _ 0 (ltn0Sn _)) EmptyU n).
+      remember (H (exist _ 0 (ltn0Sn _)) EmptyU n) as H'; clear HeqH' H; simpl in H'.
+      replace (MakeU emptyTuple n) with n in H'; auto.
+      unfold MakeU in H'.
+      apply functional_extensionality; move=> [|i]; auto.
     + move=> [i lti] u n; simpl in *.
       unfold NoQuantFOBoundCondition in H; simpl in H.
       destruct u as [u ltu]; simpl.
@@ -950,11 +953,24 @@ Proof.
     by rewrite (projT1_eq_rect (e := e)).
 Qed.
 
-Theorem Uni_Advice_Lem {a b}
+Theorem lt_dec_true_true {a b}
   (e : lt_dec D a b = true) : lt D a b.
 Proof.
   unfold lt_dec in e.
   by destruct (lt_total D a b) eqn:ltP.
+Qed.
+
+Theorem lt_dec_false_false {a b}
+  (e : lt_dec D a b = false) : ~ (lt D a b).
+Proof.
+  unfold lt_dec in e.
+  destruct (lt_total D a b) eqn:ltP;[fcrush|].
+  destruct (so D).
+  unfold Irreflexive, Reflexive, complement in StrictOrder_Irreflexive.
+  unfold Transitive in StrictOrder_Transitive.
+  destruct s;[qauto|].
+  move=> l2.
+  apply (StrictOrder_Irreflexive b); qauto.
 Qed.
 
 Program Definition Uni_Advice  {nu s}
@@ -963,7 +979,7 @@ Program Definition Uni_Advice  {nu s}
   (i : |[length (map (fun x => x.+1) nu)]|)
   (t : |[lnth (map (fun x => x.+1) nu) i]| -> T D) : T D := (
 if lt_dec D (t 0) s as b return lt_dec D (t 0) s = b -> T D
-then fun p => H (exist _ (t 0) (Uni_Advice_Lem p)) i (fun x => t (x.+1))
+then fun p => H (exist _ (t 0) (lt_dec_true_true p)) i (fun x => t (x.+1))
 else fun _ => 0%R) (erefl _).
 Next Obligation. by rewrite (lnth_nth 1) nth_map. Qed.
 Next Obligation. clear t p; by rewrite map_length in H0. Qed.
@@ -1011,7 +1027,7 @@ Proof.
     rewrite dep_if_case_true.
     by apply lt_ltdec.
     move=> H0.
-    replace ltu0 with (Uni_Advice_Lem H0);[|apply proof_irrelevance].
+    replace ltu0 with (lt_dec_true_true H0);[|apply proof_irrelevance].
     assert (s' = (exist (fun n : nat => n < length nu) (` s')
       (Uni_Advice_obligation_2 nu s
           (exist (fun n : nat => n < length [seq x.+1 | x <- nu]) (` s')
@@ -1020,6 +1036,60 @@ Proof.
     apply (exiVAdvEqLem e).
     move=> x; f_equal.
     by rewrite projT1_eq_rect.
+  - move=> i a p IH.
+    simpl.
+    do 2 f_equal.
+    apply functional_extensionality; auto.
+  - move=> i a p IH.
+    simpl.
+    do 2 f_equal.
+    apply functional_extensionality; auto.
+Qed.
+
+Lemma FO_NoQuant_Correct_Lem_4_0_1 {k} {e}
+  nu p
+  (M: Sigma11Model D)
+  (s: T D)
+  (adv: {r : T D | lt D r s} -> NoQuantAdvice D nu)
+  (u: |[k.+1]| -> T D)
+  (v: nat -> T D)
+  (ltu0: lt D (u (exist _ 0 e)) s) :
+PolyVSDenotation D p (AddModelV D M (u (exist _ 0 e)))
+    (adv (exist ((lt D)^~ s) (u (exist _ 0 e)) ltu0)) (MakeU (fSeqRest u) v) =
+PolyVSDenotation D (PolyTermVSLiftUni p) M
+    {|
+      exiVAdv := Uni_Advice (fun x => exiVAdv D nu (adv x));
+      exiFAdv := exiFAdv D nu (adv (exist ((lt D)^~ s) (u (exist _ 0 e)) ltu0))
+    |} (MakeU u v).
+Proof.
+  assert (u (exist _ 0 e) = MakeU u v 0).
+    unfold MakeU; simpl.
+    f_equal; by apply subset_eq_compat.
+  elim:p; try qauto.
+  - move=> n; destruct n; auto.
+    simpl.
+    f_equal.
+    by rewrite <- H.
+  - move=> s'.
+    simpl.
+    f_equal.
+    unfold Uni_Advice; simpl.
+    rewrite dep_if_case_true.
+    rewrite <- H.
+    by apply lt_ltdec.
+    move=> H0.
+    replace (adv (exist ((lt D)^~ s) (u (exist _ 0 e)) ltu0)) 
+       with (adv (exist ((lt D)^~ s) (MakeU u v 0) (lt_dec_true_true H0))).
+    assert (s' = (exist (fun n : nat => n < length nu) (` s')
+     (Uni_Advice_obligation_2 nu s
+        (exist _ (` s')
+           (PolyTermVSLiftUni_obligation_1 nu (PolyEVarVS s') s'
+              (erefl (PolyEVarVS s'))))
+        (fun x => MakeU u v (` x)) H0))) as e2;[destruct s'; by apply subset_eq_compat|].
+    apply (exiVAdvEqLem e2).
+    move=> x; f_equal.
+    by rewrite projT1_eq_rect.
+    f_equal; by apply subset_eq_compat.
   - move=> i a p IH.
     simpl.
     do 2 f_equal.
@@ -1048,6 +1118,29 @@ Proof.
   move=> p0 p1.
   simpl.
   by do 2 rewrite FO_NoQuant_Correct_Lem_4_0.
+Qed.
+
+
+Lemma FO_NoQuant_Correct_Lem_4_0_2 {k}
+  nu p
+  (M: Sigma11Model D)
+  (s: T D)
+  (adv: {r : T D | lt D r s} -> NoQuantAdvice D nu)
+  (u: |[k.+1]| -> T D)
+  (v: nat -> T D)
+  (ltu0: lt D (u (exist _ 0 (ltn0Sn _))) s) :
+NoQuantZODenotation D p (AddModelV D M (u (exist _ 0 (ltn0Sn _))))
+    (adv (exist ((lt D)^~ s) (u (exist _ 0 (ltn0Sn _))) ltu0)) (MakeU (fSeqRest u) v) =
+NoQuantZODenotation D (PropTermVSLiftUni p) M
+    {|
+      exiVAdv := Uni_Advice (fun x => exiVAdv D nu (adv x));
+      exiFAdv := exiFAdv D nu (adv (exist ((lt D)^~ s) (u (exist _ 0 (ltn0Sn _))) ltu0))
+    |} (MakeU u v).
+Proof.
+  elim: p; try qauto.
+  move=> p0 p1.
+  simpl.
+  by do 2 rewrite FO_NoQuant_Correct_Lem_4_0_1.
 Qed.
 
 Lemma FO_NoQuant_Correct_Lem_5_1 {p M adv1 adv2 u} :
@@ -1228,7 +1321,6 @@ Proof.
     simpl; by rewrite IHf.
 Qed.
 
-
 Lemma FO_NoQuant_Correct_Lem_5_5 {f M exiV exiF1 u} :
   NoQuantZODenotation D (PropTermVSLiftUni (formula (FO_NoQuant f))) M
         {| exiVAdv := exiV; exiFAdv := exiF1 |} u =
@@ -1237,6 +1329,53 @@ Lemma FO_NoQuant_Correct_Lem_5_5 {f M exiV exiF1 u} :
 Proof.
   do 2 rewrite <- (FO_NoQuant_Correct_Lem_7 (formula (FO_NoQuant f)) _ M).
   by do 2 rewrite FO_NoQuant_Correct_Lem_5.
+Qed.
+
+Lemma FO_NoQuant_Correct_Lem_8 {u f j M exV1 exF1 exF2} :
+  PolyVSDenotation D (nth PolyZeroVS (uniVBounds (FO_NoQuant f)) j) M
+    {| exiVAdv := exV1;
+       exiFAdv := exF1
+    |} u =
+  PolyVSDenotation D (nth PolyZeroVS (uniVBounds (FO_NoQuant f)) j) M
+    {| exiVAdv := exV1;
+       exiFAdv := exF2
+    |} u.
+Proof.
+  move: j u M; induction f.
+  - by destruct j.
+  - move=> j u M.
+    simpl.
+    change PolyZeroVS with (PolyTermVSLiftExi (nu := nu (FO_NoQuant f)) (PolyZeroVS)).
+    rewrite nth_map.
+    do 2 rewrite <- (FO_NoQuant_Correct_Lem_6_0 (nth PolyZeroVS (uniVBounds (FO_NoQuant f)) j)).
+    apply IHf.
+  - move=> j u M.
+    simpl.
+    destruct j; simpl.
+    by do 2 rewrite PolyTermVSCastFOCastId.
+    change PolyZeroVS with (PolyTermVSLiftUni (nu := nu (FO_NoQuant f)) PolyZeroVS).
+    rewrite nth_map.
+    do 2 rewrite <- (FO_NoQuant_Correct_Lem_7_0 (nth PolyZeroVS (uniVBounds (FO_NoQuant f)) j)).
+    apply IHf.
+Qed.
+
+Lemma FO_NoQuant_Correct_Lem_8_5 {f M exiV exiF1 exiF2 j u} :
+  PolyVSDenotation D (PolyTermVSLiftUni (nth PolyZeroVS (uniVBounds (FO_NoQuant f)) j)) M
+        {| exiVAdv := exiV; exiFAdv := exiF1 |} u =
+  PolyVSDenotation D (PolyTermVSLiftUni (nth PolyZeroVS (uniVBounds (FO_NoQuant f)) j)) M
+        {| exiVAdv := exiV; exiFAdv := exiF2 |} u.
+Proof.
+  do 2 rewrite <- (FO_NoQuant_Correct_Lem_7_0 (nth PolyZeroVS (uniVBounds (FO_NoQuant f)) j)).
+  apply FO_NoQuant_Correct_Lem_8.
+Qed.
+
+Program Definition FO_NoQuant_Correct_Lem_9 {A s i} (e : i < length s)
+  (u : |[nth 0 [seq x.+1 | x <- s] i]| -> A) : |[(nth 0 s i).+1]| -> A := u.
+Next Obligation.
+  assert (i < length [seq x0.+1 | x0 <- s]);[by rewrite map_length|].
+  replace (nth _ _ _) with (lnth [seq x0.+1 | x0 <- s] (exist _ i H0)).
+  by rewrite lnth_map (lnth_nth 0).
+  by rewrite (lnth_nth 0).
 Qed.
 
 Theorem FO_NoQuant_Correct (p : FirstOrderFormula) (M : Sigma11Model D) :
@@ -1310,129 +1449,241 @@ Proof.
       split;[|split].
       * unfold NoQuantFormulaCondition.
         simpl; rewrite map_length; move=> [u ltu]; simpl.
-        unfold NoQuantAddUni.
-        destruct (lt_dec D (u (exist _ 0 (ltn0Sn _))) s) eqn:ltuB.
-        remember (Uni_Advice_Lem ltuB) as ltuE; clear HeqltuE.
+        assert (lt D (u (exist _ 0 (ltn0Sn _))) s) as ltuE.
+          remember (ltu (exist _ 0 (ltn0Sn _)) (fun=> 0%R)) as ltu'; clear Heqltu' ltu.
+          simpl in ltu'.
+          unfold InBound in ltu'.
+          rewrite PolyTermVSCastFOCastId in ltu'.
+          rewrite <- PolyTerm_PolyTermVS_Correct in ltu'.
+          by rewrite PM in ltu'; simpl in ltu'.
         remember (H (exist _ (u (exist _ 0 (ltn0Sn _))) ltuE)) as H'; clear HeqH' H.
         destruct H' as [H _].
         unfold NoQuantFormulaCondition in H; simpl in H.
-        assert (forall j v, InBound D (AddModelV D M (u
-                     (exist _ 0
-                        (ltn0Sn (length (uniVBounds (FO_NoQuant f)))))))
-               (adv (exist ((lt D)^~ s) (u
-                    (exist _ 0 (ltn0Sn (length (uniVBounds (FO_NoQuant f)))))) ltuE)) (fSeqRest u j)
-               (nth PolyZeroVS (uniVBounds (FO_NoQuant f))
-                  (` j)) (MakeU (fSeqRest u) v)) as ltu0.
-          clear H ; move=> [j ltj] v.
-          assert (j.+1 < (length (uniVBounds (FO_NoQuant f))).+1) as ltj2;[clear ltu ltuB ltuE PM adv v u s M p; sfirstorder|].
-          remember (ltu (exist _ (j.+1) ltj2) v) as ltu'; clear Heqltu'.
-          unfold InBound in *.
-          simpl in *.
-          change (PolyZeroVS (nu := [seq x.+1 | x <- nu (FO_NoQuant f)]))
-          with (PolyTermVSLiftUni (nu := nu (FO_NoQuant f)) (PolyZeroVS)) in ltu'.
-          rewrite nth_map in ltu'.
-          remember (PolyVSDenotation _ _ _ _ _) as PD0.
-          replace (PolyVSDenotation _ _ _ _ _) with PD0.
-          destruct PD0; auto; simpl in *.
-          replace (fSeqRest u (exist _ j ltj))
-             with (u (exist _ j.+1 ltj2)); auto.
-          unfold fSeqRest; simpl; apply f_equal; by apply subset_eq_compat.
-          rewrite HeqPD0; clear HeqPD0 PD0 ltu'.
-          remember (adv (exist ((lt D)^~ s) _ _)) as adv'.
-          replace adv' with {| exiVAdv := exiVAdv _ _ adv' ; exiFAdv := exiFAdv _ _ adv' |};[|by destruct adv'].
-          rewrite Heqadv'; clear Heqadv' adv'.
-          destruct adv'; simpl.
-          transitivity (PolyVSDenotation D
-              (PolyTermVSLiftUni
-                (nth PolyZeroVS (uniVBounds (FO_NoQuant f)) j)) M
-              {|
-                exiVAdv :=
-                  Uni_Advice
-                    (fun x : {r : T D | lt D r s} =>
-                    exiVAdv D (nu (FO_NoQuant f)) (adv x));
-                exiFAdv := exiFAdv D _ adv'
-              |} (MakeU u v)).
-          2:{
-          rewrite <- FO_NoQuant_Correct_Lem_7_0.
-          unfold AdviceDropUni; simpl.
-          f_equal.
-          f_equal; unfold MakeU; simpl; f_equal; by apply subset_eq_compat.
-          transitivity {| exiVAdv := exiVAdv _ _ adv' ; exiFAdv := exiFAdv _ _ adv' |};[|by destruct adv'].
-          f_equal.
-          apply functional_extensionality_dep=> x.
-          apply functional_extensionality=> t.
-          unfold Uni_Advice, ExtendAt0N; simpl.
-          rewrite dep_if_case_true.
-          rewrite <- ltuB.
-          f_equal; unfold MakeU; simpl; f_equal; by apply subset_eq_compat.
-          move=> HH.
-          simpl.
-          replace (adv _) with adv'.
-          assert ((exist (fun n : nat => n < length (nu (FO_NoQuant f))) (` x)
-            (Uni_Advice_obligation_2 (nu (FO_NoQuant f)) s
-                (exist _ (` x) (AdviceDropUni_obligation_1 (nu (FO_NoQuant f)) x t))
-                (fun x0 =>
-                (if (` x0) == 0 as b return (((` x0) == 0) = b -> T D)
-                  then fun=> MakeU u v 0
-                  else
-                  fun H0 : ((` x0) == 0) = false =>
-                  t (exist _ (` x0).-1 (Utils.ExtendAt0N_obligation_2 (lnth (nu (FO_NoQuant f)) x)
-                          (exist _ (` x0) (AdviceDropUni_obligation_2 (nu (FO_NoQuant f)) x t x0)) H0)))
-                  (erefl _)) HH)) = x) as e;[by destruct x; apply subset_eq_compat|].
-          apply (exiVAdvEqLem e)=> y.
-          f_equal.
-          apply subset_eq; simpl.
-          by rewrite projT1_eq_rect.
-          by rewrite Heqadv'; f_equal; apply subset_eq_compat; unfold MakeU; simpl; f_equal; apply subset_eq_compat.
-          apply functional_extensionality=> x; unfold MakeU.
-          dep_if_case (x < length (uniVBounds (FO_NoQuant f))); auto.
-          by rewrite dep_if_case_true.
-          rewrite dep_if_case_false; auto.
-          auto.
-          Search (` _ = ` _).
-          remember (exist (fun n : nat => n < length (nu (FO_NoQuant f)))
-     (` x) _) as x1.
-          exiVAdvEqLem
-          remember (Uni_Advice_obligation_2 _ _ _) as DD0.
-          apply functional_extensionality_dep.
-          simpl.
-          destruct adv'; f_equal.
-          
-          rewrite Heqadv'.
-          unfold AdviceDropUni.
-          simpl.
-          simpl.
-          remember (adv (exist ((lt D)^~ s) _ _)) as adv'.
-          transitivity (PolyVSDenotation D
-              (PolyTermVSLiftUni
-                (nth PolyZeroVS (uniVBounds (FO_NoQuant f)) j)) M
-              {|
-                exiVAdv :=
-                  Uni_Advice
-                    (fun x : {r : T D | lt D r s} =>
-                    exiVAdv D (nu (FO_NoQuant f)) (adv x));
-                exiFAdv := exiFAdv D _ adv'
-              |} (MakeU u v)).
-          apply FO_NoQuant_Correct_Lem_5_1. 
-          rewrite (FO_NoQuant_Correct_Lem_5_1 (adv2 := {|
-                        exiVAdv := Uni_Advice (fun x => exiVAdv D (nu (FO_NoQuant f)) (adv x));
-                        exiFAdv := exiFAdv D _ adv' |})) .
-          apply functional_extensionality.
-          unfold fSeqRest.
-          pattern adv.
-          remember adv as n.
-          destruct adv.
-          destruct adv; simpl.
-          
-          rewrite FO_NoQuant_Correct_Lem_4_0.
-          change ((PolyTermVSCastFO (PolyTerm_PolyTermVS p)
-               :: [seq PolyTermVSLiftUni i
-                     | i <- uniVBounds (FO_NoQuant f)]))
-            with [seq PolyTermVSLiftUni i
-                     | i <- p :: uniVBounds (FO_NoQuant f)] in ltu'.
-          rewrite nth_map in ltu'.
-        remember (H (exist _ (fSeqRest u) ltu0)) as H'; clear HeqH' H.
+        assert (forall j v,
+              InBound D M
+                {|
+                  exiVAdv := Uni_Advice (fun x => exiVAdv D (nu (FO_NoQuant f)) (adv x));
+                  exiFAdv := exiFAdv D _ (adv (exist ((lt D)^~ s) (u (exist _ 0 (ltn0Sn _))) ltuE))
+                |} (u j)
+                (nth PolyZeroVS
+                  (uniVBounds (NoQuantAddUni (PolyTerm_PolyTermVS p) (FO_NoQuant f)))
+                  (` j)) (MakeU u v)) as ltuX.
+              clear H ; move=> [j ltj] v; simpl in *.
+              remember (ltu (exist _ j ltj) v) as ltu'; clear Heqltu'.
+              unfold InBound in *; simpl in *.
+              destruct j; simpl in *.
+              by rewrite PolyTermVSCastFOCastId; rewrite PolyTermVSCastFOCastId in ltu'.
+              change (PolyZeroVS (nu := [seq x.+1 | x <- nu (FO_NoQuant f)]))
+              with (PolyTermVSLiftUni (nu := nu (FO_NoQuant f)) PolyZeroVS) in ltu'.
+              change (PolyZeroVS (nu := [seq x.+1 | x <- nu (FO_NoQuant f)]))
+              with (PolyTermVSLiftUni (nu := nu (FO_NoQuant f)) PolyZeroVS).
+              rewrite nth_map; rewrite nth_map in ltu'.
+              remember (PolyVSDenotation _ _ _ _ _) as PD0.
+              replace (PolyVSDenotation _ _ _ _ _) with PD0.
+              destruct PD0; auto; simpl in *.
+              rewrite HeqPD0; clear HeqPD0 PD0 ltu'.
+              do 2 rewrite <- (FO_NoQuant_Correct_Lem_7_0 (nth PolyZeroVS (uniVBounds (FO_NoQuant f)) j)).
+              apply FO_NoQuant_Correct_Lem_8.
+        assert (forall j v, InBound D (AddModelV D M (u (exist _ 0 (ltn0Sn _))))
+               (adv (exist ((lt D)^~ s) (u (exist _ 0 (ltn0Sn _))) ltuE)) (fSeqRest u j)
+               (nth PolyZeroVS (uniVBounds (FO_NoQuant f)) (` j)) (MakeU (fSeqRest u) v)) as ltu0.
+              clear H ; move=> [j ltj] v; simpl in *.
+              assert (j.+1 < (length (uniVBounds (FO_NoQuant f))).+1) as ltj2;[clear ltu ltuX ltuE PM adv v u s M p; sfirstorder|].
+              remember (ltuX (exist _ (j.+1) ltj2) v) as ltu'; clear Heqltu'.
+              unfold InBound in *; simpl in *.
+              change (PolyZeroVS (nu := [seq x.+1 | x <- nu (FO_NoQuant f)]))
+              with (PolyTermVSLiftUni (nu := nu (FO_NoQuant f)) PolyZeroVS) in ltu'.
+              rewrite nth_map in ltu'.
+              remember (PolyVSDenotation _ _ _ _ _) as PD0.
+              replace (PolyVSDenotation _ _ _ _ _) with PD0.
+              destruct PD0; auto; simpl in *.
+              replace (fSeqRest u (exist _ j ltj))
+                with (u (exist _ j.+1 ltj2)); auto.
+              unfold fSeqRest; simpl; apply f_equal; by apply subset_eq_compat.
+              rewrite HeqPD0; clear HeqPD0 PD0 ltu'.
+              by rewrite <- FO_NoQuant_Correct_Lem_4_0_1.
+        remember (H (exist _ (fSeqRest u) ltu0)) as H'; clear HeqH' H; simpl in H'.
+        rewrite <- (FO_NoQuant_Correct_Lem_5_5 (exiF1 := exiFAdv D (nu (FO_NoQuant f))
+          (adv (exist ((lt D)^~ s) (u (exist _ 0 (ltn0Sn _))) ltuE)))).
+        by rewrite <- FO_NoQuant_Correct_Lem_4_0_2.
+      * unfold NoQuantFOBoundCondition=> i [u ltu] n; simpl in *.
+        destruct i as [i lti].
+        assert (i < length (nu (FO_NoQuant f))) as lti2;[clear u ltu; by rewrite map_length in lti|].
+        assert (nth 0 [seq x.+1 | x <- nu (FO_NoQuant f)] i 
+                = (nth 0 (nu (FO_NoQuant f)) i).+1).
+          transitivity (lnth [seq x.+1 | x <- nu (FO_NoQuant f)] (exist _ i lti));[by rewrite (lnth_nth 0)|].
+          by rewrite lnth_map (lnth_nth 0); f_equal.
+        remember (NoQuantFOBoundCondition_obligation_1 _ _ _ _ _ _) as DDD; clear HeqDDD.
+        change PolyZeroVS with (PolyTermVSLiftUni (nu := nu (FO_NoQuant f)) PolyZeroVS); rewrite nth_map.
+        assert (0 < nth 0 [seq x.+1 | x <- nu (FO_NoQuant f)] i) as lt0;[by rewrite H0|].
+        assert (lt D (u (exist _ 0 lt0)) s) as ltuE.
+          remember (ltu (exist _ 0 lt0) (fun=> 0%R)) as ltu'; clear Heqltu' ltu.
+          simpl in ltu'.
+          unfold InBound in ltu'.
+          rewrite PolyTermVSCastFOCastId in ltu'.
+          rewrite <- PolyTerm_PolyTermVS_Correct in ltu'.
+          by rewrite PM in ltu'.
+        remember (H (exist _ (u (exist _ 0 lt0)) ltuE)) as H'; clear HeqH' H.
+        destruct H' as [_ [H _]]; simpl in H.
+        unfold NoQuantFOBoundCondition in H.
+        remember (FO_NoQuant_Correct_Lem_9 lti2 u) as u'.
+        assert (lt D (u' (exist _ 0 (ltn0Sn (nth 0 (nu (FO_NoQuant f)) i)))) s) as ltuE2.
+          rewrite Hequ'; unfold FO_NoQuant_Correct_Lem_9; simpl.
+          remember (lt _ _ _) as L1; replace (lt _ _ _) with L1;auto;rewrite HeqL1.
+          do 2 f_equal; by apply subset_eq_compat.
+        assert (forall j v, InBound D (AddModelV D M (u (exist _ 0 lt0)))
+                 (adv (exist ((lt D)^~ s) (u (exist _ 0 lt0)) ltuE)) (fSeqRest u' j)
+                 (nth PolyZeroVS (uniVBounds (FO_NoQuant f)) (` j))
+                 (MakeU (fSeqRest u') v)) as ltu2.
+                move=> [j ltj] v.
+                simpl.
+                clear H DDD.
+                simpl in *.
+                assert (j.+1 < nth 0 [seq x.+1 | x <- nu (FO_NoQuant f)] i) as ltj2;[by rewrite H0|].
+                remember (ltu (exist _ (j.+1) ltj2) v) as ltu'; clear Heqltu' ltu.
+                unfold InBound in *.
+                remember (PolyVSDenotation _ _ _ _ _) as P0.
+                replace (PolyVSDenotation _ _ _ _ _) with P0.
+                destruct P0; auto.
+                replace (fSeqRest u' _) with (u (exist _ j.+1 ltj2)); auto.
+                rewrite Hequ'.
+                unfold FO_NoQuant_Correct_Lem_9, fSeqRest; simpl.
+                f_equal; by apply subset_eq_compat.
+                rewrite HeqP0; clear ltu' HeqP0 P0.
+                simpl.
+                change (PolyZeroVS (nu := [seq x.+1 | x <- nu (FO_NoQuant f)]))
+                with (PolyTermVSLiftUni (nu := nu (FO_NoQuant f)) PolyZeroVS). 
+                rewrite nth_map.
+                remember (adv _) as adv'.
+                assert (adv' = adv (exist ((lt D)^~ s) (u' (exist _ 0 (ltn0Sn _))) ltuE2)).
+                  rewrite Heqadv'; f_equal; apply subset_eq_compat.
+                  rewrite Hequ'; unfold FO_NoQuant_Correct_Lem_9; f_equal; by apply subset_eq_compat.
+                transitivity (PolyVSDenotation D
+                  (PolyTermVSLiftUni (nth PolyZeroVS (uniVBounds (FO_NoQuant f)) j)) M
+                  {| exiVAdv := Uni_Advice (fun x => exiVAdv D (nu (FO_NoQuant f)) (adv x));
+                    exiFAdv := exiFAdv _ _ (adv (exist ((lt D)^~ s) (u' (exist _ 0 (ltn0Sn _))) ltuE2))
+                  |} (MakeU u v));[by apply FO_NoQuant_Correct_Lem_8_5|].
+                replace (MakeU u v) with (MakeU u' v).
+                rewrite <- FO_NoQuant_Correct_Lem_4_0_1.
+                f_equal; auto.
+                f_equal; rewrite Hequ'; unfold FO_NoQuant_Correct_Lem_9; f_equal; by apply subset_eq_compat.
+                rewrite Hequ'.
+                unfold FO_NoQuant_Correct_Lem_9.
+                apply functional_extensionality=> x.
+                unfold MakeU.
+                dep_if_case (x < (nth 0 (nu (FO_NoQuant f)) i).+1); auto.
+                rewrite dep_if_case_true;[by rewrite H0|]=> Hyp0.
+                f_equal; by apply subset_eq_compat.
+                by rewrite dep_if_case_false;rewrite H0.
+        remember (H (exist _ i lti2) (exist _ _ ltu2) n) as H'; clear HeqH' H.
+        unfold InBound in *; simpl in *.
+        remember (PolyVSDenotation _ _ _ _ _) as P0; replace (PolyVSDenotation _ _ _ _ _) with P0.
+        destruct P0; auto.
+        unfold Uni_Advice; simpl.
+        rewrite dep_if_case_true.
+          apply lt_ltdec.
+          clear H' HeqP0 s0 ltu2 Hequ' ltuE2 u'.
+          replace (u _) with (u (exist _ 0 lt0)); auto.
+          f_equal; by apply subset_eq_compat.
+        move=> Hyp0.
+        remember (exiVAdv _ _ _ _ _) as A1; replace (exiVAdv _ _ _ _ _) with A1; auto; rewrite HeqA1; auto.
+        replace (adv (exist ((lt D)^~ s) (u (exist _ 0 (DDD (exist _ 0 _)))) (lt_dec_true_true Hyp0)))
+        with ((adv (exist ((lt D)^~ s) (u (exist _ 0 lt0)) ltuE))).
+        assert (exist (fun n0 : nat => n0 < length (nu (FO_NoQuant f))) i lti2 =
+                exist _ i (Uni_Advice_obligation_2 (nu (FO_NoQuant f)) s (exist _ i lti) (fun x => u (exist _ (` x) (DDD x))) Hyp0))as e;[
+        by apply subset_eq_compat|].
+        apply (exiVAdvEqLem e)=> x.
+        remember (NoQuantFOBoundCondition_obligation_1 _ _ _ _ _ _ _) as DDD0; clear HeqDDD0.
+        unfold fSeqRest; rewrite Hequ'; unfold FO_NoQuant_Correct_Lem_9.
+        f_equal; apply subset_eq_compat; simpl.
+        by rewrite projT1_eq_rect.
+        f_equal; apply subset_eq_compat; f_equal; by apply subset_eq_compat.
+        rewrite HeqP0; clear H' HeqP0 P0.
+        transitivity (PolyVSDenotation D
+          (PolyTermVSLiftUni (nth PolyZeroVS (exiVBounds (FO_NoQuant f)) i)) M
+          {| exiVAdv := Uni_Advice (fun x => exiVAdv D (nu (FO_NoQuant f)) (adv x));
+             exiFAdv := exiFAdv _ _ (adv (exist ((lt D)^~ s) (u' (exist _ 0 (ltn0Sn _))) ltuE2))
+          |} (MakeU u n)).
+        replace (MakeU u n) with (MakeU u' n).
+        rewrite <- FO_NoQuant_Correct_Lem_4_0_1.
+        do 2 f_equal.
+        rewrite Hequ'; unfold FO_NoQuant_Correct_Lem_9; f_equal; by apply subset_eq_compat.
+        apply subset_eq_compat; rewrite Hequ'; unfold FO_NoQuant_Correct_Lem_9; f_equal; by apply subset_eq_compat.
+        apply functional_extensionality=> x.
+        rewrite Hequ'; unfold MakeU.
+        dep_if_case (x < (nth 0 (nu (FO_NoQuant f)) i).+1); auto.
+        rewrite dep_if_case_true;[by rewrite H0|]=> Hyp0.
+        unfold FO_NoQuant_Correct_Lem_9; f_equal; by apply subset_eq_compat.
+        by rewrite dep_if_case_false;rewrite H0.
+        apply (FO_NoQuant_Correct_Lem_8_5 (f := f)).
+
+        rewrite (FO_NoQuant_Correct_Lem_8_5 (exiF2 := exiFAdv D _
+          (adv (exist ((lt D)^~ s) (u (exist _ 0 lt0)) ltuE)))).
+        by rewrite <- FO_NoQuant_Correct_Lem_4_0_2.
+        remember (lt _ _ _) as L1; replace (lt _ _ _) with L1; auto.
+        rewrite HeqL1.
+        unfold Uni_Advice.
+
+        unfold U in H'; simpl in *.
+
+        assert
+        move: u ltu ltuE.
+        assert (forall (j : {n : nat | n < nth 0 (nu (FO_NoQuant f)) i})
+                 (v : nat -> T D),
+               InBound D
+                 (AddModelV D M
+                    (u
+                       (exist
+                          (fun n : nat =>
+                           n < nth 0 [seq x.+1 | x <- nu (FO_NoQuant f)] i) 0
+                          lt0)))
+                 (adv
+                    (exist ((lt D)^~ s)
+                       (u
+                          (exist
+                             (fun n : nat =>
+                              n < nth 0 [seq x.+1 | x <- nu (FO_NoQuant f)] i)
+                             0 lt0)) ltuE)) (fSeqRest u j)
+                 (nth PolyZeroVS (uniVBounds (FO_NoQuant f)) (` j))
+                 (MakeU u v)) as ltu2.
+        remember (H (exist _ i lti2)) as H'; clear HeqH' H.
         simpl in H'.
+        unfold U in H'.
+
+          rewrite <- lnth_map.
+          rewrite (lnth_nth (i := exist _ i lti) 0) in lti.
+
+
+        destruct (lt_dec D (u (exist _ 0 lt0)) s) eqn:ltuB.
+        destruct i as [i lti]; simpl in *.
+        unfold InBound.
+        change PolyZeroVS with (PolyTermVSLiftUni (nu := nu (FO_NoQuant f)) PolyZeroVS).
+        rewrite nth_map.
+        unfold Uni_Advice; simpl.
+        rewrite <- (FO_NoQuant_Correct_Lem_5_5 (exiF1 := exiFAdv D (nu (FO_NoQuant f))
+          (adv (exist ((lt D)^~ s) (u (exist _ 0 (ltn0Sn _))) ltuE)))).
+        simpl in u.
+        unfold U. simpl.
+        simpl; rewrite map_length; move=> [u ltu]; simpl.
+        move=> i [u ltu] n; simpl.
+        destruct (lt_dec D (u (exist _ 0 (ltn0Sn _))) s) eqn:ltuB.
+        remember (lt_dec_true_true ltuB) as ltuE; clear HeqltuE.
+        remember (H (exist _ (u (exist _ 0 (ltn0Sn _))) ltuE)) as H'; clear HeqH' H.
+        destruct H' as [H _].
+
+ simpl. 
+
+
+
+
+
+
+
+
+
+
+
+
         apply FO_NoQuant_Correct_Lem_4 in H'.
         by rewrite FO_NoQuant_Correct_Lem_5_5 in H'.
 
