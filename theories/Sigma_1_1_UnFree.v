@@ -122,7 +122,7 @@ Fixpoint FirstOrder_Denote (f : FirstOrderFormula) (M : Sigma11Model) : Prop :=
   | FOForall p f =>
     let op := Poly_Denote p M in
     match op with
-    | None => false
+    | None => true
     | Some p' => forall (r : T D),  lt D r p' -> FirstOrder_Denote f (AddModelV M r)
     end
   end.
