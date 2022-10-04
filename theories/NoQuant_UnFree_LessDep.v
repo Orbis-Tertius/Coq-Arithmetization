@@ -1854,6 +1854,42 @@ Lemma SomeLem {A O a} {f : option A} {g h e} (t : Some a = f) :
    end) e) = g a t.
 Proof. destruct t. f_equal; apply proof_irrelevance. Qed.
 
+Lemma SO_NoQuant_Correct_Lem_4 {A a b x ltx ltx2}
+  (HH : a = b)
+  (s1 : |[a]| -> A) :
+  s1 (exist (fun n : nat => n < a) x ltx2) =
+  eq_rect _ (fun x0 : nat => |[x0]| -> A) s1 _ HH
+    (exist (fun n : nat => n < b) x ltx).
+Proof. 
+  destruct HH; simpl.
+  f_equal; by apply subset_eq_compat.
+Qed.
+
+Lemma exiFAdvEqLem {nu a i a1 a2}
+  {k : |[a1]| -> T D} 
+  {l : |[a2]| -> T D}
+  (e : a1 = a2) :
+  (forall x, k x = l (eq_rect _ (fun x => |[x]|) x _ e)) ->
+  exiFAdv D nu a i a1 k = exiFAdv D nu a i a2 l.
+Proof. 
+  destruct e=> e; f_equal.
+  by apply functional_extensionality.
+Qed.
+
+Lemma lnthEqLem {A a1 a2}
+  {k : |[length a1]|}
+  {l : |[length a2]|}
+  (e : a2 = a1) :
+  (k = eq_rect _ (fun x => |[length x]|) l _ e) ->
+  lnth (T := A) a1 k = lnth a2 l.
+Proof. 
+  destruct e=> e; f_equal.
+  destruct k, l.
+  apply subset_eq_compat.
+  apply subset_eq in e.
+  by rewrite projT1_eq_rect in e.
+Qed.
+
 Theorem SO_NoQuant_Correct (p : SecondOrderFormula) (M : Sigma11Model D) :
   SecondOrder_Denote D p M <-> NoQuantDenotation D (SO_NoQuant p) M.
 Proof.
@@ -1862,8 +1898,8 @@ Proof.
   split.
   + move=> f.
     simpl in f.
-    destruct (Poly_Denote D y M) eqn: PMy.
-    destruct (option_tuple (fun m => Poly_Denote D (lnth bs m) M)) eqn:PMbs.
+    destruct (Poly_Denote D y M) eqn: PMy;[|fcrush].
+    destruct (option_tuple (fun m => Poly_Denote D (lnth bs m) M)) eqn:PMbs;[|fcrush].
     - destruct f as [f [bnd H]].
       apply IH in H.
       unfold NoQuantDenotation.
@@ -1938,39 +1974,98 @@ Proof.
         rewrite PolyTermVSCastCastId; rewrite <- PolyTerm_PolyTermVS_Correct.
         rewrite PMy; simpl.
         assert (length bs = length [seq (PolyTermVSCast (nu := nu (SO_NoQuant s))) i | i <- [seq PolyTerm_PolyTermVS i | i <- bs]]) as HH;[by do 2 rewrite map_length|].
-        remember (eq_rect _ (fun x => |[x]| -> T D) s1 _ HH) as o1.
         replace (option_tuple (fun j => PolyVSDenotation D _ M (AdviceExiFExtend f adv) u))
            with (Some (eq_rect _ (fun x => |[x]| -> T D) s1 _ HH)).
         move=> t out.
         rewrite dep_if_case_true;[by do 2 rewrite map_length; apply EEConvert|].
         move=> Hy BoundCon.
-        split.
-        move=> [x ltx].
         unfold SO_Bound_Check in bnd.
+        remember (fun x0 => t (exist _ (` x0) _)) as ins.
+        remember (bnd ins out BoundCon) as bnd'; clear Heqbnd' bnd.
+        destruct bnd' as [ibnd obnd].
+        split; auto.
+        move=> [x ltx].
         assert (x < length bs) as ltx2;[by rewrite HH|].
-        
-        rewrite HH.
-        
-        replace (length
-               [seq PolyTermVSCast i | i <- [seq PolyTerm_PolyTermVS i | i <- bs]])
-          with (length bs) as o.
-        rewrite (SomeLem (a := s1)).
-
-
-
-        destruct (option_tuple _).
-        replace (option_tuple _) with (Some s1).
-        rewrite SO_NoQuant_Correct_Lem_2 PolyTermVSCastCastId.
-        rewrite <- PolyTerm_PolyTermVS_Correct.
-        rewrite dep_if_case_true;[do 3 rewrite map_length; by apply EEConvert|].
-        move=>HHH def; simpl in *; clear HHH.
-        rewrite SO_NoQuant_Correct_Lem_2 PolyTermVSCastCastId.
-        rewrite <- PolyTerm_PolyTermVS_Correct.
-        Poly_Denote D y (AddModelExiF D (length bs) f M)
-        rewrite PMy.
-
-        destruct i;
+        remember (ibnd (exist _ x ltx2)) as ibnd'; clear Heqibnd' ibnd.
+        replace (t _) with (ins (exist (fun n0 : nat => n0 < length bs) x ltx2)).
+        replace (eq_rect _ (fun x0 => |[x0]| -> T D) _ _ _ _) 
+           with (s1 (exist (fun n0 : nat => n0 < length bs) x ltx2)); auto.
+        apply SO_NoQuant_Correct_Lem_4.
+        rewrite Heqins.
+        f_equal; by apply subset_eq_compat.
+        transitivity (
+        option_tuple
+          (fun j => Poly_Denote D
+            (lnth bs (eq_rect _ (fun x => |[x]|) j _ (esym HH))) M)).
+        transitivity (eq_rect _ (fun x => option (|[x]| -> T D)) (Some s1) _ HH);[|rewrite <- PMbs];by destruct HH.
+        f_equal; apply functional_extensionality=> x.
+        do 2 rewrite lnth_map; rewrite PolyTermVSCastCastId; rewrite <- PolyTerm_PolyTermVS_Correct; do 3 f_equal.
+        apply subset_eq; by rewrite projT1_eq_rect.
+        change PolyPlusOneVS with (LiftPolyExiF (nu := nu (SO_NoQuant s)) PolyPlusOneVS).
         rewrite nth_map.
+        rewrite SO_NoQuant_Correct_Lem_2.
+        assert (i < length (exiFInputBounds (SO_NoQuant s))) as lti2;[by rewrite map_length in lti|].
+        remember (H2 u (exist _ i lti2)) as H; clear HeqH H2; simpl in H.
+        destruct (PolyVSDenotation D _ _ adv u); auto.
+        assert (length (lnth (exiFInputBounds (SO_NoQuant s)) (exist _ i lti2))
+          = length (lnth [seq [seq LiftPolyExiF i | i <- i] | i <- exiFInputBounds (SO_NoQuant s)] (exist _ i lti))).
+          rewrite lnth_map map_length; do 2 f_equal; by apply subset_eq_compat.
+        remember (option_tuple
+        (fun j => PolyVSDenotation D (lnth (lnth (exiFInputBounds (SO_NoQuant s))
+          (exist _ i lti2)) j) (AddModelExiF D (length bs) f M) adv u)) as o1.
+        replace (option_tuple _) with (eq_rect _ (fun x => option (|[x]| -> T D)) o1 _ H0).
+        destruct o1;[|fcrush].
+        replace (eq_rect _ (fun x => option (|[x]| -> T D)) _ _ _) with
+                (Some (eq_rect _ (fun x => |[x]| -> T D) s3 _ H0));[|by destruct H0].
+        move=> t out odef.
+        remember (H (eq_rect _ (fun x => |[x]| -> T D) t _ (esym H0)) out) as H'; clear HeqH' H.
+        remember (exiFAdv _ _ _ _ _ _) as e1.
+        replace (exiFAdv _ _ _ _ _ _) with e1 in H'.
+        remember (H' odef) as H; clear HeqH H'.
+        split; destruct H as [H' HO]; auto.
+        move=> [x ltx].
+        assert (x < length (lnth (exiFInputBounds (SO_NoQuant s)) (exist _ i lti2))) as ltx2;[by rewrite H0|].
+        remember (H' (exist _ x ltx2)) as H; clear HeqH H' HO.
+        remember (lt _ _ _) as L1; replace (lt _ _ _) with L1; auto; rewrite HeqL1; clear HeqL1 L1 H.
+        f_equal.
+        transitivity (t (eq_rect _ (fun x0 : nat => |[x0]|) (exist _ x ltx2) _ H0)).
+        remember (length (lnth _ (exist _ i lti))) as a; clear Heqa; by destruct H0.
+        f_equal; apply subset_eq; by rewrite projT1_eq_rect.
+        transitivity (s3 (eq_rect _ (fun x0 : nat => |[x0]|) (exist _ x ltx) _ (esym H0))).
+        f_equal; apply subset_eq; by rewrite projT1_eq_rect.
+        remember (length (lnth _ (exist _ i lti))) as a; clear Heqa; by destruct H0.
+        rewrite Heqe1; clear Heqe1.
+        apply (exiFAdvEqLem (esym H0)); move=> [x ltx].
+        remember (length (lnth _ (exist _ i lti))) as a; clear Heqa; by destruct H0.
+        rewrite Heqo1; clear H Heqo1 o1.
+        transitivity (option_tuple (fun j => PolyVSDenotation D (lnth
+                  (lnth (exiFInputBounds (SO_NoQuant s))
+                      (exist _ i lti2)) (eq_rect _ (fun x : nat => |[x]|) j _ (esym H0))) 
+                (AddModelExiF D (length bs) f M) adv u)).
+        remember (length (lnth _ (exist _ i lti))) as a; clear Heqa; by destruct H0.
+        f_equal; apply functional_extensionality;move=> [x ltx].
+        rewrite <- SO_NoQuant_Correct_Lem_2.
+        f_equal. 
+        pose ([seq LiftPolyExiF i0
+            | i0 <- lnth (exiFInputBounds (SO_NoQuant s))
+                      (exist _ i 
+                          (Utils.lnth_map_obligation_1 (seq PolyTermVS)
+                            (seq PolyTermVS) [eta map [eta LiftPolyExiF]]
+                            (exiFInputBounds (SO_NoQuant s)) (exist _ i lti)))]) as L1.
+        assert (x < length L1) as ltx3.
+          rewrite lnth_map map_length in ltx.
+          by rewrite map_length.
+        transitivity (lnth L1 (exist _ x ltx3));[
+          |do 2 rewrite (lnth_nth PolyZeroVS); f_equal; by rewrite lnth_map].
+        transitivity (LiftPolyExiF
+          (lnth (lnth (exiFInputBounds (SO_NoQuant s))
+          (exist _ i (Utils.lnth_map_obligation_1 _ _ _ _ (exist _ i lti))))
+          (exist _ x (Utils.lnth_map_obligation_1 _ _ _ (lnth (exiFInputBounds (SO_NoQuant s))
+          (exist _ i (Utils.lnth_map_obligation_1 _ _ _ _ (exist _ i lti))))
+          (exist _ x ltx3)))));[|by rewrite lnth_map].
+        f_equal.
+        do 2 rewrite (lnth_nth PolyZeroVS); do 2 f_equal;[
+          by apply subset_eq_compat|by rewrite projT1_eq_rect].
 
 
 
