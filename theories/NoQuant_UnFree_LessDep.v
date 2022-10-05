@@ -1793,7 +1793,7 @@ Proof.
     destruct i; simpl.
     f_equal.
     apply functional_extensionality=> x.
-    unfold AddExiF; simpl.
+    unfold AddExiF, ExtendAt0; simpl.
     dep_if_case (a' == a); auto.
     rewrite dep_if_case_true.
     f_equal; apply functional_extensionality=>y; f_equal; by apply subset_eq_compat.
@@ -1890,6 +1890,132 @@ Proof.
   by rewrite projT1_eq_rect in e.
 Qed.
 
+Definition AdviceExiFExtendA
+  (f : forall b, (|[b]| -> T D) -> option (T D))
+  {nu} (adv : NoQuantAdvice D nu) : 
+  NoQuantAdvice D nu :=
+  {| exiVAdv := exiVAdv _ _ adv
+   ; exiFAdv := fun i a => 
+      if i == 0
+      then f a
+      else exiFAdv _ _ adv (i.-1) a
+  |}.
+
+Program Definition AdviceDropExiF {nu}
+  (adv : NoQuantAdvice D nu) :=
+  {| exiVAdv := exiVAdv D _ adv
+   ; exiFAdv := fun i => exiFAdv D _ adv (i.+1) 
+  |}.
+
+Theorem AdviceDropExiF_Spec_1 {nu}
+  (adv : NoQuantAdvice D nu) :
+  adv = 
+  (AdviceExiFExtendA (exiFAdv D _ adv 0)
+                     (AdviceDropExiF adv)).
+Proof.
+  destruct adv; f_equal; simpl.
+  unfold AdviceDropExiF, AdviceExiFExtendA; simpl; f_equal.
+  apply functional_extensionality;move=> [|i]; auto.
+Qed.
+
+Theorem AdviceDropExiF_Spec_2 {nu a f} 
+  (adv : NoQuantAdvice D nu) :
+  adv = 
+  (AdviceDropExiF (AdviceExiFExtend (b := a) f adv)).
+Proof.
+  destruct adv; f_equal; simpl.
+  unfold AdviceDropExiF, AdviceExiFExtendA; simpl; f_equal.
+Qed.
+
+Lemma SO_NoQuant_Correct_Lem_2_A {M nu u p f adv} :
+  PolyVSDenotation (nu := nu) _ (LiftPolyExiF p) M (AdviceExiFExtendA f adv) u
+  = PolyVSDenotation _ p (AddModelExiFA _ f M) adv u.
+Proof.
+  move: M.
+  elim: p; try qauto.
+  - move=> i a' p IH M.
+    simpl.
+    destruct i; simpl;
+    do 2 f_equal; apply functional_extensionality; qauto.
+  - move=> i a' p IH M.
+    simpl.
+    do 2 f_equal; apply functional_extensionality=> x; auto.
+Qed.
+
+Lemma SO_NoQuant_Correct_Lem_2_B {M nu u p adv} :
+  PolyVSDenotation (nu := nu) _ (LiftPolyExiF p) M adv u
+  = PolyVSDenotation _ p (AddModelExiFA _ (exiFAdv D _ adv 0) M) (AdviceDropExiF adv) u.
+Proof.
+  move: M.
+  elim: p; try qauto.
+  - move=> i a' p IH M.
+    simpl.
+    destruct i; simpl;
+    do 2 f_equal; apply functional_extensionality; qauto.
+  - move=> i a' p IH M.
+    simpl.
+    do 2 f_equal; apply functional_extensionality=> x; auto.
+Qed.
+
+Lemma SO_NoQuant_Correct_Lem_2_C {M nu u p adv d} :
+  PolyVSDenotation (nu := nu) _ (LiftPolyExiF p) M (AdviceExiFExtend (exiFAdv D _ adv 0 d) (AdviceDropExiF adv)) u
+  = PolyVSDenotation _ p (AddModelExiF _ d (exiFAdv D _ adv 0 d) M) (AdviceDropExiF adv) u.
+Proof.
+  move: M.
+  elim: p; try qauto.
+  - move=> i a' p IH M.
+    simpl.
+    destruct i; simpl;
+    do 2 f_equal; apply functional_extensionality; try qauto.
+    unfold ExtendAt0; simpl.
+    dep_if_case (a' == d); auto.
+    assert (a' = d);[by apply EEConvert in H|].
+    move=> x; rewrite dep_if_case_true; auto.
+    f_equal; apply functional_extensionality=> X; f_equal; by apply subset_eq_compat.
+    rewrite dep_if_case_false; auto.
+  - move=> i a' p IH M.
+    simpl.
+    destruct i; simpl;
+    do 2 f_equal; apply functional_extensionality; try qauto.
+Qed.
+
+
+(* Lemma SO_NoQuant_Correct_Lem_2_C {M nu u p adv d} :
+  PolyVSDenotation (nu := nu) _ (LiftPolyExiF p) M adv u
+  = PolyVSDenotation _ p (AddModelExiF _ d (exiFAdv D _ adv 0 d) M) (AdviceDropExiF adv) u.
+Proof.
+  move: M.
+  elim: p; try qauto.
+  - move=> i a' p IH M.
+    simpl.
+    destruct i; simpl;
+    do 2 f_equal; apply functional_extensionality.
+    move=> x.
+    unfold ExtendAt0; simpl.
+    dep_if_case (a' == d); auto.
+
+ ; qauto.
+  - move=> i a' p IH M.
+    simpl.
+    do 2 f_equal; apply functional_extensionality=> x; auto.
+Qed. *)
+
+(* 
+Lemma SO_NoQuant_Correct_Lem_2_B {M nu u p adv} :
+  PolyVSDenotation (nu := nu) _ (LiftPolyExiF p) M adv u
+  = PolyVSDenotation _ p (AddModelExiF _ (exiFAdv D _ adv 0) M) (AdviceDropExiF adv) u.
+Proof.
+  move: M.
+  elim: p; try qauto.
+  - move=> i a' p IH M.
+    simpl.
+    destruct i; simpl;
+    do 2 f_equal; apply functional_extensionality; qauto.
+  - move=> i a' p IH M.
+    simpl.
+    do 2 f_equal; apply functional_extensionality=> x; auto.
+Qed. *)
+
 Theorem SO_NoQuant_Correct (p : SecondOrderFormula) (M : Sigma11Model D) :
   SecondOrder_Denote D p M <-> NoQuantDenotation D (SO_NoQuant p) M.
 Proof.
@@ -1898,6 +2024,8 @@ Proof.
   split.
   + move=> f.
     simpl in f.
+    (*Note: This proof can be made shorter by replacing 
+      Poly_Denote D y M with its equal from H2 before destructing.*)
     destruct (Poly_Denote D y M) eqn: PMy;[|fcrush].
     destruct (option_tuple (fun m => Poly_Denote D (lnth bs m) M)) eqn:PMbs;[|fcrush].
     - destruct f as [f [bnd H]].
@@ -2066,6 +2194,91 @@ Proof.
         f_equal.
         do 2 rewrite (lnth_nth PolyZeroVS); do 2 f_equal;[
           by apply subset_eq_compat|by rewrite projT1_eq_rect].
+  + move=> H; simpl.
+    destruct H as [adv [H0 [H1 H2]]].
+    unfold NoQuantSOBoundCondition in H2.
+    remember (H2 (fun _ => 0%R) (exist _ 0 (ltn0Sn _))) as H2_0; clear HeqH2_0; simpl in H2_0.
+    rewrite PolyTermVSCastCastId in H2_0; rewrite <- PolyTerm_PolyTermVS_Correct in H2_0.
+    destruct (Poly_Denote D y M) eqn: PMy;[|fcrush].
+    assert (length [seq PolyTermVSCast (nu := (nu (SO_NoQuant s))) i | i <- [seq PolyTerm_PolyTermVS i | i <- bs]]
+            = length bs) as HH;[by do 2 rewrite map_length|].
+    remember (option_tuple _) as o1.
+    replace (option_tuple _) with (eq_rect _ (fun x => option (|[x]| -> T D)) o1 _ HH).
+    2:{   rewrite Heqo1.
+          transitivity (option_tuple (fun j => PolyVSDenotation D
+            (lnth [seq PolyTermVSCast i | i <- [seq PolyTerm_PolyTermVS i | i <- bs]] 
+                (eq_rect _ (fun x => |[x]|) j _ (esym HH))) M adv
+            (fun=> 0%R)));[by destruct HH|].
+          f_equal; apply functional_extensionality;move=> [x ltx].
+          do 2 rewrite lnth_map; simpl.
+          rewrite PolyTermVSCastCastId; rewrite <- PolyTerm_PolyTermVS_Correct.
+          do 2 f_equal.
+          apply subset_eq_compat; by rewrite projT1_eq_rect. }
+    destruct HH; simpl.
+    rewrite Heqo1; rewrite Heqo1 in H2_0; clear Heqo1 o1.
+    destruct (option_tuple _);[|fcrush].
+    exists (exiFAdv _ _ adv 0 _).
+    split;[unfold SO_Bound_Check;qauto|].
+    apply IH.
+    unfold NoQuantDenotation.
+    (* rewrite (AdviceDropExiF_Spec adv) in H0 H1 H2; clear H2_0. *)
+    exists (AdviceDropExiF adv).
+    split;[|split].
+    + clear H1 H2. 
+      unfold NoQuantFormulaCondition; unfold NoQuantFormulaCondition in H0.
+      do 2 rewrite map_length; simpl in *.
+      move=> [u ltu]; simpl.
+      unfold U in H0.
+      rewrite map_length in H0.
+      assert (forall (j : {n : nat | n < length (uniVBounds (SO_NoQuant s))})
+               (v : nat -> T D),
+             InBound D M adv (u j)
+               (nth PolyZeroVS
+                  (uniVBounds
+                     (AddExiFBound (PolyTerm_PolyTermVS y)
+                        [seq PolyTerm_PolyTermVS i | i <- bs] 
+                        (SO_NoQuant s))) (` j)) (MakeU u v)).
+      move=> j v.
+      remember (ltu j v) as ltu'; clear Heqltu' ltu.
+      unfold InBound in *.
+      change PolyZeroVS with (LiftPolyExiF (nu := nu (SO_NoQuant s)) PolyZeroVS).
+      rewrite nth_map.
+      rewrite <- SO_NoQuant_Correct_Lem_2_C in ltu'.
+      remember (PolyVSDenotation _ _ _ _ _) as P0.
+      replace (PolyVSDenotation _ _ _ _ _) with P0; auto.
+      rewrite HeqP0; clear ltu' HeqP0 P0.
+      unfold AddModelExiF.
+      f_equal.
+      f_equal.
+      apply functional_extensionality_dep=> x.
+      dep_if_case (x == length bs); auto.
+      apply functional_extensionality=> z.
+      assert (length bs = x);[by apply EEConvert in H|].
+      apply (exiFAdvEqLem H1);move=> [w ltw].
+      f_equal.
+      by apply subset_eq; rewrite projT1_eq_rect.
+      Search (_ <-> ` _ = ` _).
+      rewrite H1.
+
+
+      f_equal.
+      simpl.
+      auto.
+      f_equal.
+      rewrite (AdviceDropExiF_Spec adv); rewrite SO_NoQuant_Correct_Lem_2_A.
+      rewrite <- SO_NoQuant_Correct_Lem_2_A in ltu'.
+    unfold SO_Bound_Check. qauto.
+    move=> ins out hyp.
+    remember (H2_0 ins out hyp).
+    simpl.
+
+
+
+    destruct (Poly_Denote D y M) eqn: PMy.
+    destruct (option_tuple (fun m => Poly_Denote D (lnth bs m) M)) eqn:PMbs.
+    destruct H as [adv [H0 [H1 H2]]].
+    exists (exiFAdv _ _ adv 0 (length bs)).
+    unfold NoQuantDenotation in H.
 
 
 

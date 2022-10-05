@@ -151,8 +151,17 @@ Program Definition AddExiF (newA : nat) (f : (|[newA]| -> T D) -> option (T D))
     ) (erefl _).
 Next Obligation. by assert (a = newA);[rewrite <- EEConvert|rewrite H0]. Qed.
 
+Definition AddModelExiFA (f : forall newA, (|[newA]| -> T D) -> option (T D)) (M : Sigma11Model)  :
+  Sigma11Model := {| V_F := V_F M; F_S := ExtendAt0 f (F_S M) |}.
+
 Program Definition AddModelExiF (newA : nat) (f : (|[newA]| -> T D) -> option (T D)) (M : Sigma11Model)  :
-  Sigma11Model := {| V_F := V_F M; F_S := AddExiF newA f (F_S M) |}.
+  Sigma11Model :=
+  AddModelExiFA (fun a => (
+    if a == newA as b return ((a == newA) = b -> (|[a]| -> T D) -> option (T D))
+    then fun _ => f
+    else fun _ _ => None
+  ) (erefl _)) M.
+Next Obligation. apply EEConvert in e; by destruct e. Qed.
 
 Fixpoint SecondOrder_Denote (f : SecondOrderFormula) (M : Sigma11Model) : Prop :=
   match f with
