@@ -191,11 +191,11 @@ Program Definition NoQuantSOBoundCondition
 
 Definition NoQuantDenotation
   (f : NoQuant) 
-  (i : Sigma11Model D): Prop :=
+  (M : Sigma11Model D): Prop :=
   exists (a : NoQuantAdvice (nu f)),
-    NoQuantFormulaCondition f i a /\
-    NoQuantFOBoundCondition f i a /\
-    NoQuantSOBoundCondition f i a.
+    NoQuantFormulaCondition f M a /\
+    NoQuantFOBoundCondition f M a /\
+    NoQuantSOBoundCondition f M a.
 
 End NoQuantDef.
 
@@ -335,7 +335,7 @@ Proof.
            , ZO_NoQuant_Correct_NoQuantSOBoundCondition.
 Qed.
 
-Fixpoint FOUni (f : FirstOrderFormula) : nat :=
+(* Fixpoint FOUni (f : FirstOrderFormula) : nat :=
   match f with
   | ZO z => 0
   | FOExists p f => FOUni f
@@ -347,7 +347,7 @@ Fixpoint FOExi (f : FirstOrderFormula) : nat :=
   | ZO z => 0
   | FOExists p f => (FOExi f).+1
   | FOForall p f => FOExi f
-  end.
+  end. *)
 
 Program Fixpoint PolyTermVSLiftExi {nu}
   (p : @PolyTermVS nu):
@@ -478,7 +478,7 @@ Program Definition AdviceExiExtend
   |}.
 Next Obligation. destruct i; auto. Qed.
 
-Program Definition AdviceUniExtend
+(* Program Definition AdviceUniExtend
   (M : Sigma11Model D)
   nu (adv : NoQuantAdvice D nu) 
   (f : forall i, (|[(lnth nu i).+1]| -> T D) -> T D)
@@ -497,7 +497,7 @@ Next Obligation. by rewrite map_length in H0. Qed.
 Next Obligation. 
   rewrite (lnth_nth 1); rewrite (lnth_nth 0) in H0; simpl in *.
   by rewrite nth_map.
-Qed.
+Qed. *)
 
 Lemma FO_NoQuant_Correct_Lem_0_0 {nu}
   (p : @PolyTermVS nu)
@@ -2228,7 +2228,7 @@ Proof.
       unfold NoQuantFormulaCondition; unfold NoQuantFormulaCondition in H0.
       do 2 rewrite map_length; simpl in *.
       move=> [u ltu]; simpl.
-      unfold U in H0.
+      (* unfold U in H0. *)
       rewrite map_length in H0.
       assert (forall (j : {n : nat | n < length (uniVBounds (SO_NoQuant s))})
                (v : nat -> T D),

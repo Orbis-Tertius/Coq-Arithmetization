@@ -530,12 +530,12 @@ Program Definition fSeqMost {A n} (f : |[n.+1]| -> A) (x : |[n]|) : A := f x.
 
 Program Definition fSeqRest {A n} (f : |[n.+1]| -> A) (x : |[n]|) : A := f (x.+1).
 
-Program Fixpoint option_tuple {A} {l : nat} (t : |[l]| -> option A) : option (|[l]| -> A) := 
+Program Fixpoint option_fun {A} {l : nat} (t : |[l]| -> option A) : option (|[l]| -> A) := 
   match l with
   | 0 => Some emptyTuple
   | m.+1 =>
     let most : |[m]| -> option A := fun x => t x in
-    let r : option (|[m]| -> A) := option_tuple most in
+    let r : option (|[m]| -> A) := option_fun most in
     let last : option A := t m in
     obind (fun last => obind (fun r => Some (
       fun x : {n : nat | n < m.+1} => 
