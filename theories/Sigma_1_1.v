@@ -48,9 +48,9 @@ Section Sigma_1_1_Denotation.
 
 Record Sigma11Model : Type :=
   mkSigma11Model {
-      p : nat;
-      V_F : nat -> 'F_p;
-      F_S : nat -> { a & (|[a]| -> 'F_p) -> option 'F_p };
+      FSize : nat;
+      V_F : nat -> 'F_FSize;
+      F_S : nat -> { a & (|[a]| -> 'F_FSize) -> option 'F_FSize };
   }.
 
 Definition indFun {p} (x y : 'F_p) : 'F_p := if (x < y) then 1%R else 0%R.
@@ -64,14 +64,14 @@ Proof.
 Qed.
 
 Program Fixpoint Poly_Denote (M : Sigma11Model) 
-  (r : PolyTerm) : option ('F_(p M)) :=
+  (r : PolyTerm) : option ('F_(FSize M)) :=
   match r with
   | PolyVar m => Some (V_F M m)
   | PolyFun i a t => 
-    (if a == projT1 (F_S M i) as b return ((a == projT1 (F_S M i)) = b -> option ('F_(p M)))
+    (if a == projT1 (F_S M i) as b return ((a == projT1 (F_S M i)) = b -> option ('F_(FSize M)))
      then fun _ => (
           let ds := option_fun (fun x => Poly_Denote M (t x)) in
-          obind (fun t : |[a]| -> 'F_(p M) => projT2 (F_S M i) t) ds)
+          obind (fun t : |[a]| -> 'F_(FSize M) => projT2 (F_S M i) t) ds)
       else fun _ => None) (erefl _)
   | PolyMinusOne => Some (-1)%R
   | PolyPlusOne => Some 1%R
@@ -115,15 +115,15 @@ Fixpoint ZerothOrder_Denote (M : Sigma11Model)
     obind (fun r1 => obind (fun r2 => Some (r1 == r2)) d2) d1
   end.
 
-Definition AddModelV (M : Sigma11Model) (r : 'F_(p M)) : Sigma11Model :=
+Definition AddModelV (M : Sigma11Model) (r : 'F_(FSize M)) : Sigma11Model :=
   {| V_F := ExtendAt0 r (V_F M); F_S := F_S M |}.
 
-Definition AddModelF  (M : Sigma11Model) (f : { newA & (|[newA]| -> 'F_(p M)) -> option ('F_(p M))})  :
+Definition AddModelF  (M : Sigma11Model) (f : { newA & (|[newA]| -> 'F_(FSize M)) -> option ('F_(FSize M))})  :
   Sigma11Model := {| V_F := V_F M; F_S := ExtendAt0 f (F_S M) |}.
 
 Program Fixpoint FunBounds 
   (M : Sigma11Model) {a}
-  (ins : |[a]| -> 'F_(p M)) (out : 'F_(p M))
+  (ins : |[a]| -> 'F_(FSize M)) (out : 'F_(FSize M))
   (insB : |[a]| -> PolyTerm) (outB : PolyTerm) : bool :=
   match a with
   | 0 => 
@@ -143,8 +143,8 @@ Definition Fun_Bound_Check
   {n : nat}
   (bs : |[n]| -> PolyTerm)
   (y : PolyTerm)
-  (f : (|[n]| -> 'F_(p M)) -> option ('F_(p M))) : Prop :=
-forall (ins : |[n]| -> 'F_(p M)) (out : 'F_(p M)),
+  (f : (|[n]| -> 'F_(FSize M)) -> option ('F_(FSize M))) : Prop :=
+forall (ins : |[n]| -> 'F_(FSize M)) (out : 'F_(FSize M)),
   f ins == Some out -> 
   FunBounds M ins out bs y == true.
 
@@ -152,12 +152,12 @@ Fixpoint QuantifiedFormula_Denote (M : Sigma11Model) (f : QuantifiedFormula) : P
   match f with
   | ZO z => ZerothOrder_Denote M z == Some true
   | QExists bs y f => 
-    exists (F : (|[length bs]| -> 'F_(p M)) -> option ('F_(p M))), 
+    exists (F : (|[length bs]| -> 'F_(FSize M)) -> option ('F_(FSize M))), 
     Fun_Bound_Check M (lnth bs) y F /\ QuantifiedFormula_Denote (AddModelF M (existT _ (length bs) F)) f
   | QForall b f =>
     match Poly_Denote M b with
     | None => False
-    | Some p' => forall (r : 'F_(p M)), r < p' -> QuantifiedFormula_Denote (AddModelV M r) f
+    | Some p' => forall (r : 'F_(FSize M)), r < p' -> QuantifiedFormula_Denote (AddModelV M r) f
     end
   end.
 
