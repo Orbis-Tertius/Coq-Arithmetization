@@ -130,7 +130,7 @@ Fixpoint ZerothOrder_Denote (M : Sigma11Model)
   | ZOAnd f1 f2 =>
     let d1 := ZerothOrder_Denote M f1 in
     let d2 := ZerothOrder_Denote M f2 in
-    obind (fun r1 => obind (fun r2 => Some (r1 || r2)) d2) d1
+    obind (fun r1 => obind (fun r2 => Some (r1 && r2)) d2) d1
   | ZOOr f1 f2 => 
     let d1 := ZerothOrder_Denote M f1 in
     let d2 := ZerothOrder_Denote M f2 in
@@ -138,7 +138,7 @@ Fixpoint ZerothOrder_Denote (M : Sigma11Model)
   | ZOImp f1 f2 => 
     let d1 := ZerothOrder_Denote M f1 in
     let d2 := ZerothOrder_Denote M f2 in
-    obind (fun r1 => obind (fun r2 => Some (negb r1 || r2)) d2) d1
+    obind (fun r1 => obind (fun r2 => Some (r1 ==> r2)) d2) d1
   | ZOEq r1 r2 => 
     let d1 := Poly_Denote M r1 in
     let d2 := Poly_Denote M r2 in
@@ -182,22 +182,10 @@ Program Fixpoint FunBounds
   | n.+1 => 
     match Poly_Denote M (thead insB) with
     | None => false
-    | Some iB => (thead ins < iB) && @FunBounds (AddModelV M (thead ins)) n (behead_tuple ins) out (behead_tuple insB) outB
-    end  
+    | Some iB => (thead ins < iB) && 
+      @FunBounds (AddModelV M (thead ins)) n (behead_tuple ins) out (behead_tuple insB) outB
+    end
   end.
-
-Definition Hole {A} : A. Admitted.
-
-(* Definition Fun_Bound_Check 
-  (M : Sigma11Model)
-  {n : nat}
-  (bs : n .-tuple PolyTerm)
-  (y : PolyTerm)
-  (f : {ffun (n.-tuple 'F_(p M)) -> option ('F_(p M))}) :  option bool :=
-let ips : seq (n .-tuple 'F_(p M) * 'F_(p M))
-        := enum [pred x | f x.1 == Some x.2] in
-obind (fun x => Some (all [pred x | x] x))
-      (option_seq (map (fun x => FunBounds M x.1 x.2 bs y) ips)). *)
 
 Definition Fun_Bound_Check
   (M : Sigma11Model)
@@ -229,6 +217,20 @@ Fixpoint QuantifiedFormula_Denote (M : Sigma11Model) (f : QuantifiedFormula) : o
   | QForall B f => obind (fun B : 'F_(p M) => Some
     [forall r, ((r : 'F_(p M)) < B) ==> (QuantifiedFormula_Denote (AddModelV M r) f == Some true)]
   ) (Poly_Denote M B)
+  end.
+
+Fixpoint QuantifiedFormula_Denote_B (M : Sigma11Model) (f : QuantifiedFormula) : bool :=
+  match f with
+  | ZO z => ZerothOrder_Denote M z == Some true
+  | QExists bs y f =>
+    [exists F, Fun_Bound_Check M (in_tuple bs) y F
+            && (QuantifiedFormula_Denote_B (AddModelExiF M (existT _ (size bs) F)) f == true)] 
+  | QForall B f => 
+    match Poly_Denote M B with
+    | None => false
+    | Some B => 
+      [forall r, ((r : 'F_(p M)) < B) ==> (QuantifiedFormula_Denote_B (AddModelV M r) f == true)]
+    end
   end.
 
 End Sigma_1_1_Denotation.
