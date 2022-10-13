@@ -124,15 +124,15 @@ Definition AddModelF  (M : Sigma11Model) (f : { newA & (|[newA]| -> 'F_(FSize M)
 Program Fixpoint FunBounds 
   (M : Sigma11Model) {a}
   (ins : |[a]| -> 'F_(FSize M)) (out : 'F_(FSize M))
-  (insB : |[a]| -> PolyTerm) (outB : PolyTerm) : bool :=
+  (insB : |[a]| -> option ('F_(FSize M))) (outB : option ('F_(FSize M))) : bool :=
   match a with
   | 0 => 
-    match Poly_Denote M outB with
+    match outB with
     | None => false
     | Some oB => out < oB
     end
   | n.+1 => 
-    match Poly_Denote M (insB 0) with
+    match (insB 0) with
     | None => false
     | Some iB => (ins 0 < iB) && @FunBounds (AddModelV M (ins 0)) n (fun x => ins (x.+1)) out (fun x => insB (x.+1)) outB
     end  
@@ -146,7 +146,7 @@ Definition Fun_Bound_Check
   (f : (|[n]| -> 'F_(FSize M)) -> option ('F_(FSize M))) : Prop :=
 forall (ins : |[n]| -> 'F_(FSize M)) (out : 'F_(FSize M)),
   f ins == Some out -> 
-  FunBounds M ins out bs y == true.
+  FunBounds M ins out (fun x => Poly_Denote M (bs x)) (Poly_Denote M y) == true.
 
 Fixpoint QuantifiedFormula_Denote (M : Sigma11Model) (f : QuantifiedFormula) : Prop :=
   match f with
