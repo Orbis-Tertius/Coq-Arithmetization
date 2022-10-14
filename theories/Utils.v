@@ -563,3 +563,12 @@ Record RingData : Type :=
 
 Theorem emptyTupleUnique {A} : forall e, e = emptyTuple (A := A).
 Proof. move=> e; apply functional_extensionality_dep;move=> [i lti]; fcrush. Qed. 
+
+
+Theorem eq_rect_ap {A B} {P : A -> B -> Type} {i x1 x2 F} {e : x1 = x2} :
+  eq_rect _ (fun x => forall i, P x i) F _ e i = eq_rect _ (fun x => P x i) (F i) _ e.
+Proof. by destruct e. Qed.
+
+Theorem eq_rect_ap_el {A B} {P : B -> Type} {x1 x2 i F} {e : x1 = x2} :
+  eq_rect _ (fun x => P x -> A) F _ e i = F (eq_rect _ P i _ (esym e)).
+Proof. by destruct e. Qed.
