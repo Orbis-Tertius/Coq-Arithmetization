@@ -526,6 +526,43 @@ Ltac dep_if_case b :=
   pose t := b;assert (b = t);
   [trivial|destruct t;[rewrite dep_if_case_true|rewrite dep_if_case_false]].
 
+Theorem dep_option_match_some {A T} a
+  (p : option A)
+  (t : p = Some a) 
+  (S : forall a, p = Some a -> T) 
+  (N : p = None -> T) :
+  (match p as b return (p = b -> T) with
+   | Some a => S a
+   | None => N
+  end) (erefl _) = S a t.
+Proof.
+  destruct p.
+  injection t=>e; destruct e.
+  f_equal; apply proof_irrelevance.
+  fcrush.
+Qed.
+
+Theorem dep_option_match_none {A T}
+  (p : option A)
+  (t : p = None) 
+  (S : forall a, p = Some a -> T) 
+  (N : p = None -> T) :
+  (match p as b return (p = b -> T) with
+   | Some a => S a
+   | None => N
+  end) (erefl _) = N t.
+Proof.
+  destruct p.
+  fcrush.
+  f_equal; apply proof_irrelevance.
+Qed.
+
+Ltac dep_option_match b :=
+  let t := fresh "dep_option_match_DUMMY" in
+  let a := fresh "dep_option_some_DUMMY" in
+  pose t := b;assert (b = t);
+  [trivial|destruct t as [|a];[rewrite dep_option_match_none|rewrite (dep_option_match_some a)]];auto.
+
 Program Definition fSeqMost {A n} (f : |[n.+1]| -> A) (x : |[n]|) : A := f x.
 
 Program Definition fSeqRest {A n} (f : |[n.+1]| -> A) (x : |[n]|) : A := f (x.+1).
