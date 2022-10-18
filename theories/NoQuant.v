@@ -223,44 +223,6 @@ Fixpoint PolyTerm_PolyTermVS (p : PolyTerm) : PolyTermVS :=
   | PolyInd r1 r2 => PolyIndVS (PolyTerm_PolyTermVS r1) (PolyTerm_PolyTermVS r2)
   end.
 
-(* 
-Definition EmptyAdvice {A} {p} : NoQuantAdvice A p := fun _ _ => None.
-
-Definition PolyVSDenotation0
-  (M : Sigma11Model)
-  (p : PolyTermVS) : option ('F_FSize) :=
-  PolyVSDenotation p (@EmptyAdvice (fun _=> 0) _) (fun _ => 0%R).
-
-Definition PolyVSDenotation0Spec
-  (p : PolyTerm) (M : Sigma11Model) {A} (a : NoQuantAdvice A _) t :
-  PolyVSDenotation (PolyTerm_PolyTermVS p) a t =
-  PolyVSDenotation0 M (PolyTerm_PolyTermVS p).
-Proof.
-  unfold PolyVSDenotation0; induction p; auto; simpl.
-  dep_if_case (a0 == projT1 (F_S M i)); auto;[rewrite dep_if_case_true|rewrite dep_if_case_false];auto.
-  do 2 f_equal; auto; apply functional_extensionality=> u;[|apply H].
-  f_equal; apply functional_extensionality=> x.
-  f_equal; by apply subset_eq_compat.
-  all: f_equal; auto;
-       apply functional_extensionality=> x;
-       f_equal; auto.
-Qed.
-
-Theorem PolyTerm_PolyTermVS_Correct' M p :
-  Poly_Denote M p = PolyVSDenotation0 M (PolyTerm_PolyTermVS p).
-Proof.
-  induction p; auto.
-  - unfold PolyVSDenotation0; simpl.
-    dep_if_case (a == projT1 (F_S M i)); auto;[rewrite dep_if_case_true|rewrite dep_if_case_false];auto.
-    do 2 f_equal; auto; apply functional_extensionality=> u;[|apply H].
-    f_equal; apply functional_extensionality=> x. 
-    f_equal; by apply subset_eq_compat.
-  all: unfold PolyVSDenotation0; simpl;
-      f_equal;[|by rewrite IHp1];
-      apply functional_extensionality; intro;
-      f_equal; by rewrite IHp2.
-Qed. *)
-
 Theorem PolyTerm_PolyTermVS_Correct M p {A} (a : NoQuantAdvice A _) u :
   PolyVSDenotation FSize M (PolyTerm_PolyTermVS p) a u = Poly_Denote _ M p.
 Proof.
@@ -282,30 +244,6 @@ Fixpoint ZerothOrder_ZerothOrderVS (p : ZerothOrderFormula) : ZerothOrderFormula
   | ZOImp r1 r2 => ZOImpVS (ZerothOrder_ZerothOrderVS r1) (ZerothOrder_ZerothOrderVS r2)
   | ZOEq a b => ZOEqVS (PolyTerm_PolyTermVS a) (PolyTerm_PolyTermVS b)
   end.
-
-(* Definition NoQuantZODenotation0
-  (p : ZerothOrderFormulaVS)
-  (M : Sigma11Model) : Prop :=
-  NoQuantZODenotation p M EmptyAdvice (fun _ => 0%R).
-
-Definition NoQuantZODenotation0Spec
-  (p : ZerothOrderFormula) (M : Sigma11Model) a t :
-  NoQuantZODenotation (ZerothOrder_ZerothOrderVS p) M a t =
-  NoQuantZODenotation0 (ZerothOrder_ZerothOrderVS p) M.
-Proof.
-  unfold NoQuantZODenotation0; induction p; try qauto; simpl.
-  by do 2 rewrite PolyVSDenotation0Spec.
-Qed.
-
-Theorem ZerothOrder_ZerothOrderVS_Correct (p : ZerothOrderFormula) :
-  ZerothOrder_Denote p = NoQuantZODenotation0 (ZerothOrder_ZerothOrderVS p).
-Proof.
-  induction p; apply functional_extensionality; intro; try qauto.
-  unfold NoQuantZODenotation0; simpl.
-  do 2 rewrite PolyTerm_PolyTermVS_Correct.
-  unfold PolyVSDenotation0.
-  do 2 (destruct (PolyVSDenotation  _ _ _ _); auto).
-Qed. *)
 
 Theorem ZerothOrder_ZerothOrderVS_Correct M p {A} (a : NoQuantAdvice A _) t :
   NoQuantZODenotation FSize M (ZerothOrder_ZerothOrderVS p) a t = ZerothOrder_Denote _ M p.
@@ -354,21 +292,6 @@ Proof.
            , ZO_NoQuant_Correct_NoQuantUniversalCondition
            , ZO_NoQuant_Correct_NoQuantExiBoundCondition.
 Qed.
-
-(* Fixpoint FOUni (f : FirstOrderFormula) : nat :=
-  match f with
-  | ZO z => 0
-  | FOExists p f => FOUni f
-  | FOForall p f => (FOUni f).+1
-  end.
-
-Fixpoint FOExi (f : FirstOrderFormula) : nat :=
-  match f with
-  | ZO z => 0
-  | FOExists p f => (FOExi f).+1
-  | FOForall p f => FOExi f
-  end. *)
-
 
 Program Fixpoint LiftPolyExi
   (p : PolyTermVS) :  PolyTermVS :=
@@ -431,35 +354,6 @@ Fixpoint LiftPropUni
   | ZOImpVS f1 f2 => ZOImpVS (LiftPropUni f1) (LiftPropUni f2)
   | ZOEqVS r1 r2 => ZOEqVS (LiftPolyUni r1) (LiftPolyUni r2)
   end.
-
-(* Program Fixpoint PolyTermVSCast {nu}
-  (p : @PolyTermVS [::]):
-  PolyTermVS :=
-  match p with
-  | PolyFVarVS i => PolyFVarVS i
-  | PolyEVarVS i => emptyTuple i
-  | PolyUVarVS i => PolyUVarVS i
-  | PolyFFunVS i a t => PolyFFunVS i a (fun x => PolyTermVSCast (t x))
-  | PolyEFunVS i a t => PolyEFunVS i a (fun x => PolyTermVSCast (t x))
-  | PolyMinusOneVS => PolyMinusOneVS
-  | PolyPlusOneVS => PolyPlusOneVS
-  | PolyZeroVS => PolyZeroVS
-  | PolyPlusVS p1 p2 => PolyPlusVS (PolyTermVSCast p1) (PolyTermVSCast p2)
-  | PolyTimesVS p1 p2 => PolyTimesVS (PolyTermVSCast p1) (PolyTermVSCast p2)
-  | PolyIndVS p1 p2 => PolyIndVS (PolyTermVSCast p1) (PolyTermVSCast p2)
-  end. *)
-
-(* Theorem PolyTermVSCastCastId {nu}
-  (p : PolyTerm) (M : Sigma11Model) a t :
-  PolyVSDenotation (PolyTermVSCast (nu := nu) (PolyTerm_PolyTermVS p)) M a t =
-  PolyVSDenotation0 (PolyTerm_PolyTermVS p) M.
-Proof.
-  unfold PolyVSDenotation0; induction p; auto; simpl.
-  do 2 f_equal; by apply functional_extensionality.
-  all: f_equal; auto;
-       apply functional_extensionality=> x;
-       f_equal; auto.
-Qed. *)
 
 Definition NoQuantAddExi (bs : seq PolyTermVS) (y : PolyTermVS) (q : NoQuant) : NoQuant :=
   {| uniBounds := map LiftPolyExi (uniBounds q)
@@ -540,6 +434,29 @@ Proof.
   by do 2 rewrite Q_NoQuant_Correct_Lem_0.
 Qed.
 
+Theorem Q_NoQuant_Correct_Lem_2 (M: Sigma11Model FSize) 
+  {A} (adv: NoQuantAdvice A FSize)
+  ar u ins out insB outB a F :
+FunBoundsVS FSize (AddModelF FSize M (existT _ a F)) adv ins out insB outB u = 
+FunBoundsVS FSize M (AdviceExtend F adv) (a := ar) ins out (fun x => LiftPolyExi (insB x)) (LiftPolyExi outB) u.
+Proof.
+  move:M ins; induction ar=> M ins; simpl;[by rewrite <- Q_NoQuant_Correct_Lem_0|].
+  remember (FunBoundsVS_obligation_4 _ _ _ adv _ _ _ _ _ _) as DD0; clear HeqDD0; simpl in DD0;
+  remember (FunBoundsVS_obligation_5 _ _ _ adv _ _ _ _ _ _) as DD1; clear HeqDD1; simpl in DD1;
+  remember (FunBoundsVS_obligation_4 _ _ _ _ _ _ _ _ _ _) as DD2; clear HeqDD2; simpl in DD2;
+  remember (FunBoundsVS_obligation_5 _ _ _ _ _ _ _ _ _ _) as DD3; clear HeqDD3; simpl in DD3.
+  assert (PolyVSDenotation FSize
+    (AddModelF FSize M (existT _ a F))
+    (insB (exist (fun n : nat => n < ar.+1) 0 is_true_true)) adv u =
+    (PolyVSDenotation FSize M
+    (LiftPolyExi (insB (exist (fun n : nat => n < ar.+1) 0 is_true_true)))
+    (AdviceExtend F adv) u));[by rewrite Q_NoQuant_Correct_Lem_0|].
+  destruct (PolyVSDenotation _ _ _ _ _);destruct (PolyVSDenotation _ _ _ _ _);[|fcrush|fcrush|auto].
+  f_equal;[qauto|].
+  rewrite <- IHar.
+  f_equal; apply functional_extensionality=>x;f_equal;by apply subset_eq_compat.
+Qed.
+
 Theorem Q_NoQuant_Correct_Lem_3 (M: Sigma11Model FSize) 
   {A} (adv: NoQuantAdvice A FSize)
   (bs: seq PolyTerm) (y: PolyTerm) u ins out
@@ -549,40 +466,22 @@ Theorem Q_NoQuant_Correct_Lem_3 (M: Sigma11Model FSize)
       (eq_rect _ (fun x => |[x]| -> 'F_FSize) ins _ (map_length PolyTerm_PolyTermVS bs)) out 
       (lnth bs) y.
 Proof.
-  move:M ins; induction bs=> M ins;[simpl; by rewrite PolyTerm_PolyTermVS_Correct|].
-  simpl.
-  remember (FunBoundsVS_obligation_4 _ _ _ _ _ _ _ _ _ _) as DD0; clear HeqDD0; simpl in DD0.
-  remember (FunBoundsVS_obligation_5 _ _ _ _ _ _ _ _ _ _) as DD1; clear HeqDD1; simpl in DD1.
-  remember (Sigma_1_1.FunBounds_obligation_4 _ _ _ _ _ _ _) as DD2; clear HeqDD2; simpl in DD2.
+  move:M ins; induction bs=> M ins;[simpl; by rewrite PolyTerm_PolyTermVS_Correct|simpl].
+  remember (FunBoundsVS_obligation_4 _ _ _ _ _ _ _ _ _ _) as DD0; clear HeqDD0; simpl in DD0;
+  remember (FunBoundsVS_obligation_5 _ _ _ _ _ _ _ _ _ _) as DD1; clear HeqDD1; simpl in DD1;
+  remember (Sigma_1_1.FunBounds_obligation_4 _ _ _ _ _ _ _) as DD2; clear HeqDD2; simpl in DD2;
   remember (Sigma_1_1.FunBounds_obligation_5 _ _ _ _ _ _ _) as DD3; clear HeqDD3; simpl in DD3.
-  destruct (PolyVSDenotation _ _ _ _ _) eqn:PM;rewrite PolyTerm_PolyTermVS_Correct in PM;[
-     (destruct (Poly_Denote FSize M a);[|fcrush])
-    |(destruct (Poly_Denote FSize M a);[fcrush|auto])].
-  assert (o0 = o) as e;[qauto|destruct e].
-  f_equal; rewrite eq_rect_ap_el; do 4 f_equal;[
-    apply subset_eq; by rewrite projT1_eq_rect|].
-  replace (fun x : {n : nat | n < length [seq PolyTerm_PolyTermVS i | i <- bs]} =>
-   lnth [seq PolyTerm_PolyTermVS i | i <- bs]
-     (exist (fun n : nat => n < length [seq PolyTerm_PolyTermVS i | i <- bs])
-        (` x) (DD1 o0 (erefl (Some o0)) x))) with (lnth [seq PolyTerm_PolyTermVS i | i <- bs]).
-  rewrite IHbs.
-  f_equal.
+  destruct (PolyVSDenotation _ _ _ _ _) eqn:PM;rewrite PolyTerm_PolyTermVS_Correct in PM;
+    (destruct (Poly_Denote FSize M a));[assert (o0 = o) as e;[qauto|destruct e];clear PM|fcrush|fcrush|auto].
+  f_equal; rewrite eq_rect_ap_el; do 4 f_equal;[apply subset_eq; by rewrite projT1_eq_rect|].
+  replace (fun x => lnth [seq PolyTerm_PolyTermVS i | i <- bs] (exist _ (` x) (DD1 o0 (erefl _) x))) 
+    with (lnth [seq PolyTerm_PolyTermVS i | i <- bs]).
+  rewrite IHbs;f_equal.
   do 3 f_equal; apply subset_eq; by rewrite projT1_eq_rect.
-  apply functional_extensionality; move=> [x ltx]; do 2 rewrite eq_rect_ap_el; f_equal.
-  apply subset_eq; simpl; by do 2 rewrite projT1_eq_rect.
+  apply functional_extensionality; move=> [x ltx]; do 2 rewrite eq_rect_ap_el; f_equal;
+    apply subset_eq; simpl; by do 2 rewrite projT1_eq_rect.
   all: apply functional_extensionality; move=> [x ltx]; f_equal; by apply subset_eq_compat.
 Qed.
-
-(* Lemma fEqLem {A B P} {i j : B} {F : forall b : B, (P b -> A) -> Type}
-  {k : P i -> A} 
-  {l : P j -> A}
-  (e : i = j) :
-  (forall x, k x = l (eq_rect _ P x _ e)) ->
-  F i k = F j l.
-Proof. 
-  destruct e=> e; f_equal.
-  by apply functional_extensionality.
-Qed. *)
 
 Theorem Q_NoQuant_Correct M p :
   QuantifiedFormula_Denote FSize M p <-> NoQuantDenotation _ M (Q_NoQuant p).
@@ -739,6 +638,118 @@ Proof.
                   do 2 rewrite eq_rect_ap_el; simpl; f_equal;
                   apply subset_eq; simpl; by do 2 rewrite projT1_eq_rect.
             remember (H2 u (exist _ i lti2) (eq_rect _ (fun x => |[x]| -> _) ins _ E2) out YY) as H2'; clear YY chk HeqH2' H2; simpl in H2'.
+            rewrite Q_NoQuant_Correct_Lem_2 in H2'.
+            remember (FunBoundsVS _ _ _ _ _ _ _ _) as FB1.
+            replace (FunBoundsVS _ _ _ _ _ _ _ _) with FB1; auto.
+            rewrite HeqFB1; clear HeqFB1 FB1 H2'.
+            remember (AdviceExtend F adv) as ADV1.
+            remember (eq_rect _ (NoQuantAdvice^~ FSize) ADV1 _ E1) as ADV2.
+            remember (eq_rect _ (fun x : nat => |[x]| -> 'F_FSize) ins _ E2) as ins1.
+            remember (fun x => LiftPolyExi (lnth _ _)) as insB1.
+            remember (fun x => lnth _ _) as insB2.
+            remember (LiftPolyExi _) as outB1.
+            remember (lnth _ (exist (fun n : nat => n < length
+                      [seq x.2 | x <- [seq ([seq LiftPolyExi i | i <- x.1], LiftPolyExi x.2)
+                      | x <- exiBounds (Q_NoQuant q)]]) i _)) as outB2.
+            transitivity (FunBoundsVS FSize M ADV2 ins1 out insB1 outB1 u);[
+              rewrite HeqADV2 HeqADV1; by destruct E1|clear HeqADV1 ADV1 HeqADV2].
+            replace outB1 with outB2;[clear HeqoutB1 outB1 HeqoutB2 |
+              rewrite HeqoutB1 HeqoutB2; do 3 rewrite lnth_map; simpl; do 3 f_equal; by apply subset_eq_compat].
+            transitivity (FunBoundsVS FSize M ADV2 (eq_rect _ (fun x => |[x]| -> _) ins _ E2) out 
+                                                   (eq_rect _ (fun x => |[x]| -> _) insB2 _ E2) outB2 u).
+                f_equal.
+                by rewrite Heqins1.
+                rewrite HeqinsB1; clear HeqinsB1 insB1.
+                apply functional_extensionality;move=>[x ltx]; simpl.
+                rewrite eq_rect_ap_el.
+                rewrite HeqinsB2; clear HeqinsB2.
+                rewrite (lnth_nth PolyZeroVS); simpl.
+                rewrite (lnth_nth ([::], PolyZeroVS).1).
+                rewrite nth_map; simpl.
+                rewrite (lnth_nth PolyZeroVS); simpl.
+                rewrite projT1_eq_rect; simpl.
+                do 2 rewrite lnth_map; simpl.
+                change (PolyZeroVS) with (LiftPolyExi PolyZeroVS).
+                rewrite nth_map; simpl. 
+                do 2 f_equal.
+                by rewrite (lnth_nth ([::], PolyZeroVS)).
+            rewrite HeqinsB2; clear HeqinsB2 HeqinsB1 insB1 Heqins1 ins1.
+            by destruct E2.
+    + 
+
+            rewrite projT1_eq_rect; simpl.
+            rewrite nth_map; simpl.
+            remember (NoQuantExiBoundCondition_obligation_4 _ _ _ _ _) as DDD0; clear HeqDDD0; simpl in DDD0.
+            remember (NoQuantExiBoundCondition_obligation_3 _ _ _ _ _) as DDD1; clear HeqDDD1; simpl in DDD1.
+            remember (NoQuantExiBoundCondition_obligation_4 _ _ _ _ _) as DDD3; clear HeqDDD3; simpl in DDD3.
+            remember (NoQuantExiBoundCondition_obligation_3 _ _ _ _ _) as DDD2; clear HeqDDD2; simpl in DDD2.
+            rewrite (lnth_nth PolyZeroVS); simpl.
+            rewrite (lnth_nth ([::], PolyZeroVS).1).
+            rewrite nth_map; simpl.
+            rewrite (lnth_nth PolyZeroVS); simpl.
+            rewrite (lnth_nth ([::], PolyZeroVS).1).
+            rewrite nth_map; simpl.
+            rewrite projT1_eq_rect; simpl.
+
+LiftPolyExi
+  (nth PolyZeroVS
+     (nth ([::], PolyZeroVS).1 [seq x0.1 | x0 <- exiBounds (Q_NoQuant q)]
+        (` (exist (fun n : nat => n < length [seq x0.1 | x0 <- exiBounds (Q_NoQuant q)]) i DDD1))) x)
+LiftPolyExi
+  (nth PolyZeroVS
+     (nth ([::], PolyZeroVS) (exiBounds (Q_NoQuant q)) (` (exist (fun n : nat => n < length [seq x0.1 | x0 <- exiBounds (Q_NoQuant q)]) i DDD1))).1 x)
+
+            rewrite nth_map.
+Check exiBounds.
+            rewrite (lnth_nth ((PolyZeroVS, [::]).1)).
+            do 2 rewrite (lnth_nth PolyMinusOneVS); simpl.
+            rewrite lnth_map.
+            f_equal.
+            destruct E2.
+            2:{ f_equal. destruct E2.
+            destruct E2.
+                rewrite lnth_map; simpl.
+                rewrite lnth_map; simpl.
+            Set Printing Implicit.
+
+
+  (lnth
+     [seq x.2
+        | x <- [seq ([seq LiftPolyExi i | i <- x.1], LiftPolyExi x.2)
+                  | x <- exiBounds (Q_NoQuant q)]]
+     (exist
+        (fun n : nat =>
+         n <
+         length
+           [seq x.2
+              | x <- [seq ([seq LiftPolyExi i | i <- x.1], LiftPolyExi x.2)
+                        | x <- exiBounds (Q_NoQuant q)]]) i
+        (NoQuantExiBoundCondition_obligation_5 FSize
+           (NoQuantAddExi [seq PolyTerm_PolyTermVS i | i <- bs]
+              (PolyTerm_PolyTermVS y) (Q_NoQuant q))
+           (exist
+              (fun n : nat =>
+               n <
+               (length
+                  [seq ([seq LiftPolyExi i | i <- x.1], LiftPolyExi x.2)
+                     | x <- exiBounds (Q_NoQuant q)]).+1) i.+1 lt
+            simpl in ADV2.
+            replace (AdviceExtend F adv) with ADV2.
+
+            replace ADV1 with ADV2.
+            destruct E1.
+            f_equal.
+            replace (eq_rect
+     (ExtendAt0 (length bs)
+        [eta nth 0 [seq length x.1 | x <- exiBounds (Q_NoQuant q)]])
+     (NoQuantAdvice^~ FSize) (AdviceExtend F adv)
+     [eta nth 0
+            (length [seq PolyTerm_PolyTermVS i0 | i0 <- bs]
+             :: [seq length x.1
+                   | x <- [seq ([seq LiftPolyExi i | i <- x.1],
+                               LiftPolyExi x.2)
+                             | x <- exiBounds (Q_NoQuant q)]])] E1) with  (AdviceExtend F adv).
+
 
 Lemma Q_NoQuant_Correct_Lem_2 {M u p a f A adv} :
   NoQuantZODenotation FSize M (LiftPropExi p) (AdviceExtend f adv) u
