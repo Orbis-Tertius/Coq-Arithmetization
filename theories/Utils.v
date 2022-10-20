@@ -571,16 +571,17 @@ Program Fixpoint option_fun {A} {l : nat} (t : |[l]| -> option A) : option (|[l]
   match l with
   | 0 => Some emptyTuple
   | m.+1 =>
-    let most : |[m]| -> option A := fun x => t x in
+    let most : |[m]| -> option A := fun x => t (x.+1) in
     let r : option (|[m]| -> A) := option_fun most in
-    let last : option A := t m in
-    obind (fun last => obind (fun r => Some (
+    let fst : option A := t 0 in
+    obind (fun fst => obind (fun r => Some (
       fun x : {n : nat | n < m.+1} => 
-      (if x < m as b return x < m = b -> A 
-       then (fun _ => r (x : |[m]|) )
-       else (fun _ => last)) (erefl _)
-    )) r) last
+      (if x == 0 as b return x == 0 = b -> A 
+       then fun _ => fst
+       else fun _ => r (x.-1 : |[m]|)) (erefl _)
+    )) r) fst
   end.
+Next Obligation. by destruct x. Qed.
 
 Record RingData : Type :=
   mkRingData {
