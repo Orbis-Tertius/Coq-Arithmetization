@@ -563,9 +563,13 @@ Ltac dep_option_match b :=
   pose t := b;assert (b = t);
   [trivial|destruct t as [|a];[rewrite dep_option_match_none|rewrite (dep_option_match_some a)]];auto.
 
-Program Definition fSeqMost {A n} (f : |[n.+1]| -> A) (x : |[n]|) : A := f x.
+Program Definition fSeqMost {n A} (f : |[n.+1]| -> A) (x : |[n]|) : A := f x.
+Program Definition fSeqMostDep {n A} (f : forall i : |[n.+1]|, A (` i)) (i : |[n]|) : A (` i) := f i.
 
-Program Definition fSeqRest {A n} (f : |[n.+1]| -> A) (x : |[n]|) : A := f (x.+1).
+Program Definition fSeqRest {n A} (f : |[n.+1]| -> A) (x : |[n]|) : A := f (x.+1).
+Program Definition fSeqRestDep {n A} (f : forall i : |[n.+1]|, A (` i)) (i : |[n]|) : A (i.+1) := f (i.+1).
+
+Program Definition FSuc {n} (i : |[n]|) : |[n.+1]| := i.+1.
 
 Program Fixpoint option_fun {A} {l : nat} (t : |[l]| -> option A) : option (|[l]| -> A) := 
   match l with
