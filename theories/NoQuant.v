@@ -851,7 +851,7 @@ Proof.
                 (AddModelV FSize M (u (exist _ 0 (ltn0Sn _))))
                 (adv (exist (fun r : 'F_FSize => r < o) _ ltuo))
                 (u' j) (lnth (uniBounds (Q_Prenex q)) j) 
-                (MakeU u' v)).
+                (MakeU u' v)) as ltu'.
             move=> [j ltj] v.
             assert (j.+1 < (length [seq LiftPolyUni i | i <- uniBounds (Q_Prenex q)]).+1) as ltj2;[by rewrite map_length|].
             remember (ltu (exist _ (j.+1) ltj2) v) as ltu'; clear Heqltu' ltu; simpl in *.
@@ -862,22 +862,35 @@ Proof.
             rewrite Q_Prenex_Correct_Lem_4.
             replace (ExtendAt0 _ _) with (MakeU u v).
             destruct (PolyVSDenotation _ _ _ _ _); auto.
-            remember (exist _ (u _) ltuo) as u0.
-            replace (u _) with (` u0).
-            remember (MakeU u' v) as v'.
-            replace (MakeU u v) with (ExtendAt0 (` u0) v') in ltu'.
+            rewrite Hequ'; clear Hequ' u'.
+            destruct (map_length LiftPolyUni (uniBounds (Q_Prenex q))); simpl.
+            unfold fSeqRest; simpl.
+            by replace ltj with ltj2;[|apply eq_irrelevance].
+            rewrite Hequ'; clear Hequ' u'.
+            destruct (map_length LiftPolyUni (uniBounds (Q_Prenex q))); simpl.
+            apply functional_extensionality=>x.
+            unfold ExtendAt0; destruct x; auto; simpl.
+            unfold MakeU; simpl.
+            f_equal; by apply subset_eq_compat.
+        remember (H0 (exist _ u' ltu')) as H0'; clear HeqH0' H0; simpl in H0'.
+        rewrite Q_Prenex_Correct_Lem_5 in H0'.
+        replace (ExtendAt0 _ _) with (MakeU u (fun=> 0%R)) in H0'; auto.
+        rewrite Hequ'; clear H0' Hequ' ltu' u'.
+        destruct (map_length LiftPolyUni (uniBounds (Q_Prenex q))); simpl.
+        apply functional_extensionality;move=>[|i]; cbn; auto.
+        f_equal; by apply subset_eq_compat.
+      + move=> u [[|i] lti] chk; simpl in *.
+        unfold InBound; rewrite PolyTerm_PolyTermVS_Correct PM.
+        clear chk.
+        
 
-
-
-            remember (lnth (uniBounds (Q_Prenex q)) _) as B.
-            Set Printing Implicit.
-
-
-
-
-
-            rewrite Q_Prenex_Correct_Lem_0.
-        rewrite <- Q_Prenex_Correct_Lem_1 in H0.
+        assert (u 0 < o) as ltuo.
+            remember (ltu (exist _ 0 (ltn0Sn _)) (fun _ => 0%R)) as ltu'; clear Heqltu'.
+            unfold InBound in ltu'.
+            simpl in ltu'.
+            rewrite PolyTerm_PolyTermVS_Correct in ltu'.
+            by rewrite PM in ltu'.
+        destruct (H (exist _ (u (exist _ 0 (ltn0Sn _))) ltuo)) as [H0 _]; simpl in *.
         rewrite 
         unfold PrenexZODenotation in *.
 
