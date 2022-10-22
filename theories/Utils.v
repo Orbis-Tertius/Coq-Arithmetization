@@ -542,6 +542,36 @@ Proof.
   fcrush.
 Qed.
 
+Theorem dep_match_zero {T}
+  (p : nat)
+  (t : 0 = p) 
+  (S : forall a, a.+1 = p -> T) 
+  (N : 0 = p -> T) :
+  (match p as b return (b = p -> T) with
+   | 0 => N
+   | a.+1 => S a
+  end) (erefl _) = N t.
+Proof.
+  destruct p. f_equal; apply eq_irrelevance.
+  fcrush.
+Qed.
+
+Theorem dep_match_suc {T} a
+  (p : nat)
+  (t : a.+1 = p) 
+  (S : forall a, a.+1 = p -> T) 
+  (N : 0 = p -> T) :
+  (match p as b return (b = p -> T) with
+   | 0 => N
+   | a.+1 => S a
+  end) (erefl _) = S a t.
+Proof.
+  destruct p. 
+  fcrush.
+  injection t=> t'; destruct t'.
+  f_equal;apply eq_irrelevance.
+Qed.
+
 Theorem dep_option_match_none {A T}
   (p : option A)
   (t : None = p) 
@@ -568,6 +598,9 @@ Program Definition fSeqMostDep {n A} (f : forall i : |[n.+1]|, A (` i)) (i : |[n
 
 Program Definition fSeqRest {n A} (f : |[n.+1]| -> A) (x : |[n]|) : A := f (x.+1).
 Program Definition fSeqRestDep {n A} (f : forall i : |[n.+1]|, A (` i)) (i : |[n]|) : A (i.+1) := f (i.+1).
+
+Program Definition fSeqBack {n m A} (f : |[n + m]| -> A) (x : |[m]|) : A := f (x + n).
+Next Obligation. by rewrite addnC ltn_add2l. Qed.
 
 Program Definition FSuc {n} (i : |[n]|) : |[n.+1]| := i.+1.
 
@@ -629,6 +662,12 @@ Proof.
 Qed.
 
 Theorem subOut_addIn_LR : forall n0 n, n < n0 -> (n0 - n.+1) = (n0 - n).-1.
+Proof.
+  destruct n0;[by cbn|simpl].
+  induction n0; destruct n; simpl; try by cbn; try qauto use:zero_sub.
+Qed.
+
+Theorem subIn_addIn : forall n0 n, n < n0 -> (n0 - n.+1) = (n0.-1 - n).
 Proof.
   destruct n0;[by cbn|simpl].
   induction n0; destruct n; simpl; try by cbn; try qauto use:zero_sub.
