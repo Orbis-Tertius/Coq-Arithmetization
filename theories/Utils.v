@@ -528,10 +528,10 @@ Ltac dep_if_case b :=
 
 Theorem dep_option_match_some {A T} a
   (p : option A)
-  (t : p = Some a) 
-  (S : forall a, p = Some a -> T) 
-  (N : p = None -> T) :
-  (match p as b return (p = b -> T) with
+  (t : Some a = p) 
+  (S : forall a, Some a = p -> T) 
+  (N : None = p -> T) :
+  (match p as b return (b = p -> T) with
    | Some a => S a
    | None => N
   end) (erefl _) = S a t.
@@ -544,10 +544,10 @@ Qed.
 
 Theorem dep_option_match_none {A T}
   (p : option A)
-  (t : p = None) 
-  (S : forall a, p = Some a -> T) 
-  (N : p = None -> T) :
-  (match p as b return (p = b -> T) with
+  (t : None = p) 
+  (S : forall a, Some a = p -> T) 
+  (N : None = p -> T) :
+  (match p as b return (b = p -> T) with
    | Some a => S a
    | None => N
   end) (erefl _) = N t.
@@ -614,3 +614,22 @@ Proof. by destruct e. Qed.
 Theorem eq_rect_ap_el {A B} {P : B -> Type} {x1 x2 i F} {e : x1 = x2} :
   eq_rect _ (fun x => P x -> A) F _ e i = F (eq_rect _ P i _ (esym e)).
 Proof. by destruct e. Qed.
+
+
+Theorem zero_sub : forall n, n - 0 = n.
+Proof. induction n; qauto. Qed.
+
+Theorem n_sub_n : forall n, n - n = 0.
+Proof. induction n; qauto. Qed.
+
+Theorem subIn_addOut : forall n n0, n0 < n -> (n - n0) = (n.-1 - n0).+1.
+Proof.
+  destruct n;[by cbn|simpl].
+  induction n; destruct n0; simpl; try by cbn; try qauto use:zero_sub.
+Qed.
+
+Theorem subOut_addIn_LR : forall n0 n, n < n0 -> (n0 - n.+1) = (n0 - n).-1.
+Proof.
+  destruct n0;[by cbn|simpl].
+  induction n0; destruct n; simpl; try by cbn; try qauto use:zero_sub.
+Qed.

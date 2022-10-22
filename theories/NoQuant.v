@@ -138,12 +138,12 @@ Program Definition PrenexFormulaCondition {E} (M : @Sigma11Model FSize)
   forall (u : U M f adv), 
   PrenexZODenotation M (formula f) adv (MakeU u (fun _ => 0%R)) == Some true.
 
-Program Definition PrenexUniversalCondition {E} (M : @Sigma11Model FSize)
+(* Program Definition PrenexUniversalCondition {E} (M : @Sigma11Model FSize)
   (f : Prenex) (adv : PrenexAdvice E) : Prop :=
   forall (u : nat -> 'F_FSize) (i : |[length (uniBounds f)]|),
     (forall j : |[i]|, InBound M adv (u j) (lnth (uniBounds f) j) u) ->
     InBound M adv (u i) (lnth (uniBounds f) i) u.
-Next Obligation. strivial use: ltn_trans. Qed.
+Next Obligation. strivial use: ltn_trans. Qed. *)
 
 Program Fixpoint FunBoundsVS {E} (M : @Sigma11Model FSize)
   (adv : PrenexAdvice E) {a}
@@ -160,7 +160,7 @@ Program Fixpoint FunBoundsVS {E} (M : @Sigma11Model FSize)
     match PolyVSDenotation M (insB 0) adv u with
     | None => false
     | Some iB => (ins 0 < iB) && 
-        @FunBoundsVS E (AddModelV _ M (ins 0)) adv n (fun x => ins (x.+1)) out (fun x => insB (x.+1)) outB u
+        @FunBoundsVS E M adv n (fun x => ins (x.+1)) out (fun x => insB (x.+1)) outB u
     end
   end.
 
@@ -171,13 +171,13 @@ Definition PrenexExiBoundCondition {E} (M : @Sigma11Model FSize)
   adv i ins == Some out -> 
   FunBoundsVS M adv ins out 
     (fun x => (exiBounds f i).1 x)
-    (exiBounds f i).2 u == true.
+    (exiBounds f i).2 (MakeU ins u) == true.
 
 Definition PrenexDenotation {E} (M : @Sigma11Model FSize)
   (f : Prenex) : Prop :=
   exists (a : PrenexAdvice E),
     PrenexFormulaCondition M f a /\
-    PrenexUniversalCondition M f a /\
+    (* PrenexUniversalCondition M f a /\ *)
     PrenexExiBoundCondition M f a.
 
 End PrenexDef.
@@ -186,22 +186,62 @@ Section PrenexTranslation.
 
 Variable (FSize : nat).
 
-Fixpoint PolyTerm_PolyTermVS {E} (p : PolyTerm) : @PolyTermVS E :=
+Fixpoint PolyTerm_PolyTermVS {E} (n : nat) (p : PolyTerm) : @PolyTermVS E :=
   match p with
-  | PolyVar m => PolyFVarVS m
-  | PolyFun i a t => PolyFFunVS i a (fun x => PolyTerm_PolyTermVS (t x))
+  | PolyVar m => 
+    if m < n
+    then PolyUVarVS (n.-1 - m)
+    else PolyFVarVS (m - n)
+  | PolyFun i a t => PolyFFunVS i a (fun x => PolyTerm_PolyTermVS n (t x))
   | PolyMinusOne => PolyMinusOneVS
   | PolyPlusOne => PolyPlusOneVS
   | PolyZero => PolyZeroVS
-  | PolyPlus r1 r2 => PolyPlusVS (PolyTerm_PolyTermVS r1) (PolyTerm_PolyTermVS r2)
-  | PolyTimes r1 r2 => PolyTimesVS (PolyTerm_PolyTermVS r1) (PolyTerm_PolyTermVS r2)
-  | PolyInd r1 r2 => PolyIndVS (PolyTerm_PolyTermVS r1) (PolyTerm_PolyTermVS r2)
+  | PolyPlus r1 r2 => PolyPlusVS (PolyTerm_PolyTermVS n r1) (PolyTerm_PolyTermVS n r2)
+  | PolyTimes r1 r2 => PolyTimesVS (PolyTerm_PolyTermVS n r1) (PolyTerm_PolyTermVS n r2)
+  | PolyInd r1 r2 => PolyIndVS (PolyTerm_PolyTermVS n r1) (PolyTerm_PolyTermVS n r2)
   end.
 
 Theorem PolyTerm_PolyTermVS_Correct M p {A} (a : PrenexAdvice _ A) u :
-  PolyVSDenotation FSize M (PolyTerm_PolyTermVS p) a u = Poly_Denote _ M p.
+  PolyVSDenotation FSize M (PolyTerm_PolyTermVS 0 p) a u = Poly_Denote _ M p.
 Proof.
   induction p; auto; simpl.
+  induction n; qauto.
+  - dep_if_case (a0 == projT1 (F_S _ M i)); auto;[rewrite dep_if_case_true|rewrite dep_if_case_false];auto.
+    do 2 f_equal; auto; apply functional_extensionality=> t;[|apply H].
+    f_equal; apply functional_extensionality=> x. 
+    f_equal; by apply subset_eq_compat.
+  all: f_equal;[|by rewrite IHp1];
+      apply functional_extensionality; intro;
+      f_equal; by rewrite IHp2.
+Qed.
+
+Theorem PolyTerm_PolyTermVS_Correct_N M p n {A} (a : PrenexAdvice _ A) u :
+  PolyVSDenotation FSize M (PolyTerm_PolyTermVS n.+1 p) a u = 
+  PolyVSDenotation FSize (AddModelV _ M (u 0)) (PolyTerm_PolyTermVS n p) a (fun x => u x.+1).
+Proof.
+  induction p; auto; simpl.
+  simpl.
+  destruct (n0 < n) eqn:E1; simpl.
+  replace (n0 < n.+1) with true; simpl.
+  by rewrite <- subIn_addOut.
+  symmetry.
+  assert (n0 < n);[|apply ltnSE, ltnW in H];qauto lq: on.
+  change (n0 < n.+1) with (n0 <= n).
+  assert (n <= n0);[move: n0 E1; induction n; destruct n0; try (cbn; qauto)|clear E1].
+  destruct (n0 == n) eqn:E2; simpl.
+  apply EEConvert in E2.
+  destruct E2.
+  replace (n0 <= n0) with true.
+  unfold ExtendAt0.
+  replace (n0 - n0 == 0) with true.
+  by rewrite n_sub_n.
+  assert (n < n0);[move: n0 E2 H; induction n; destruct n0; try (cbn; qauto)|clear E2 H].
+  assert (n0 <= n = false);[move: n H0; induction n0; destruct n; try (cbn in *; qauto)|].
+  rewrite H.
+  unfold ExtendAt0.
+  change (n0 - n == 0) with (n0 <= n).
+  rewrite H; simpl.
+  by rewrite subOut_addIn_LR.
   - dep_if_case (a0 == projT1 (F_S _ M i)); auto;[rewrite dep_if_case_true|rewrite dep_if_case_false];auto.
     do 2 f_equal; auto; apply functional_extensionality=> t;[|apply H].
     f_equal; apply functional_extensionality=> x. 
@@ -217,7 +257,7 @@ Fixpoint ZerothOrder_ZerothOrderVS {E} (p : ZerothOrderFormula) : @ZerothOrderFo
   | ZOAnd r1 r2 => ZOAndVS (ZerothOrder_ZerothOrderVS r1) (ZerothOrder_ZerothOrderVS r2)
   | ZOOr r1 r2 => ZOOrVS (ZerothOrder_ZerothOrderVS r1) (ZerothOrder_ZerothOrderVS r2)
   | ZOImp r1 r2 => ZOImpVS (ZerothOrder_ZerothOrderVS r1) (ZerothOrder_ZerothOrderVS r2)
-  | ZOEq a b => ZOEqVS (PolyTerm_PolyTermVS a) (PolyTerm_PolyTermVS b)
+  | ZOEq a b => ZOEqVS (PolyTerm_PolyTermVS 0 a) (PolyTerm_PolyTermVS 0 b)
   end.
 
 Theorem ZerothOrder_ZerothOrderVS_Correct M p {A} (a : PrenexAdvice _ A) t :
@@ -252,9 +292,9 @@ Proof.
     by rewrite ZerothOrder_ZerothOrderVS_Correct in H'.
 Qed.
 
-Lemma ZO_Prenex_Correct_PrenexUniversalCondition
+(* Lemma ZO_Prenex_Correct_PrenexUniversalCondition
   M f : forall a, PrenexUniversalCondition FSize M (ZO_Prenex f) a.
-Proof. move=> a u [i lti]; fcrush. Qed.
+Proof. move=> a u [i lti]; fcrush. Qed. *)
 
 Lemma ZO_Prenex_Correct_PrenexExiBoundCondition
   M f : forall a, PrenexExiBoundCondition FSize M (ZO_Prenex f) a.
@@ -264,7 +304,7 @@ Theorem ZO_Prenex_Correct M p :
   ZerothOrder_Denote FSize M p == Some true <-> PrenexDenotation _ M (ZO_Prenex p).
 Proof.
   qauto use: ZO_Prenex_Correct_PrenexFormulaCondition
-           , ZO_Prenex_Correct_PrenexUniversalCondition
+           (* , ZO_Prenex_Correct_PrenexUniversalCondition *)
            , ZO_Prenex_Correct_PrenexExiBoundCondition.
 Qed.
 
@@ -345,12 +385,21 @@ Fixpoint LiftPropUni {E}
   | ZOEqVS r1 r2 => ZOEqVS (LiftPolyUni r1) (LiftPolyUni r2)
   end.
 
+Fixpoint LiftExiArgs {E} n (bs : seq PolyTerm) : seq (@PolyTermVS E) :=
+  match bs with
+  | [::] => [::]
+  | x :: xs => PolyTerm_PolyTermVS n x :: LiftExiArgs n.+1 xs
+  end.
+
+Theorem LiftExiArgs_length {E n bs} : length (@LiftExiArgs E n bs) = length bs.
+Proof. move:n; induction bs; qauto. Qed.
+
 Program Definition PrenexAddExi {E} 
   (bs : seq PolyTerm) (y : PolyTerm) (q : @Prenex E) : @Prenex (length bs :: E) :=
   {| uniBounds := map LiftPolyExi (uniBounds q)
    ; exiBounds := fun i => (
       if i == 0 as B return i == 0 = B -> (|[lnth (length bs :: E) i]| -> @PolyTermVS (length bs :: E)) * @PolyTermVS (length bs :: E)
-      then fun _ => (lnth (map PolyTerm_PolyTermVS bs), PolyTerm_PolyTermVS y)
+      then fun _ => (lnth (LiftExiArgs 0 bs), PolyTerm_PolyTermVS (length bs) y)
       else fun _ => (fun x => LiftPolyExi ((exiBounds q (i.-1)).1 x), LiftPolyExi (exiBounds q (i.-1)).2)
    ) (erefl _)
    ; formula := LiftPropExi (formula q)
@@ -362,10 +411,10 @@ Next Obligation.
   remember (PrenexAddExi_obligation_3 _ _ _ _ _) as DDD0; clear HeqDDD0; simpl in DDD0.
   by replace DDD0 with H0;[|apply eq_irrelevance].
 Qed.
-Next Obligation. rewrite map_length. by destruct i;[|fcrush]. Qed.
+Next Obligation. rewrite LiftExiArgs_length. by destruct i;[|fcrush]. Qed.
 
 Program Definition PrenexAddUni {E} (b : PolyTerm) (q : @Prenex E) : @Prenex (map (fun x => x.+1) E) :=
-  let b' := PolyTerm_PolyTermVS b in
+  let b' := PolyTerm_PolyTermVS 0 b in
   {| uniBounds := b' :: map LiftPolyUni (uniBounds q)
    ; exiBounds := fun i => (fun x => (ExtendAt0N b' (fun y => LiftPolyUni (x.1 y)), LiftPolyUni x.2)) (exiBounds q i)
    ; formula := LiftPropUni (formula q)
@@ -616,15 +665,106 @@ Proof.
   f_equal;apply Q_Prenex_Correct_Lem_4.
 Qed.
 
-(* Theorem Q_Prenex_Correct_Lem_6
-  {M E v o} {u0 : 'F_FSize} {ltu : u0 < o}
+Theorem Q_Prenex_Correct_Lem_6
+  {M E o p u ar b} {u0 : 'F_FSize} {ltu : u0 < o}
   {adv : {r : 'F_FSize | r < o} -> PrenexAdvice _ E}
   ins out insB outB :
-FunBoundsVS FSize (AddModelV FSize M u0) (adv (exist _ u0 ltu)) ins out insB outB u = 
-FunBoundsVS FSize M (AdviceExtend (projT2 F) adv) (a := ar) ins out (fun x => LiftPolyExi (insB x)) (LiftPolyExi outB) u.
+PolyVSDenotation FSize M p (Uni_AdviceF adv) u = Some b ->
+u0 < b ->
+FunBoundsVS FSize (AddModelV FSize M u0) (adv (exist _ u0 ltu)) (a := ar) ins out insB outB u = 
+FunBoundsVS FSize M (Uni_AdviceF adv) (ExtendAt0N u0 ins) out 
+            (ExtendAt0N p (fun x => LiftPolyUni (insB x))) (LiftPolyUni outB) u.
 Proof.
+  simpl=> e bn.
+  rewrite (dep_option_match_some b); auto.
+  replace (ExtendAt0N u0 ins (exist (fun n : nat => n < ar.+1) 0 is_true_true) < b) with true; auto; simpl.
+  unfold ExtendAt0N; simpl.
+  clear e.
+  move:M ins; induction ar=> M ins; simpl=> hyp.
+  rewrite Q_Prenex_Correct_Lem_4.
 
-Qed. *)
+PolyVSDenotation FSize (AddModelV FSize M u0) B adv u = 
+PolyVSDenotation FSize M B adv (ExtendAt0 u0 u)
+
+PolyVSDenotation FSize M (LiftPolyUni outB) (Uni_AdviceF adv) (ExtendAt0 u0 u)
+PolyVSDenotation FSize (AddModelV FSize M u0) (LiftPolyUni outB) (Uni_AdviceF adv) u
+
+PolyVSDenotation FSize (AddModelV FSize M u0) B (Uni_AdviceF adv) u
+PolyVSDenotation FSize M B adv (ExtendAt0 u0 u)
+
+  rewrite Q_Prenex_Correct_Lem_4.
+
+  PolyVSDenotation FSize (AddModelV FSize M u0) B (adv (exist _ u0 ltu)) v
+  = PolyVSDenotation FSize M (LiftPolyUni B) (Uni_AdviceF adv) (ExtendAt0 u0 v).
+
+  r
+  remember (Utils.ExtendAt0N_obligation_2 _ _ _) as DDD.
+  destruct (PolyVSDenotation FSize M p (Uni_AdviceF adv) u);[simpl|fcrush].
+  rewrite e.
+  destruct e.
+  intro e.
+  rewrite Q_Prenex_Correct_Lem_4.
+  
+  unfold ExtendAt0N; simpl.
+  remember (FunBoundsVS_obligation_4 _ _ _ adv _ _ _ _ _ _) as DD0; clear HeqDD0; simpl in DD0;
+  remember (FunBoundsVS_obligation_5 _ _ _ adv _ _ _ _ _ _) as DD1; clear HeqDD1; simpl in DD1;
+  remember (FunBoundsVS_obligation_4 _ _ _ _ _ _ _ _ _ _) as DD2; clear HeqDD2; simpl in DD2;
+  remember (FunBoundsVS_obligation_5 _ _ _ _ _ _ _ _ _ _) as DD3; clear HeqDD3; simpl in DD3.
+  assert (PolyVSDenotation FSize
+    (AddModelF FSize M F)
+    (insB (exist (fun n : nat => n < ar.+1) 0 is_true_true)) adv u =
+    (PolyVSDenotation FSize M
+    (LiftPolyExi (insB (exist (fun n : nat => n < ar.+1) 0 is_true_true)))
+    (AdviceExtend (projT2 F) adv) u));[by rewrite Q_Prenex_Correct_Lem_0|].
+  destruct (PolyVSDenotation _ _ _ _ _);destruct (PolyVSDenotation _ _ _ _ _);[|fcrush|fcrush|auto].
+  f_equal;[qauto|].
+  rewrite <- IHar.
+  f_equal; apply functional_extensionality=>x;f_equal;by apply subset_eq_compat.
+
+
+FunBoundsVS FSize (AddModelV FSize M X)
+        (adv (exist (fun r : 'F_FSize => r < o) X o0))
+        (fSeqRest
+           (eq_rect
+              (lnth [seq x.+1 | x <- Q_Ar q]
+                 (exist (fun n : nat => n < length [seq x.+1 | x <- Q_Ar q])
+                    i lti)) (fun x : nat => {n : nat | n < x} -> 'F_FSize)
+              ins
+              (lnth (Q_Ar q)
+                 (exist (fun n : nat => n < length (Q_Ar q)) i lti2)).+1 EE))
+        out [eta insB] outB u == is_true_true
+
+FunBoundsVS FSize M (Uni_AdviceF adv) ins out
+  (fun
+     x : {n : nat
+         | n <
+           lnth [seq x.+1 | x <- Q_Ar q]
+             (exist (fun n0 : nat => n0 < length [seq x.+1 | x <- Q_Ar q]) i
+                lti)} =>
+   ExtendAt0N (PolyTerm_PolyTermVS p)
+     (fun
+        y : {n0 : nat
+            | n0 <
+              lnth (Q_Ar q)
+                (exist (fun n : nat => n < length (Q_Ar q)) i
+                   (PrenexAddUni_obligation_1 (Q_Ar q)
+                      (exist
+                         (fun n : nat =>
+                          n < length [seq x0.+1 | x0 <- Q_Ar q]) i lti)))} =>
+      LiftPolyUni (insB2 y))
+     (exist
+        (fun n0 : nat =>
+         n0 <
+         (lnth (Q_Ar q)
+            (exist (fun n : nat => n < length (Q_Ar q)) i
+               (PrenexAddUni_obligation_1 (Q_Ar q)
+                  (exist
+                     (fun n : nat => n < length [seq x0.+1 | x0 <- Q_Ar q]) i
+                     lti)))).+1) (` x)
+        (PrenexAddUni_obligation_2 (Q_Ar q)
+           (exist (fun n : nat => n < length [seq x0.+1 | x0 <- Q_Ar q]) i
+              lti) x))) (LiftPolyUni outB2) u == true
+
 
 Theorem Q_Prenex_Correct M p :
   QuantifiedFormula_Denote FSize M p <-> PrenexDenotation _ M (Q_Prenex p).
@@ -636,11 +776,10 @@ Proof.
     + simpl.
       destruct H as [F [FBC H]].
       apply IH in H; clear IH.
-      destruct H as [adv [H0 [H1 H2]]].
-      unfold PrenexDenotation.
-      unfold PrenexDenotation, PrenexAdvice.
+      (* destruct H as [adv [H0 [H1 H2]]]. *)
+      destruct H as [adv [H0 H2]].
       exists (AdviceExtend F adv).
-      split;[|split].
+      split.
       * unfold PrenexFormulaCondition in *.
         move=> [u ltu]; simpl.
         pose (eq_rect _ (fun x => |[x]| -> 'F_FSize) u _ (map_length LiftPolyExi _)) as u2.
@@ -672,7 +811,7 @@ Proof.
         remember (H0 (exist _ u2 ltu2)) as H0'; clear HeqH0' H0; simpl in H0'.
         rewrite Q_Prenex_Correct_Lem_1 in H0'.
         by rewrite u2el in H0'.
-      * move=> u [i lti] bnds; simpl in *.
+      (* * move=> u [i lti] bnds; simpl in *.
         assert (i < length (uniBounds (Q_Prenex q))) as lti2;[clear bnds; by rewrite map_length in lti|].
         assert (forall j, InBound FSize (AddModelF FSize M (existT _ (length bs) F))
             adv (u (` j)) (lnth (uniBounds (Q_Prenex q))
@@ -691,7 +830,7 @@ Proof.
         rewrite Q_Prenex_Correct_Lem_0 in H1'; simpl in H1'. 
         rewrite lnth_map; simpl.
         remember (Utils.lnth_map_obligation_1 _ _ _ _ _) as DD0; clear HeqDD0; simpl in DD0.
-        by replace DD0 with lti2;[|apply eq_irrelevance].
+        by replace DD0 with lti2;[|apply eq_irrelevance]. *)
       * move=> u [[|i] lti]; simpl in *=> ins out chk; unfold AdviceExtend in chk; simpl in chk.
         --  replace (fun x => ins _) with ins in chk;[
               |apply functional_extensionality;move=>[x ltx];f_equal; by apply subset_eq_compat].
@@ -722,7 +861,8 @@ Proof.
             apply functional_extensionality;move=>[x ltx]; simpl.
             f_equal; by apply subset_eq_compat.
     + simpl.
-      destruct H as [adv [H0 [H1 H2]]].
+      (* destruct H as [adv [H0 [H1 H2]]]. *)
+      destruct H as [adv [H0 H2]].
       simpl in adv.
       exists (adv (exist _ 0 (ltn0Sn (length (Q_Ar q))))).
       simpl; split.
@@ -750,7 +890,7 @@ Proof.
             assert (ltx = ltx2) as EE;[apply eq_irrelevance|destruct EE].
             f_equal; apply functional_extensionality;move=>[z ltz]; simpl.
             f_equal; by apply subset_eq_compat.
-      split;[|split].
+      split.
       * move=>[u ltu]; simpl.
         remember (eq_rect _ (fun x => |[x]| -> _) u _ (esym (map_length (LiftPolyExi (a := length bs)) _))) as u'; simpl in u'.
         assert (forall j v,
@@ -787,7 +927,7 @@ Proof.
         rewrite eq_rect_ap_el; f_equal.
         f_equal; apply subset_eq; by rewrite projT1_eq_rect.
         by rewrite map_length in H.
-      * move=> u [i lti] bnd; simpl in *.
+      (* * move=> u [i lti] bnd; simpl in *.
         assert (i < length (uniBounds (PrenexAddExi bs y (Q_Prenex q)))) as lti2;[
               cbn; by rewrite map_length|].
         assert (forall j, InBound FSize M adv (u (` j))
@@ -807,7 +947,7 @@ Proof.
         rewrite Q_Prenex_Correct_Lem_0 AE.
         rewrite lnth_map in H1'; simpl in H1'.
         by replace (Utils.lnth_map_obligation_1 _ _ _ _ (exist _ i lti2)) with lti in H1';[
-          |apply eq_irrelevance].
+          |apply eq_irrelevance]. *)
       * move=> u [i lti] ins out io; simpl in *.
         rewrite Q_Prenex_Correct_Lem_2 AE.
         unfold AdviceDrop in io; simpl in io.
@@ -834,7 +974,7 @@ Proof.
           PrenexDenotation FSize (AddModelV _ M (` r)) (Q_Prenex q)) as H';[qauto|clear IH H].
       apply choice in H'; destruct H' as [adv H].
       exists (Uni_AdviceF adv).
-      split;[|split].
+      split.
       + move=>[u ltu]; simpl.
         simpl in u.
         assert (u (exist _ 0 (ltn0Sn (length [seq LiftPolyUni i | i <- uniBounds (Q_Prenex q)]))) < o) as ltuo.
@@ -879,9 +1019,81 @@ Proof.
         destruct (map_length LiftPolyUni (uniBounds (Q_Prenex q))); simpl.
         apply functional_extensionality;move=>[|i]; cbn; auto.
         f_equal; by apply subset_eq_compat.
-      + move=> u [[|i] lti] chk; simpl in *.
+      (* + move=> u [[|i] lti] chk; simpl in *.
         unfold InBound; rewrite PolyTerm_PolyTermVS_Correct PM.
-        clear chk.
+        clear chk. *)
+      + move=> u [i lti] ins out io.
+        unfold Uni_AdviceF in io; simpl in io.
+        pose (ins (exist _ 0 (Uni_AdviceF_obligation_1 (Q_Ar q) (exist _ i lti) ins))) as X.
+        destruct (X < o) eqn:o0;[|rewrite dep_if_case_false in io;[exact o0|by cbn in io]].
+        rewrite dep_if_case_true in io.
+        destruct (H (exist _ X o0)) as [_ H2]; clear H.
+        unfold PrenexExiBoundCondition in H2.
+        assert (i < length (Q_Ar q)) as lti2;[clear io X o0 H2 ins; by rewrite map_length in lti|].
+        assert (lnth [seq x.+1 | x <- Q_Ar q] (exist _ i lti) = (lnth (Q_Ar q) (exist _ i lti2)).+1) as EE;[
+          rewrite lnth_map; simpl; do 2 f_equal; by apply subset_eq_compat|].
+        assert (adv (exist _ X o0) (exist _ i lti2)
+                  (fSeqRest (eq_rect _ (fun x : nat => |[x]| -> _) ins _ EE)) ==
+                  Some out) as YY.
+          clear H2.
+          remember (adv _ _ _) as A1.
+          replace (adv _ _ _) with A1; auto.
+          rewrite HeqA1; clear io HeqA1 A1.
+          unfold X in *; clear X; simpl in *.
+          unfold fSeqRest.
+          assert (exist (fun n : nat => n < length (Q_Ar q)) i (Uni_AdviceF_obligation_2 o (Q_Ar q) (exist _ i lti) ins o0) = exist _ i lti2);[
+            by apply subset_eq_compat|].
+          destruct H.
+          f_equal.
+          apply functional_extensionality;move=>[x ltx]; simpl.
+          rewrite eq_rect_ap_el; f_equal.
+          apply subset_eq; by rewrite projT1_eq_rect.          
+        remember (H2 u (exist _ i lti2) (fSeqRest (eq_rect _ (fun x => |[x]| -> _) ins _ EE)) out YY) as H2'; clear HeqH2' H2; simpl in H2'.
+        simpl in *.
+        remember (exiBounds (Q_Prenex q)
+        (exist (fun n : nat => n < length (Q_Ar q)) i
+           lti2)) as Y; destruct Y as [insB outB]; simpl in H2'.
+        remember (exiBounds (Q_Prenex q)
+                  (exist (fun n : nat => n < length (Q_Ar q)) i
+                    (PrenexAddUni_obligation_1 (Q_Ar q)
+                        (exist (fun n : nat => n < length [seq x.+1 | x <- Q_Ar q]) i
+                          lti)))) as Y2; destruct Y2 as [insB2 outB2]; simpl.
+        remember (fSeqRest _) as ins2.
+        simpl.
+        remember (exist
+        (fun n0 : nat =>
+         n0 <
+         (lnth (Q_Ar q)
+            (exist (fun n : nat => n < length (Q_Ar q)) i
+               (PrenexAddUni_obligation_1 (Q_Ar q)
+                  (exist
+                     (fun n : nat => n < length [seq x0.+1 | x0 <- Q_Ar q]) i
+                     lti)))).+1)) as i'.
+        (PrenexAddUni_obligation_2 (Q_Ar q)
+           (exist (fun n : nat => n < length [seq x0.+1 | x0 <- Q_Ar q]) i
+              lti) x)) as i'.
+        (exist (fun n : nat => n < length (Q_Ar q)) i
+           lti2)) as Y.
+        simpl in H2'.
+        clear YY.
+        (exist (fun n : nat => n < length (Q_Ar q)) i
+           (PrenexAddUni_obligation_1 (Q_Ar q)
+              (exist (fun n : nat => n < length [seq x.+1 | x <- Q_Ar q]) i
+                 lti)))) as Y.
+(PrenexAddUni_obligation_1 (Q_Ar q)
+               (exist (fun n : nat => n < length [seq x.+1 | x <- Q_Ar q]) i
+                  lti)).
+          clear adv PM out M p.
+          remember (length (Q_Ar q)) as n; clear Heqn q u o FSize.
+          hammer.
+          sfirstorder.
+        apply EEConvert in io.
+        fcrush.
+        destruct o as [o].
+
+        destruct i; simpl.
+        
+
         
 
         assert (u 0 < o) as ltuo.
