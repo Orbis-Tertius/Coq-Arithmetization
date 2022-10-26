@@ -576,7 +576,7 @@ Proof.
   by do 2 rewrite Q_Prenex_Correct_Lem_0.
 Qed.
 
-Theorem Q_Prenex_Correct_Lem_2 (M: Sigma11Model FSize) 
+Lemma Q_Prenex_Correct_Lem_2 (M: Sigma11Model FSize) 
   {A} (adv: PrenexAdvice _ A)
   ar u ins out insB outB F :
 FunBoundsVS FSize (AddModelF FSize M F) adv ins out insB outB u = 
@@ -586,7 +586,7 @@ Proof.
   by f_equal;[unfold InBound; rewrite <- Q_Prenex_Correct_Lem_0|rewrite <- IHar].
 Qed.
 
-Theorem Q_Prenex_Correct_Lem_3_0 {n} (M: Sigma11Model FSize) 
+Lemma Q_Prenex_Correct_Lem_3_0 {n} (M: Sigma11Model FSize) 
   {A} (adv: PrenexAdvice _ A)
   (bs: seq PolyTerm) (y: PolyTerm) u (ins : |[n + length (LiftArgs n bs)]| -> _) out
   : FunBoundsVS FSize M adv (fSeqBack ins) out (lnth (LiftArgs n bs)) (PolyTerm_PolyTermVS (length bs + n) y) (MakeU ins u) = 
@@ -644,7 +644,7 @@ Proof.
   apply subset_eq; rewrite projT1_eq_rect; simpl; by rewrite addSnnS.
 Qed. 
 
-Theorem Q_Prenex_Correct_Lem_3 (M: Sigma11Model FSize) 
+Lemma Q_Prenex_Correct_Lem_3 (M: Sigma11Model FSize) 
   {A} (adv: PrenexAdvice _ A)
   (bs: seq PolyTerm) (y: PolyTerm) u ins out
   : FunBoundsVS FSize M adv ins out (lnth (LiftArgs 0 bs)) (PolyTerm_PolyTermVS (length bs) y) (MakeU ins u) = 
@@ -819,7 +819,7 @@ Proof.
   f_equal;apply Q_Prenex_Correct_Lem_4_1.
 Qed.
 
-Theorem Q_Prenex_Correct_Lem_6
+Lemma Q_Prenex_Correct_Lem_6
   {M E o u ar} {u0 : 'F_FSize} {ltu : u0 < o}
   {adv : {r : 'F_FSize | r < o} -> PrenexAdvice _ E}
   ins out insB outB :
@@ -839,7 +839,7 @@ Proof.
   by rewrite IHar.
 Qed.
 
-Theorem Q_Prenex_Correct_Lem_6_1
+Lemma Q_Prenex_Correct_Lem_6_1
   {M E u ar r}
   {adv : PrenexAdvice FSize [seq x.+1 | x <- E]}
   ins out insB outB :
@@ -1497,8 +1497,4 @@ Proof.
         by replace (Utils.lnth_map_obligation_1 _ _ _ _ (exist _ i lti2)) with lti;[|apply eq_irrelevance].
 Qed.
 
-
-
-
-
-End PrenexCorrect.
+End PrenexTranslation.
