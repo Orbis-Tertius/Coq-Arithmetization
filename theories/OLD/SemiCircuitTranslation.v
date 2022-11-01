@@ -16,6 +16,152 @@ Section SemicircuitTranslation.
 
 Variable D : RingData.
 
+(*Convert constraint to one over context with additional function calls*)
+Program Fixpoint PolyCallCastFree {ctx} {c}
+  {newC : |[freeF ctx]| -> nat}
+  (p : @SemicircuitPolyConstraint ctx c) :
+  @SemicircuitPolyConstraint _ {| freeFC := fun x => freeFC c x + newC x 
+                               ; exiFC := exiFC c
+                               ; indC := indC c
+  |} := 
+  match p with
+  | PolyConsZero => PolyConsZero
+  | PolyConsPlusOne => PolyConsPlusOne
+  | PolyConsMinusOne => PolyConsMinusOne
+  | PolyConsPlus p1 p2 =>
+    let r1 := PolyCallCastFree p1 in
+    let r2 := PolyCallCastFree p2 in 
+    PolyConsPlus r1 r2
+  | PolyConsTimes p1 p2 =>
+    let r1 := PolyCallCastFree p1 in
+    let r2 := PolyCallCastFree p2 in 
+    PolyConsTimes r1 r2
+  | PolyConsInd i => PolyConsInd i
+  | PolyConsFreeV i => PolyConsFreeV i
+  | PolyConsExiV i => PolyConsExiV i
+  | PolyConsUniV i => PolyConsUniV i
+  | PolyConsFreeF i j => PolyConsFreeF i j
+  | PolyConsExiF i j => PolyConsExiF i j
+  end.
+Next Obligation. qauto use: ltn_addr. Qed.
+
+Program Fixpoint PolyCallCastExi {ctx} {c}
+  {newC : |[exiF ctx]| -> nat}
+  (p : @SemicircuitPolyConstraint ctx c) :
+  @SemicircuitPolyConstraint _ {| freeFC := freeFC c
+                               ; exiFC := fun x => exiFC c x + newC x
+                               ; indC := indC c
+  |} := 
+  match p with
+  | PolyConsZero => PolyConsZero
+  | PolyConsPlusOne => PolyConsPlusOne
+  | PolyConsMinusOne => PolyConsMinusOne
+  | PolyConsPlus p1 p2 =>
+    let r1 := PolyCallCastExi p1 in
+    let r2 := PolyCallCastExi p2 in 
+    PolyConsPlus r1 r2
+  | PolyConsTimes p1 p2 =>
+    let r1 := PolyCallCastExi p1 in
+    let r2 := PolyCallCastExi p2 in 
+    PolyConsTimes r1 r2
+  | PolyConsInd i => PolyConsInd i
+  | PolyConsFreeV i => PolyConsFreeV i
+  | PolyConsExiV i => PolyConsExiV i
+  | PolyConsUniV i => PolyConsUniV i
+  | PolyConsFreeF i j => PolyConsFreeF i j
+  | PolyConsExiF i j => PolyConsExiF i j
+  end.
+Next Obligation. qauto use: ltn_addr. Qed.
+
+Program Fixpoint PolyCallCastInd {ctx} {c}
+  {newC : nat}
+  (p : @SemicircuitPolyConstraint ctx c) :
+  @SemicircuitPolyConstraint _ {| freeFC := freeFC c
+                                ; exiFC := exiFC c
+                                ; indC := indC c + newC
+  |} := 
+  match p with
+  | PolyConsZero => PolyConsZero
+  | PolyConsPlusOne => PolyConsPlusOne
+  | PolyConsMinusOne => PolyConsMinusOne
+  | PolyConsPlus p1 p2 =>
+    let r1 := PolyCallCastInd p1 in
+    let r2 := PolyCallCastInd p2 in 
+    PolyConsPlus r1 r2
+  | PolyConsTimes p1 p2 =>
+    let r1 := PolyCallCastInd p1 in
+    let r2 := PolyCallCastInd p2 in 
+    PolyConsTimes r1 r2
+  | PolyConsInd i => PolyConsInd i
+  | PolyConsFreeV i => PolyConsFreeV i
+  | PolyConsExiV i => PolyConsExiV i
+  | PolyConsUniV i => PolyConsUniV i
+  | PolyConsFreeF i j => PolyConsFreeF i j
+  | PolyConsExiF i j => PolyConsExiF i j
+  end.
+Next Obligation. qauto use: ltn_addr. Qed.
+
+Program Fixpoint PolyCallCast {ctx} {c}
+    {newFC : |[freeF ctx]| -> nat}
+    {newEC : |[exiF ctx]| -> nat}
+    {newIC : nat}
+    (p : @SemicircuitPolyConstraint ctx c) :
+  @SemicircuitPolyConstraint _ {| freeFC := fun x => freeFC c x + newFC x
+                              ; exiFC := fun x => exiFC c x + newEC x
+                              ; indC := indC c + newIC
+  |} := 
+  match p with
+  | PolyConsZero => PolyConsZero
+  | PolyConsPlusOne => PolyConsPlusOne
+  | PolyConsMinusOne => PolyConsMinusOne
+  | PolyConsPlus p1 p2 =>
+    let r1 := PolyCallCast p1 in
+    let r2 := PolyCallCast p2 in 
+    PolyConsPlus r1 r2
+  | PolyConsTimes p1 p2 =>
+    let r1 := PolyCallCast p1 in
+    let r2 := PolyCallCast p2 in 
+    PolyConsTimes r1 r2
+  | PolyConsInd i => PolyConsInd i
+  | PolyConsFreeV i => PolyConsFreeV i
+  | PolyConsExiV i => PolyConsExiV i
+  | PolyConsUniV i => PolyConsUniV i
+  | PolyConsFreeF i j => PolyConsFreeF i j
+  | PolyConsExiF i j => PolyConsExiF i j
+  end.
+Solve All Obligations with qauto use: ltn_addr.
+
+(*Lift new polynomial args so names don't conflict with arguments from other polynomials *)
+Program Fixpoint PolyCallLift {ctx} {c}
+    {newFC : |[freeF ctx]| -> nat}
+    {newEC : |[exiF ctx]| -> nat}
+    {newIC : nat}
+    (p : @SemicircuitPolyConstraint ctx c) :
+  @SemicircuitPolyConstraint _ {| freeFC := fun x => newFC x + freeFC c x
+                               ; exiFC := fun x => newEC x +  exiFC c x
+                               ; indC := newIC + indC c
+  |} := 
+  match p with
+  | PolyConsZero => PolyConsZero
+  | PolyConsPlusOne => PolyConsPlusOne
+  | PolyConsMinusOne => PolyConsMinusOne
+  | PolyConsPlus p1 p2 =>
+    let r1 := PolyCallLift p1 in
+    let r2 := PolyCallLift p2 in 
+    PolyConsPlus r1 r2
+  | PolyConsTimes p1 p2 =>
+    let r1 := PolyCallLift p1 in
+    let r2 := PolyCallLift p2 in 
+    PolyConsTimes r1 r2
+  | PolyConsInd i => PolyConsInd (newIC + i)
+  | PolyConsFreeV i => PolyConsFreeV i
+  | PolyConsExiV i => PolyConsExiV i
+  | PolyConsUniV i => PolyConsUniV i
+  | PolyConsFreeF i j => PolyConsFreeF i (newFC i + j)
+  | PolyConsExiF i j => PolyConsExiF i (newEC i + j)
+  end.
+Solve All Obligations with qauto use: ltn_add2l.
+
 Definition ModelInstance {ctx} {c} (M : Sigma11Model D) : @SemiCircuitInstance ctx D c :=
   {| freeVInst := fun n => freeV_F D M (` n)
    ; freeFInst := fun i t => freeF_S D M (` i) (freeFA ctx i) t
@@ -25,7 +171,7 @@ Record PolyConversionData {ctx : Sigma11Ctx} : Type := mkPolyConvertData {
   newFreeFCalls : |[freeF ctx]| -> nat ;
   newExiFCalls : |[exiF ctx]| -> nat ;
   newIndCalls : nat ;
-  newPolys : seq (@SCPoly _ {| freeFC := newFreeFCalls; exiFC := newExiFCalls; indC := newIndCalls |}) ;
+  newPolys : seq (@SemicircuitPolyConstraint _ {| freeFC := newFreeFCalls; exiFC := newExiFCalls; indC := newIndCalls |}) ;
   newFreeArgs : forall (i : |[freeF ctx]|), |[newFreeFCalls i]| -> |[freeFA ctx i]| -> |[length newPolys]| ;
   newExiArgs : forall (i : |[exiF ctx]|), |[newExiFCalls i]| -> |[exiFA ctx i]| -> |[length newPolys]| ;
   newIndArgs : |[newIndCalls]| -> (|[length newPolys]| * |[length newPolys]|)
@@ -175,10 +321,10 @@ Next Obligation.
 Qed.
 
 Program Definition PolyFuseCoerce {ctx : Sigma11Ctx} {d1 d2 : @PolyConversionData ctx} 
-  (s : @SCPoly ctx {| freeFC := fun x => newFreeFCalls d1 x + newFreeFCalls d2 x
+  (s : @SemicircuitPolyConstraint ctx {| freeFC := fun x => newFreeFCalls d1 x + newFreeFCalls d2 x
                                                   ; exiFC := fun x => newExiFCalls d1 x + newExiFCalls d2 x
                                                   ; indC := newIndCalls d1 + newIndCalls d2 |}) :
-  @SCPoly ctx {| freeFC := newFreeFCalls (PolyConversionCombineData d1 d2)
+  @SemicircuitPolyConstraint ctx {| freeFC := newFreeFCalls (PolyConversionCombineData d1 d2)
                                     ; exiFC := newExiFCalls (PolyConversionCombineData d1 d2)
                                     ; indC := newIndCalls (PolyConversionCombineData d1 d2) |} := s.
 Next Obligation. by f_equal; destruct d1, d2. Qed.
@@ -187,10 +333,10 @@ Next Obligation. by f_equal; destruct d1, d2. Qed.
 Program Fixpoint PolyCallSeqFuse {ctx X Y Z} 
   (s : seq { d : @PolyConversionData ctx & 
     prod (SemiDenotation (@PolyConversionDataCtx ctx d) X Y Z)
-         (@SCPoly _ (@PolyConversionDataCtx ctx d)) }) :
+         (@SemicircuitPolyConstraint _ (@PolyConversionDataCtx ctx d)) }) :
   { d : @PolyConversionData ctx & 
     prod (SemiDenotation (@PolyConversionDataCtx ctx d) X Y Z)
-         {t : seq (@SCPoly _ (@PolyConversionDataCtx ctx d)) | length t = length s} } :=
+         {t : seq (@SemicircuitPolyConstraint _ (@PolyConversionDataCtx ctx d)) | length t = length s} } :=
   match s with
   | [::] => existT _ PolyConversionEmptyData (EmptyDataAdvice, [::])
   | (existT b (a, x)) :: xs => 
@@ -257,7 +403,7 @@ Next Obligation. by destruct (k _); rewrite ltn_add2l. Qed.
 (*Add a list of circuit constraints associated to a free fun call to data*)
 Program Definition FreeCallIncorp {ctx}
   (d : @PolyConversionData ctx) (i : |[freeF ctx]|) :
-  forall s : seq (@SCPoly _ (@PolyConversionDataCtx ctx d)),
+  forall s : seq (@SemicircuitPolyConstraint _ (@PolyConversionDataCtx ctx d)),
   length s = freeFA ctx i -> @PolyConversionData ctx :=
   match d with
   | {| newFreeFCalls := nffc; newExiFCalls := nefc; newIndCalls := nic; newPolys := plys; newFreeArgs := farg; newExiArgs := earg; newIndArgs := iarg |} =>
@@ -346,7 +492,7 @@ Qed.
 (*Add a list of circuit constraints associated to an exi fun call to data*)
 Program Definition ExiCallIncorp {ctx}
   (d : @PolyConversionData ctx) (i : |[exiF ctx]|) :
-  forall s : seq (@SCPoly _ (@PolyConversionDataCtx ctx d)),
+  forall s : seq (@SemicircuitPolyConstraint _ (@PolyConversionDataCtx ctx d)),
   length s = exiFA ctx i ->
   @PolyConversionData ctx :=
   match d with
@@ -438,10 +584,10 @@ Program Definition PolyConvertFreeCase {ctx X Y Z}
   (t : |[freeFA ctx i]| ->
     { d : @PolyConversionData ctx &  
       prod (SemiDenotation (@PolyConversionDataCtx ctx d) X Y Z)
-          (@SCPoly _ (@PolyConversionDataCtx ctx d)) }) :
+          (@SemicircuitPolyConstraint _ (@PolyConversionDataCtx ctx d)) }) :
   { d : @PolyConversionData ctx &  
     prod (SemiDenotation (@PolyConversionDataCtx ctx d) X Y Z)
-         (@SCPoly _ (@PolyConversionDataCtx ctx d)) } := 
+         (@SemicircuitPolyConstraint _ (@PolyConversionDataCtx ctx d)) } := 
   let (data, D) := PolyCallSeqFuse [seq t i | i <- cRange 0 (freeFA ctx i) ] in let (ad, polys) := D in
   let data2 : @PolyConversionData ctx := FreeCallIncorp data i polys _ in
   existT _ data2 (FreeCallIncorpDenotation _ ad, PolyConsFreeF i (newFreeFCalls data i)).
@@ -458,10 +604,10 @@ Program Definition PolyConvertExiCase {ctx X Y Z}
   (t : |[exiFA ctx i]| ->
     { d : @PolyConversionData ctx &  
       prod (SemiDenotation (@PolyConversionDataCtx ctx d) X Y Z)
-           (@SCPoly _ (@PolyConversionDataCtx ctx d)) }) :
+           (@SemicircuitPolyConstraint _ (@PolyConversionDataCtx ctx d)) }) :
   { d : @PolyConversionData ctx &  
     prod (SemiDenotation (@PolyConversionDataCtx ctx d) X Y Z)
-         (@SCPoly _ (@PolyConversionDataCtx ctx d)) } :=
+         (@SemicircuitPolyConstraint _ (@PolyConversionDataCtx ctx d)) } :=
   let (data, D) := PolyCallSeqFuse [seq t i | i <- cRange 0 (exiFA ctx i) ] in let (ad, polys) := D in
   let data2 : @PolyConversionData ctx := ExiCallIncorp data i polys _ in
   existT _ data2 (ExiCallIncorpDenotation _ ad, PolyConsExiF i (newExiFCalls data i)).
@@ -477,8 +623,8 @@ Qed.
 (*Add a list of circuit constraints associated to an ind call to data*)
 Program Definition IndCallIncorp {ctx}
   (d : @PolyConversionData ctx) :
-  (@SCPoly _ (@PolyConversionDataCtx ctx d)) ->
-  (@SCPoly _ (@PolyConversionDataCtx ctx d)) ->
+  (@SemicircuitPolyConstraint _ (@PolyConversionDataCtx ctx d)) ->
+  (@SemicircuitPolyConstraint _ (@PolyConversionDataCtx ctx d)) ->
   @PolyConversionData ctx :=
   match d with
   | {| newFreeFCalls := nffc; newExiFCalls := nefc; newIndCalls := nic; newPolys := plys; newFreeArgs := farg; newExiArgs := earg; newIndArgs := iarg |} =>
@@ -568,13 +714,13 @@ Qed.
 Program Definition PolyConvertIndCase {ctx X Y Z} 
   (x : { d : @PolyConversionData ctx &  
           prod (SemiDenotation (@PolyConversionDataCtx ctx d) X Y Z)
-              (@SCPoly _ (@PolyConversionDataCtx ctx d)) })
+              (@SemicircuitPolyConstraint _ (@PolyConversionDataCtx ctx d)) })
   (y : { d : @PolyConversionData ctx &  
           prod (SemiDenotation (@PolyConversionDataCtx ctx d) X Y Z)
-              (@SCPoly _ (@PolyConversionDataCtx ctx d)) }) :
+              (@SemicircuitPolyConstraint _ (@PolyConversionDataCtx ctx d)) }) :
   { d : @PolyConversionData ctx &  
     prod (SemiDenotation (@PolyConversionDataCtx ctx d) X Y Z)
-         (@SCPoly _ (@PolyConversionDataCtx ctx d)) } :=
+         (@SemicircuitPolyConstraint _ (@PolyConversionDataCtx ctx d)) } :=
   let (data, D) := PolyCallSeqFuse (cons x (cons y nil)) in let (ad, polys) := D in
   let data2 : @PolyConversionData ctx := IndCallIncorp data (lnth polys 0) (lnth polys 1) in
   existT _ data2 (IndCallIncorpAdvice _ ad, PolyConsInd (newIndCalls data)).
@@ -585,7 +731,7 @@ Next Obligation. by destruct data; apply Utils.cRange_obligation_1. Qed.
 Program Fixpoint PolyConvert {ctx X Y Z} (r : @PolyTerm ctx) :
   { d : @PolyConversionData ctx &  
     prod (SemiDenotation (@PolyConversionDataCtx ctx d) X Y Z)
-         (@SCPoly _ (@PolyConversionDataCtx ctx d)) } := 
+         (@SemicircuitPolyConstraint _ (@PolyConversionDataCtx ctx d)) } := 
   match r with
   | PolyFVar m => existT _ PolyConversionEmptyData (EmptyDataAdvice, PolyConsFreeV m)
   | PolyEVar m => existT _ PolyConversionEmptyData (EmptyDataAdvice, PolyConsExiV m)
@@ -961,8 +1107,8 @@ Next Obligation. by destruct ctx, c. Qed. Next Obligation. by destruct ctx, c. Q
 Next Obligation. by destruct ctx, c. Qed.
 
 Program Fixpoint PolyLiftExiV {ctx c}
-  (p : @SCPoly ctx c) :
-  @SCPoly _ (incExiCC c) := 
+  (p : @SemicircuitPolyConstraint ctx c) :
+  @SemicircuitPolyConstraint _ (incExiCC c) := 
   match p with
   | PolyConsZero => PolyConsZero
   | PolyConsPlusOne => PolyConsPlusOne
@@ -1049,8 +1195,8 @@ Next Obligation. by destruct ctx, c. Qed.
 Next Obligation. by destruct ctx, c. Qed.
 
 Program Fixpoint PolyLiftUniV {ctx c}
-  (p : @SCPoly ctx c) :
-    @SCPoly _ (incUniCC c) := 
+  (p : @SemicircuitPolyConstraint ctx c) :
+    @SemicircuitPolyConstraint _ (incUniCC c) := 
   match p with
   | PolyConsZero => PolyConsZero
   | PolyConsPlusOne => PolyConsPlusOne
@@ -1111,7 +1257,7 @@ Fixpoint PropLiftUniV {ctx c}
 
 (*Add a new existentially quantified first order variable to semicircuit *)
 Program Definition SemicircuitExiInc {ctx} (c : @SemiCircuit ctx)
-  (p : @SCPoly _ (Ctx c)): SemiCircuit :=
+  (p : @SemicircuitPolyConstraint _ (Ctx c)): SemiCircuit :=
   {| Ctx := incExiCC (Ctx c)
   ; nu := ExtendAt0N (uniV ctx) (nu c)
   ; polyConstraints := map PolyLiftExiV (rcons (polyConstraints c) p)
@@ -1197,7 +1343,7 @@ Qed.
 
 Definition SemicircuitExiIncWA {ctx X Y Z}
   (c : {s : @SemiCircuit ctx & SemiDenotation (Ctx s) X Y Z}) :
-  @SCPoly ctx (Ctx (projT1 c)) ->
+  @SemicircuitPolyConstraint ctx (Ctx (projT1 c)) ->
   {s : SemiCircuit & SemiDenotation (Ctx s) X Y (Z.+1)} :=
 match c with
 | existT s ad => fun p => existT _ (SemicircuitExiInc s p) (incExiAd ad)
@@ -1210,7 +1356,7 @@ Definition PolyIntExi {ctx X Y Z}
 
   (d : @PolyConversionData ctx)
   (ad : SemiDenotation (@PolyConversionDataCtx ctx d) X Y Z)
-  (p : @SCPoly _ (@PolyConversionDataCtx ctx d)) :=
+  (p : @SemicircuitPolyConstraint _ (@PolyConversionDataCtx ctx d)) :=
 
   SemicircuitExiIncWA (IntegrateConversionData (existT _ c adc) (existT _ d ad)) (PolyCallLift p).
 
@@ -1219,14 +1365,14 @@ Definition IntegrateNewPolyExi {ctx X Y Z}
 
   (p : { d : @PolyConversionData ctx &  
         prod (SemiDenotation (@PolyConversionDataCtx ctx d) X Y Z)
-            (@SCPoly _ (@PolyConversionDataCtx ctx d)) }) :
+            (@SemicircuitPolyConstraint _ (@PolyConversionDataCtx ctx d)) }) :
   {s0 : SemiCircuit & SemiDenotation (Ctx s0) X Y Z.+1} :=
   match s, p with
   | existT c adc, existT d (ad, p) => PolyIntExi c adc d ad p
   end.
 
 (*Add a new universally quantified first order variable to semicircuit *)
-Program Definition SemicircuitUniInc {ctx} (c : SemiCircuit) (p : @SCPoly ctx (Ctx c)): SemiCircuit :=
+Program Definition SemicircuitUniInc {ctx} (c : SemiCircuit) (p : @SemicircuitPolyConstraint ctx (Ctx c)): SemiCircuit :=
   {| Ctx := incUniCC (Ctx c)
   ; nu := nu c
   ; polyConstraints := map PolyLiftUniV (rcons (polyConstraints c) p)
@@ -1302,7 +1448,7 @@ Qed.
 
 Definition SemicircuitUniIncWA {ctx} {X Y Z}
   (c : {s : @SemiCircuit ctx & SemiDenotation (Ctx s) X Y Z}) :
-  @SCPoly _ (Ctx (projT1 c)) ->
+  @SemicircuitPolyConstraint _ (Ctx (projT1 c)) ->
   {s : SemiCircuit & SemiDenotation (Ctx s) X Y Z} :=
   match c with
   | existT s ad => fun p => existT _ (SemicircuitUniInc s p) (incUniAd ad)
@@ -1315,7 +1461,7 @@ Definition PolyIntUni {ctx X Y Z}
 
   (d : @PolyConversionData ctx)
   (ad : SemiDenotation (@PolyConversionDataCtx ctx d) X Y Z)
-  (p : @SCPoly ctx (@PolyConversionDataCtx ctx d)) :=
+  (p : @SemicircuitPolyConstraint ctx (@PolyConversionDataCtx ctx d)) :=
 
   SemicircuitUniIncWA (IntegrateConversionData (existT _ c adc) (existT _ d ad)) (PolyCallLift p).
 
@@ -1324,7 +1470,7 @@ Definition IntegrateNewPolyUni {ctx X Y Z}
 
   (p : { d : @PolyConversionData ctx &  
         prod (SemiDenotation (@PolyConversionDataCtx ctx d) X Y Z)
-            (@SCPoly _ (@PolyConversionDataCtx ctx d)) }) :
+            (@SemicircuitPolyConstraint _ (@PolyConversionDataCtx ctx d)) }) :
   {s0 : SemiCircuit & SemiDenotation (Ctx s0) X Y Z} :=
   match s, p with
   | existT c adc, existT d (ad, p) => PolyIntUni c adc d ad p
@@ -1370,8 +1516,8 @@ Next Obligation. by destruct ctx. Qed.
 
 Program Fixpoint PolyLiftAddExiF {ctx c}
   (a : nat)
-  (p : @SCPoly ctx c) :
-    @SCPoly _ (CtxAddExiF a c) := 
+  (p : @SemicircuitPolyConstraint ctx c) :
+    @SemicircuitPolyConstraint _ (CtxAddExiF a c) := 
   match p with
   | PolyConsZero => PolyConsZero
   | PolyConsPlusOne => PolyConsPlusOne
@@ -1432,8 +1578,8 @@ Program Fixpoint PropLiftAddExiF {ctx c}
 
 Program Definition SemicircuitExiFAdd {ctx}
   (c : SemiCircuit) 
-  (y : @SCPoly ctx (Ctx c))
-  (bs : seq (@SCPoly ctx (Ctx c))) : 
+  (y : @SemicircuitPolyConstraint ctx (Ctx c))
+  (bs : seq (@SemicircuitPolyConstraint ctx (Ctx c))) : 
   @SemiCircuit (addExiF (length bs) ctx) :=
   let Ctx' := CtxAddExiF (length bs) (Ctx c) in
   let polyConstraints' := map (PolyLiftAddExiF (length bs)) (rcons (polyConstraints c ++ bs) y) in
@@ -1651,11 +1797,11 @@ Definition PolyIntExiF {ctx X Y Z}
 
   (y : @PolyConversionData ctx)
   (ady : SemiDenotation (@PolyConversionDataCtx ctx d) X Y Z)
-  (poy : @SCPoly _ (@PolyConversionDataCtx ctx d))
+  (poy : @SemicircuitPolyConstraint _ (@PolyConversionDataCtx ctx d))
 
   (bs : @PolyConversionData ctx)
   (adbs : SemiDenotation (@PolyConversionDataCtx ctx d) X Y Z)
-  (pobs : seq (@SCPoly _ (@PolyConversionDataCtx ctx d))) :=
+  (pobs : seq (@SemicircuitPolyConstraint _ (@PolyConversionDataCtx ctx d))) :=
 
   SemicircuitUniIncWA (IntegrateConversionData (existT _ c adc) (existT _ d ad)) (PolyCallLift p).
 
@@ -1664,12 +1810,12 @@ Definition IntegrateNewPolyExiF {ctx X Y Z}
 
   (y : { d : @PolyConversionData ctx &  
         prod (SemiDenotation (@PolyConversionDataCtx ctx d) X Y Z)
-             (@SCPoly _ (@PolyConversionDataCtx ctx d)) })
+             (@SemicircuitPolyConstraint _ (@PolyConversionDataCtx ctx d)) })
 
   (bs : seq 
       { d : @PolyConversionData ctx &  
         prod (SemiDenotation (@PolyConversionDataCtx ctx d) X Y Z)
-             (@SCPoly _ (@PolyConversionDataCtx ctx d)) }) :
+             (@SemicircuitPolyConstraint _ (@PolyConversionDataCtx ctx d)) }) :
 
   {s0 : @SemiCircuit ctx & SemiDenotation (Ctx s0) X Y Z} :=
   match y with 
@@ -1692,7 +1838,7 @@ Definition PolyIntExiF {ctx X Y Z}
 
   (d : @PolyConversionData ctx)
   (ad : SemiDenotation (@PolyConversionDataCtx ctx d) X Y Z)
-  (p : @SCPoly _ (@PolyConversionDataCtx ctx d)) :=
+  (p : @SemicircuitPolyConstraint _ (@PolyConversionDataCtx ctx d)) :=
 
   SemicircuitUniIncWA (IntegrateConversionData (existT _ c adc) (existT _ d ad)) (PolyCallLift p).
 
@@ -1701,12 +1847,12 @@ Definition IntegrateNewPolyExiF {ctx X Y Z}
 
   (y : { d : @PolyConversionData ctx &  
         prod (SemiDenotation (@PolyConversionDataCtx ctx d) X Y Z)
-             (@SCPoly _ (@PolyConversionDataCtx ctx d)) }) :
+             (@SemicircuitPolyConstraint _ (@PolyConversionDataCtx ctx d)) }) :
 
   (bs : seq 
       { d : @PolyConversionData ctx &  
         prod (SemiDenotation (@PolyConversionDataCtx ctx d) X Y Z)
-             (@SCPoly _ (@PolyConversionDataCtx ctx d)) }) :
+             (@SemicircuitPolyConstraint _ (@PolyConversionDataCtx ctx d)) }) :
 
   {s0 : SemiCircuit & SemiDenotation (Ctx s0) X Y Z} :=
   match s, p with
@@ -1728,12 +1874,12 @@ Program Fixpoint Translate_SecondOrderFormula
   | SOExists y bs f => 
     let (day, poy) := PolyConvert y in
     let c0 := IntegrateConversionData c day in
-    let poy0 : @SCPoly (Ctx c0) := PolyCallLift poy in
+    let poy0 : @SemicircuitPolyConstraint (Ctx c0) := PolyCallLift poy in
     let bs' := map PolyConvert bs in
     let (dabs, pobs) := PolyCallSeqFuse bs' in
     let c1 := IntegrateConversionData c0 dabs in
-    let poy1 : @SCPoly (Ctx c1) := PolyCallCast poy0 in
-    let pobs1 : seq (@SCPoly (Ctx c1)) := map PolyCallLift pobs in
+    let poy1 : @SemicircuitPolyConstraint (Ctx c1) := PolyCallCast poy0 in
+    let pobs1 : seq (@SemicircuitPolyConstraint (Ctx c1)) := map PolyCallLift pobs in
     let c2 := SemicircuitExiFAdd c1 poy1 pobs1 in
     Translate_SecondOrderFormula c2 f
   end.
