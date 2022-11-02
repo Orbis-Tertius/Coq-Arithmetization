@@ -21,7 +21,7 @@ Definition ModelInstance {ctx} {c} (M : Sigma11Model D) : @SemiCircuitInstance c
    ; freeFInst := fun i t => freeF_S D M (` i) (freeFA ctx i) t
   |}.
 
-Record PolyConversionData {ctx : Sigma11Ctx} : Type := mkPolyConvertData {
+Record SemiConversionData {ctx : Sigma11Ctx} : Type := mkPolyConvertData {
   newFreeFCalls : |[freeF ctx]| -> nat ;
   newExiFCalls : |[exiF ctx]| -> nat ;
   newIndCalls : nat ;
@@ -31,7 +31,7 @@ Record PolyConversionData {ctx : Sigma11Ctx} : Type := mkPolyConvertData {
   newIndArgs : |[newIndCalls]| -> (|[length newPolys]| * |[length newPolys]|)
   }.
 
-Definition PolyConversionDataCtx {ctx} (data : @PolyConversionData ctx) : @SemicircuitCtx ctx :=
+Definition SemiConversionDataCtx {ctx} (data : @SemiConversionData ctx) : @SemicircuitCtx ctx :=
   {| freeFC := newFreeFCalls data 
    ; exiFC := newExiFCalls data
    ; indC := newIndCalls data
@@ -44,8 +44,8 @@ Definition SemiDenotation {ctx} c exFN (exFA : |[exFN]| -> nat) exVN :=
 
 Definition emptyCtx ctx : @SemicircuitCtx ctx := {| freeFC := fun _=> 0; exiFC := fun _=> 0; indC := 0|}.
 
-Definition PolyConversionEmptyData {ctx} : 
-  @PolyConversionData ctx :=
+Definition SemiConversionEmptyData {ctx} : 
+  @SemiConversionData ctx :=
   {| newFreeFCalls := fun _ => 0; newExiFCalls := fun _ => 0; newIndCalls := 0; newPolys := [::]
    ; newFreeArgs := fun x => emptyTuple; newExiArgs := fun x => emptyTuple; newIndArgs := emptyTuple|}.
 
@@ -58,11 +58,11 @@ Program Definition EmptyDenotation {c i j k} : SemiDenotation (emptyCtx c) i j k
    ; indCallOut := emptyTuple
   |}.
 
-Definition EmptyDataAdvice {c i j k} : SemiDenotation (@PolyConversionDataCtx c PolyConversionEmptyData) i j k :=
+Definition EmptyDataAdvice {c i j k} : SemiDenotation (@SemiConversionDataCtx c SemiConversionEmptyData) i j k :=
   EmptyDenotation.
 
-Program Definition PolyConversionCombineData {ctx}
-  (d1 d2 : @PolyConversionData ctx) : @PolyConversionData ctx :=
+Program Definition SemiConversionCombineData {ctx}
+  (d1 d2 : @SemiConversionData ctx) : @SemiConversionData ctx :=
   match d1, d2 with
   | {| newFreeFCalls := nffc1; newExiFCalls := nefc1; newIndCalls := nic1; newPolys := polys1; newFreeArgs := farg1; newExiArgs := earg1; newIndArgs := iarg1 |}
   , {| newFreeFCalls := nffc2; newExiFCalls := nefc2; newIndCalls := nic2; newPolys := polys2; newFreeArgs := farg2; newExiArgs := earg2; newIndArgs := iarg2 |}
@@ -138,13 +138,13 @@ Next Obligation.
 Qed.
 
 Program Definition CombineDataDenotation {c i j k} 
-  {d1 d2 : @PolyConversionData c}
-  (ad1 : SemiDenotation (@PolyConversionDataCtx c d1) i j k)
-  (ad2 : SemiDenotation (@PolyConversionDataCtx c d2) i j k) :
-  SemiDenotation (@PolyConversionDataCtx c (PolyConversionCombineData d1 d2)) i j k :=
+  {d1 d2 : @SemiConversionData c}
+  (ad1 : SemiDenotation (@SemiConversionDataCtx c d1) i j k)
+  (ad2 : SemiDenotation (@SemiConversionDataCtx c d2) i j k) :
+  SemiDenotation (@SemiConversionDataCtx c (SemiConversionCombineData d1 d2)) i j k :=
   fun X Y M =>
-  let data' := (PolyConversionCombineData d1 d2) in
-  let ctx' := PolyConversionDataCtx data' in
+  let data' := (SemiConversionCombineData d1 d2) in
+  let ctx' := SemiConversionDataCtx data' in
   {| exiVAdv := exiVAdv (ad1 X Y M)
    ; exiFAdv := exiFAdv (ad1 X Y M)
    ; freeFCallOut := fun i j => (
@@ -174,28 +174,28 @@ Next Obligation.
   destruct d1, d2, c; cbn in *; hecrush use: ltn_subLR, contraFltn, is_true_true unfold: is_true.
 Qed.
 
-Program Definition PolyFuseCoerce {ctx : Sigma11Ctx} {d1 d2 : @PolyConversionData ctx} 
+Program Definition PolyFuseCoerce {ctx : Sigma11Ctx} {d1 d2 : @SemiConversionData ctx} 
   (s : @SCPoly ctx {| freeFC := fun x => newFreeFCalls d1 x + newFreeFCalls d2 x
                                                   ; exiFC := fun x => newExiFCalls d1 x + newExiFCalls d2 x
                                                   ; indC := newIndCalls d1 + newIndCalls d2 |}) :
-  @SCPoly ctx {| freeFC := newFreeFCalls (PolyConversionCombineData d1 d2)
-                                    ; exiFC := newExiFCalls (PolyConversionCombineData d1 d2)
-                                    ; indC := newIndCalls (PolyConversionCombineData d1 d2) |} := s.
+  @SCPoly ctx {| freeFC := newFreeFCalls (SemiConversionCombineData d1 d2)
+                                    ; exiFC := newExiFCalls (SemiConversionCombineData d1 d2)
+                                    ; indC := newIndCalls (SemiConversionCombineData d1 d2) |} := s.
 Next Obligation. by f_equal; destruct d1, d2. Qed.
 
 (*Fuse sequence of poly conversion outputs into a single output. *)
 Program Fixpoint PolyCallSeqFuse {ctx X Y Z} 
-  (s : seq { d : @PolyConversionData ctx & 
-    prod (SemiDenotation (@PolyConversionDataCtx ctx d) X Y Z)
-         (@SCPoly _ (@PolyConversionDataCtx ctx d)) }) :
-  { d : @PolyConversionData ctx & 
-    prod (SemiDenotation (@PolyConversionDataCtx ctx d) X Y Z)
-         {t : seq (@SCPoly _ (@PolyConversionDataCtx ctx d)) | length t = length s} } :=
+  (s : seq { d : @SemiConversionData ctx & 
+    prod (SemiDenotation (@SemiConversionDataCtx ctx d) X Y Z)
+         (@SCPoly _ (@SemiConversionDataCtx ctx d)) }) :
+  { d : @SemiConversionData ctx & 
+    prod (SemiDenotation (@SemiConversionDataCtx ctx d) X Y Z)
+         {t : seq (@SCPoly _ (@SemiConversionDataCtx ctx d)) | length t = length s} } :=
   match s with
-  | [::] => existT _ PolyConversionEmptyData (EmptyDataAdvice, [::])
+  | [::] => existT _ SemiConversionEmptyData (EmptyDataAdvice, [::])
   | (existT b (a, x)) :: xs => 
     let (d, D) := PolyCallSeqFuse xs in let (ad, p) := D in
-    let d0 := PolyConversionCombineData b d in
+    let d0 := SemiConversionCombineData b d in
     let ad0 := CombineDataDenotation a ad in
     let p0 := map PolyFuseCoerce (PolyCallCast x :: map PolyCallLift p) in
     existT _ d0 (ad0, p0)
@@ -256,9 +256,9 @@ Next Obligation. by destruct (k _); rewrite ltn_add2l. Qed.
 
 (*Add a list of circuit constraints associated to a free fun call to data*)
 Program Definition FreeCallIncorp {ctx}
-  (d : @PolyConversionData ctx) (i : |[freeF ctx]|) :
-  forall s : seq (@SCPoly _ (@PolyConversionDataCtx ctx d)),
-  length s = freeFA ctx i -> @PolyConversionData ctx :=
+  (d : @SemiConversionData ctx) (i : |[freeF ctx]|) :
+  forall s : seq (@SCPoly _ (@SemiConversionDataCtx ctx d)),
+  length s = freeFA ctx i -> @SemiConversionData ctx :=
   match d with
   | {| newFreeFCalls := nffc; newExiFCalls := nefc; newIndCalls := nic; newPolys := plys; newFreeArgs := farg; newExiArgs := earg; newIndArgs := iarg |} =>
     fun ps ls =>
@@ -292,12 +292,12 @@ Next Obligation.
 Qed.
 
 Program Definition FreeCallIncorpDenotation {ctx X Y Z} 
-  (d : @PolyConversionData ctx) {i} {s} {e}
-  (ad : SemiDenotation (@PolyConversionDataCtx ctx d) X Y Z) :
-  SemiDenotation (@PolyConversionDataCtx ctx (FreeCallIncorp d i s e)) X Y Z :=
+  (d : @SemiConversionData ctx) {i} {s} {e}
+  (ad : SemiDenotation (@SemiConversionDataCtx ctx d) X Y Z) :
+  SemiDenotation (@SemiConversionDataCtx ctx (FreeCallIncorp d i s e)) X Y Z :=
   fun X Y M =>
   let data' := FreeCallIncorp d i s e in
-  let ctx' := PolyConversionDataCtx data' in
+  let ctx' := SemiConversionDataCtx data' in
   {| exiVAdv := exiVAdv (ad X Y M)
    ; exiFAdv := exiFAdv (ad X Y M)
    ; freeFCallOut := fun j => (
@@ -335,7 +335,7 @@ Qed.
 Next Obligation.
   change (exist _ ?x _ == exist _ ?y _) with (x == y) in *.
   destruct d, ctx; simpl in *.
-  unfold AddCall, PolyConversionDataCtx, SingleCall in *;
+  unfold AddCall, SemiConversionDataCtx, SingleCall in *;
   rewrite dep_if_case_true in H; auto.
   apply leq_neq_lt;[by rewrite addn1 in H|].
   simpl; rewrite <- EEFConvert.
@@ -345,10 +345,10 @@ Qed.
 
 (*Add a list of circuit constraints associated to an exi fun call to data*)
 Program Definition ExiCallIncorp {ctx}
-  (d : @PolyConversionData ctx) (i : |[exiF ctx]|) :
-  forall s : seq (@SCPoly _ (@PolyConversionDataCtx ctx d)),
+  (d : @SemiConversionData ctx) (i : |[exiF ctx]|) :
+  forall s : seq (@SCPoly _ (@SemiConversionDataCtx ctx d)),
   length s = exiFA ctx i ->
-  @PolyConversionData ctx :=
+  @SemiConversionData ctx :=
   match d with
   | {| newFreeFCalls := nffc; newExiFCalls := nefc; newIndCalls := nic; newPolys := plys; newFreeArgs := farg; newExiArgs := earg; newIndArgs := iarg |} =>
     fun ps ls =>
@@ -382,12 +382,12 @@ Next Obligation.
 Qed.
 
 Program Definition ExiCallIncorpDenotation {ctx X Y Z} 
-  (d : @PolyConversionData ctx) {i} {s} {e}
-  (ad : SemiDenotation (@PolyConversionDataCtx ctx d) X Y Z) :
-  SemiDenotation (@PolyConversionDataCtx ctx (ExiCallIncorp d i s e)) X Y Z :=
+  (d : @SemiConversionData ctx) {i} {s} {e}
+  (ad : SemiDenotation (@SemiConversionDataCtx ctx d) X Y Z) :
+  SemiDenotation (@SemiConversionDataCtx ctx (ExiCallIncorp d i s e)) X Y Z :=
   fun X Y M =>
   let data' := ExiCallIncorp d i s e in
-  let ctx' := PolyConversionDataCtx data' in
+  let ctx' := SemiConversionDataCtx data' in
   {| exiVAdv := exiVAdv (ad X Y M)
    ; exiFAdv := exiFAdv (ad X Y M)
    ; freeFCallOut := freeFCallOut (ad X Y M)
@@ -425,7 +425,7 @@ Qed.
 Next Obligation.
   change (exist _ ?x _ == exist _ ?y _) with (x == y) in *.
   destruct d, ctx; simpl in *.
-  unfold AddCall, PolyConversionDataCtx, SingleCall in *;
+  unfold AddCall, SemiConversionDataCtx, SingleCall in *;
   rewrite dep_if_case_true in H; auto.
   apply leq_neq_lt;[by rewrite addn1 in H|].
   simpl; rewrite <- EEFConvert.
@@ -436,14 +436,14 @@ Qed.
 Program Definition PolyConvertFreeCase {ctx X Y Z} 
   (i : |[freeF ctx]|) 
   (t : |[freeFA ctx i]| ->
-    { d : @PolyConversionData ctx &  
-      prod (SemiDenotation (@PolyConversionDataCtx ctx d) X Y Z)
-          (@SCPoly _ (@PolyConversionDataCtx ctx d)) }) :
-  { d : @PolyConversionData ctx &  
-    prod (SemiDenotation (@PolyConversionDataCtx ctx d) X Y Z)
-         (@SCPoly _ (@PolyConversionDataCtx ctx d)) } := 
+    { d : @SemiConversionData ctx &  
+      prod (SemiDenotation (@SemiConversionDataCtx ctx d) X Y Z)
+          (@SCPoly _ (@SemiConversionDataCtx ctx d)) }) :
+  { d : @SemiConversionData ctx &  
+    prod (SemiDenotation (@SemiConversionDataCtx ctx d) X Y Z)
+         (@SCPoly _ (@SemiConversionDataCtx ctx d)) } := 
   let (data, D) := PolyCallSeqFuse [seq t i | i <- cRange 0 (freeFA ctx i) ] in let (ad, polys) := D in
-  let data2 : @PolyConversionData ctx := FreeCallIncorp data i polys _ in
+  let data2 : @SemiConversionData ctx := FreeCallIncorp data i polys _ in
   existT _ data2 (FreeCallIncorpDenotation _ ad, PolyConsFreeF i (newFreeFCalls data i)).
 Next Obligation. by rewrite map_length (length_cRange (n := 0)) in H. Qed.
 Next Obligation.
@@ -456,14 +456,14 @@ Qed.
 Program Definition PolyConvertExiCase {ctx X Y Z} 
   (i : |[exiF ctx]|) 
   (t : |[exiFA ctx i]| ->
-    { d : @PolyConversionData ctx &  
-      prod (SemiDenotation (@PolyConversionDataCtx ctx d) X Y Z)
-           (@SCPoly _ (@PolyConversionDataCtx ctx d)) }) :
-  { d : @PolyConversionData ctx &  
-    prod (SemiDenotation (@PolyConversionDataCtx ctx d) X Y Z)
-         (@SCPoly _ (@PolyConversionDataCtx ctx d)) } :=
+    { d : @SemiConversionData ctx &  
+      prod (SemiDenotation (@SemiConversionDataCtx ctx d) X Y Z)
+           (@SCPoly _ (@SemiConversionDataCtx ctx d)) }) :
+  { d : @SemiConversionData ctx &  
+    prod (SemiDenotation (@SemiConversionDataCtx ctx d) X Y Z)
+         (@SCPoly _ (@SemiConversionDataCtx ctx d)) } :=
   let (data, D) := PolyCallSeqFuse [seq t i | i <- cRange 0 (exiFA ctx i) ] in let (ad, polys) := D in
-  let data2 : @PolyConversionData ctx := ExiCallIncorp data i polys _ in
+  let data2 : @SemiConversionData ctx := ExiCallIncorp data i polys _ in
   existT _ data2 (ExiCallIncorpDenotation _ ad, PolyConsExiF i (newExiFCalls data i)).
 Next Obligation. by rewrite map_length (length_cRange (n := 0)) in H. Qed.
 Next Obligation.
@@ -476,10 +476,10 @@ Qed.
 
 (*Add a list of circuit constraints associated to an ind call to data*)
 Program Definition IndCallIncorp {ctx}
-  (d : @PolyConversionData ctx) :
-  (@SCPoly _ (@PolyConversionDataCtx ctx d)) ->
-  (@SCPoly _ (@PolyConversionDataCtx ctx d)) ->
-  @PolyConversionData ctx :=
+  (d : @SemiConversionData ctx) :
+  (@SCPoly _ (@SemiConversionDataCtx ctx d)) ->
+  (@SCPoly _ (@SemiConversionDataCtx ctx d)) ->
+  @SemiConversionData ctx :=
   match d with
   | {| newFreeFCalls := nffc; newExiFCalls := nefc; newIndCalls := nic; newPolys := plys; newFreeArgs := farg; newExiArgs := earg; newIndArgs := iarg |} =>
     fun p1 p2 =>
@@ -534,12 +534,12 @@ Next Obligation.
 Qed.
 
 Program Definition IndCallIncorpAdvice {c X Y Z} 
-  (d : @PolyConversionData c) {x} {y}
-  (ad : SemiDenotation (@PolyConversionDataCtx c d) X Y Z) :
-  SemiDenotation (@PolyConversionDataCtx c (IndCallIncorp d x y)) X Y Z :=
+  (d : @SemiConversionData c) {x} {y}
+  (ad : SemiDenotation (@SemiConversionDataCtx c d) X Y Z) :
+  SemiDenotation (@SemiConversionDataCtx c (IndCallIncorp d x y)) X Y Z :=
   fun X Y M =>
   let data' := IndCallIncorp d x y in
-  let ctx' := PolyConversionDataCtx data' in
+  let ctx' := SemiConversionDataCtx data' in
   {| exiVAdv := exiVAdv (ad X Y M)
    ; exiFAdv := exiFAdv (ad X Y M)
    ; freeFCallOut := freeFCallOut (ad X Y M)
@@ -566,55 +566,55 @@ Next Obligation.
 Qed.
 
 Program Definition PolyConvertIndCase {ctx X Y Z} 
-  (x : { d : @PolyConversionData ctx &  
-          prod (SemiDenotation (@PolyConversionDataCtx ctx d) X Y Z)
-              (@SCPoly _ (@PolyConversionDataCtx ctx d)) })
-  (y : { d : @PolyConversionData ctx &  
-          prod (SemiDenotation (@PolyConversionDataCtx ctx d) X Y Z)
-              (@SCPoly _ (@PolyConversionDataCtx ctx d)) }) :
-  { d : @PolyConversionData ctx &  
-    prod (SemiDenotation (@PolyConversionDataCtx ctx d) X Y Z)
-         (@SCPoly _ (@PolyConversionDataCtx ctx d)) } :=
+  (x : { d : @SemiConversionData ctx &  
+          prod (SemiDenotation (@SemiConversionDataCtx ctx d) X Y Z)
+              (@SCPoly _ (@SemiConversionDataCtx ctx d)) })
+  (y : { d : @SemiConversionData ctx &  
+          prod (SemiDenotation (@SemiConversionDataCtx ctx d) X Y Z)
+              (@SCPoly _ (@SemiConversionDataCtx ctx d)) }) :
+  { d : @SemiConversionData ctx &  
+    prod (SemiDenotation (@SemiConversionDataCtx ctx d) X Y Z)
+         (@SCPoly _ (@SemiConversionDataCtx ctx d)) } :=
   let (data, D) := PolyCallSeqFuse (cons x (cons y nil)) in let (ad, polys) := D in
-  let data2 : @PolyConversionData ctx := IndCallIncorp data (lnth polys 0) (lnth polys 1) in
+  let data2 : @SemiConversionData ctx := IndCallIncorp data (lnth polys 0) (lnth polys 1) in
   existT _ data2 (IndCallIncorpAdvice _ ad, PolyConsInd (newIndCalls data)).
 Next Obligation. by rewrite H. Qed.
 Next Obligation. by destruct data; apply Utils.cRange_obligation_1. Qed.
 
 (*Construct a polynomial constraint, new calls within that constraint, simultanious with data to modify a semicircuit *)
 Program Fixpoint PolyConvert {ctx X Y Z} (r : @PolyTerm ctx) :
-  { d : @PolyConversionData ctx &  
-    prod (SemiDenotation (@PolyConversionDataCtx ctx d) X Y Z)
-         (@SCPoly _ (@PolyConversionDataCtx ctx d)) } := 
+  { d : @SemiConversionData ctx &  
+    prod (SemiDenotation (@SemiConversionDataCtx ctx d) X Y Z)
+         (@SCPoly _ (@SemiConversionDataCtx ctx d)) } := 
   match r with
-  | PolyFVar m => existT _ PolyConversionEmptyData (EmptyDataAdvice, PolyConsFreeV m)
-  | PolyEVar m => existT _ PolyConversionEmptyData (EmptyDataAdvice, PolyConsExiV m)
-  | PolyUVar m => existT _ PolyConversionEmptyData (EmptyDataAdvice, PolyConsUniV m)
+  | PolyFVar m => existT _ SemiConversionEmptyData (EmptyDataAdvice, PolyConsFreeV m)
+  | PolyEVar m => existT _ SemiConversionEmptyData (EmptyDataAdvice, PolyConsExiV m)
+  | PolyUVar m => existT _ SemiConversionEmptyData (EmptyDataAdvice, PolyConsUniV m)
   | PolyFFun i t => PolyConvertFreeCase i (fun x => PolyConvert (t x))
   | PolyEFun i t => PolyConvertExiCase i (fun x => PolyConvert (t x))
-  | PolyMinusOne => existT _ PolyConversionEmptyData (EmptyDataAdvice, PolyConsMinusOne)
-  | PolyPlusOne => existT _ PolyConversionEmptyData (EmptyDataAdvice, PolyConsPlusOne)
-  | PolyZero => existT _ PolyConversionEmptyData (EmptyDataAdvice, PolyConsZero)
+  | PolyMinusOne => existT _ SemiConversionEmptyData (EmptyDataAdvice, PolyConsMinusOne)
+  | PolyPlusOne => existT _ SemiConversionEmptyData (EmptyDataAdvice, PolyConsPlusOne)
+  | PolyZero => existT _ SemiConversionEmptyData (EmptyDataAdvice, PolyConsZero)
   | PolyPlus r1 r2 => 
     let (d1, D1) := PolyConvert r1 in let (ad1, p1) := D1 in
     let (d2, D2) := PolyConvert r2 in let (ad2, p2) := D2 in
-    existT _ (PolyConversionCombineData d1 d2)
+    existT _ (SemiConversionCombineData d1 d2)
              (CombineDataDenotation ad1 ad2
              ,PolyConsPlus (PolyCallCast (newFC := newFreeFCalls d2) (newEC := newExiFCalls d2) (newIC := newIndCalls d2) p1) 
                            (PolyCallLift (newFC := newFreeFCalls d1) (newEC := newExiFCalls d1) (newIC := newIndCalls d1) p2))
   | PolyTimes r1 r2 => 
     let (d1, D1) := PolyConvert r1 in let (ad1, p1) := D1 in
     let (d2, D2) := PolyConvert r2 in let (ad2, p2) := D2 in
-    existT _ (PolyConversionCombineData d1 d2)
+    existT _ (SemiConversionCombineData d1 d2)
              (CombineDataDenotation ad1 ad2
              ,PolyConsTimes (PolyCallCast (newFC := newFreeFCalls d2) (newEC := newExiFCalls d2) (newIC := newIndCalls d2) p1) 
                             (PolyCallLift (newFC := newFreeFCalls d1) (newEC := newExiFCalls d1) (newIC := newIndCalls d1) p2))
   | PolyInd r1 r2 => PolyConvertIndCase (PolyConvert r1) (PolyConvert r2)
   end.
-Next Obligation. by destruct d1, d2; unfold PolyConversionDataCtx; f_equal; apply functional_extensionality;move=>[x ltx]. Qed.
-Next Obligation. by destruct d1, d2; unfold PolyConversionDataCtx; f_equal; apply functional_extensionality;move=>[x ltx]. Qed.
-Next Obligation. by destruct d1, d2; unfold PolyConversionDataCtx; f_equal; apply functional_extensionality;move=>[x ltx]. Qed.
-Next Obligation. by destruct d1, d2; unfold PolyConversionDataCtx; f_equal; apply functional_extensionality;move=>[x ltx]. Qed.
+Next Obligation. by destruct d1, d2; unfold SemiConversionDataCtx; f_equal; apply functional_extensionality;move=>[x ltx]. Qed.
+Next Obligation. by destruct d1, d2; unfold SemiConversionDataCtx; f_equal; apply functional_extensionality;move=>[x ltx]. Qed.
+Next Obligation. by destruct d1, d2; unfold SemiConversionDataCtx; f_equal; apply functional_extensionality;move=>[x ltx]. Qed.
+Next Obligation. by destruct d1, d2; unfold SemiConversionDataCtx; f_equal; apply functional_extensionality;move=>[x ltx]. Qed.
 
 (*Convert constraint to one with new function with no calls*)
 Fixpoint PropCallCast {ctx c}
@@ -679,9 +679,9 @@ Fixpoint PropCallLift {ctx c}
 
 (*Construct a proposition constraint, new calls within that constraint, simultanious with data to modify a semicircuit *)
 Program Fixpoint PropConvert {ctx X Y Z} (r : @ZerothOrderFormula ctx) :
-  { d : @PolyConversionData ctx &  
-        prod (SemiDenotation (@PolyConversionDataCtx ctx d) X Y Z)
-             (@SemicircuitPropConstraint _ (@PolyConversionDataCtx ctx d)) } := 
+  { d : @SemiConversionData ctx &  
+        prod (SemiDenotation (@SemiConversionDataCtx ctx d) X Y Z)
+             (@SemicircuitPropConstraint _ (@SemiConversionDataCtx ctx d)) } := 
   match r with
   | ZONot f => 
     let (d, D) := PropConvert f in let (ad, p) := D in
@@ -689,45 +689,45 @@ Program Fixpoint PropConvert {ctx X Y Z} (r : @ZerothOrderFormula ctx) :
   | ZOAnd f1 f2 => 
     let (d1, D1) := PropConvert f1 in let (ad1, p1) := D1 in
     let (d2, D2) := PropConvert f2 in let (ad2, p2) := D2 in
-    existT _ (PolyConversionCombineData d1 d2)
+    existT _ (SemiConversionCombineData d1 d2)
              (CombineDataDenotation ad1 ad2
              ,ZOConsAnd (PropCallCast (newFC := newFreeFCalls d2) (newEC := newExiFCalls d2) (newIC := newIndCalls d2) p1) 
                         (PropCallLift (newFC := newFreeFCalls d1) (newEC := newExiFCalls d1) (newIC := newIndCalls d1) p2))
   | ZOOr f1 f2 => 
     let (d1, D1) := PropConvert f1 in let (ad1, p1) := D1 in
     let (d2, D2) := PropConvert f2 in let (ad2, p2) := D2 in
-    existT _ (PolyConversionCombineData d1 d2)
+    existT _ (SemiConversionCombineData d1 d2)
              (CombineDataDenotation ad1 ad2
              ,ZOConsOr (PropCallCast (newFC := newFreeFCalls d2) (newEC := newExiFCalls d2) (newIC := newIndCalls d2) p1) 
                        (PropCallLift (newFC := newFreeFCalls d1) (newEC := newExiFCalls d1) (newIC := newIndCalls d1) p2))
   | ZOImp f1 f2 => 
     let (d1, D1) := PropConvert f1 in let (ad1, p1) := D1 in
     let (d2, D2) := PropConvert f2 in let (ad2, p2) := D2 in
-    existT _ (PolyConversionCombineData d1 d2)
+    existT _ (SemiConversionCombineData d1 d2)
              (CombineDataDenotation ad1 ad2
              ,ZOConsImp (PropCallCast (newFC := newFreeFCalls d2) (newEC := newExiFCalls d2) (newIC := newIndCalls d2) p1) 
                         (PropCallLift (newFC := newFreeFCalls d1) (newEC := newExiFCalls d1) (newIC := newIndCalls d1) p2))
   | ZOEq r1 r2 => 
     let (d1, D1) := PolyConvert r1 in let (ad1, p1) := D1 in
     let (d2, D2) := PolyConvert r2 in let (ad2, p2) := D2 in
-    existT _ (PolyConversionCombineData d1 d2)
+    existT _ (SemiConversionCombineData d1 d2)
              (CombineDataDenotation ad1 ad2
              ,ZOConsEq (PolyCallCast (newFC := newFreeFCalls d2) (newEC := newExiFCalls d2) (newIC := newIndCalls d2) p1) 
                        (PolyCallLift (newFC := newFreeFCalls d1) (newEC := newExiFCalls d1) (newIC := newIndCalls d1) p2))
   end.
-Next Obligation. by destruct d1, d2; unfold PolyConversionDataCtx; f_equal; apply functional_extensionality;move=>[x ltx]. Qed.
-Next Obligation. by destruct d1, d2; unfold PolyConversionDataCtx; f_equal; apply functional_extensionality;move=>[x ltx]. Qed.
-Next Obligation. by destruct d1, d2; unfold PolyConversionDataCtx; f_equal; apply functional_extensionality;move=>[x ltx]. Qed.
-Next Obligation. by destruct d1, d2; unfold PolyConversionDataCtx; f_equal; apply functional_extensionality;move=>[x ltx]. Qed.
-Next Obligation. by destruct d1, d2; unfold PolyConversionDataCtx; f_equal; apply functional_extensionality;move=>[x ltx]. Qed.
-Next Obligation. by destruct d1, d2; unfold PolyConversionDataCtx; f_equal; apply functional_extensionality;move=>[x ltx]. Qed.
-Next Obligation. by destruct d1, d2; unfold PolyConversionDataCtx; f_equal; apply functional_extensionality;move=>[x ltx]. Qed.
-Next Obligation. by destruct d1, d2; unfold PolyConversionDataCtx; f_equal; apply functional_extensionality;move=>[x ltx]. Qed.
+Next Obligation. by destruct d1, d2; unfold SemiConversionDataCtx; f_equal; apply functional_extensionality;move=>[x ltx]. Qed.
+Next Obligation. by destruct d1, d2; unfold SemiConversionDataCtx; f_equal; apply functional_extensionality;move=>[x ltx]. Qed.
+Next Obligation. by destruct d1, d2; unfold SemiConversionDataCtx; f_equal; apply functional_extensionality;move=>[x ltx]. Qed.
+Next Obligation. by destruct d1, d2; unfold SemiConversionDataCtx; f_equal; apply functional_extensionality;move=>[x ltx]. Qed.
+Next Obligation. by destruct d1, d2; unfold SemiConversionDataCtx; f_equal; apply functional_extensionality;move=>[x ltx]. Qed.
+Next Obligation. by destruct d1, d2; unfold SemiConversionDataCtx; f_equal; apply functional_extensionality;move=>[x ltx]. Qed.
+Next Obligation. by destruct d1, d2; unfold SemiConversionDataCtx; f_equal; apply functional_extensionality;move=>[x ltx]. Qed.
+Next Obligation. by destruct d1, d2; unfold SemiConversionDataCtx; f_equal; apply functional_extensionality;move=>[x ltx]. Qed.
 
 (*Integrate generated polynomial constraint data into a semicircuit*)
 Program Definition IntegrateConversionDataC {ctx}
   (c : @SemiCircuit ctx)
-  (d : @PolyConversionData ctx) : SemiCircuit :=
+  (d : @SemiConversionData ctx) : SemiCircuit :=
   let Ctx' := {|freeFC := fun x => freeFCalls c x + newFreeFCalls d x
               ; exiFC := fun x => exiFCalls c x + newExiFCalls d x
               ; indC := indCalls c + newIndCalls d |} in
@@ -840,7 +840,7 @@ Qed.
 
 Program Definition IntegrateConversionDataA {ctx X Y Z}
   {s} (ad1 : SemiDenotation (Ctx s) X Y Z)
-  {d} (ad2 : SemiDenotation (@PolyConversionDataCtx ctx d) X Y Z) :
+  {d} (ad2 : SemiDenotation (@SemiConversionDataCtx ctx d) X Y Z) :
   SemiDenotation (Ctx (IntegrateConversionDataC s d)) X Y Z :=
   fun X Y M =>
   let data' := IntegrateConversionDataC s d in
@@ -877,8 +877,8 @@ Qed.
 
 Definition IntegrateConversionData {ctx X Y Z}
   (c : {s : @SemiCircuit ctx & SemiDenotation (Ctx s) X Y Z})
-  (d : {d : @PolyConversionData ctx & 
-            SemiDenotation (@PolyConversionDataCtx ctx d) X Y Z}) : 
+  (d : {d : @SemiConversionData ctx & 
+            SemiDenotation (@SemiConversionDataCtx ctx d) X Y Z}) : 
   {s : @SemiCircuit ctx & SemiDenotation (Ctx s) X Y Z} :=
   match c, d with
   | existT c adc, existT d add =>
@@ -912,9 +912,9 @@ Check PropConvert.
 Definition PropInt {ctx X Y Z}
   (s : { s : @SemiCircuit ctx & SemiDenotation (Ctx s) X Y Z})
 
-  (d : @PolyConversionData ctx)
-  (ad : SemiDenotation (@PolyConversionDataCtx ctx d) X Y Z)
-  (p : @SemicircuitPropConstraint _ (@PolyConversionDataCtx ctx d)) :
+  (d : @SemiConversionData ctx)
+  (ad : SemiDenotation (@SemiConversionDataCtx ctx d) X Y Z)
+  (p : @SemicircuitPropConstraint _ (@SemiConversionDataCtx ctx d)) :
   { s : @SemiCircuit ctx & SemiDenotation (Ctx s) X Y Z} :=
   let c0 := IntegrateConversionDataC (projT1 s) d in
   let c' := {| Ctx := Ctx c0
@@ -1208,18 +1208,18 @@ Definition PolyIntExi {ctx X Y Z}
   (c : @SemiCircuit ctx)
   (adc : SemiDenotation (Ctx c) X Y Z)
 
-  (d : @PolyConversionData ctx)
-  (ad : SemiDenotation (@PolyConversionDataCtx ctx d) X Y Z)
-  (p : @SCPoly _ (@PolyConversionDataCtx ctx d)) :=
+  (d : @SemiConversionData ctx)
+  (ad : SemiDenotation (@SemiConversionDataCtx ctx d) X Y Z)
+  (p : @SCPoly _ (@SemiConversionDataCtx ctx d)) :=
 
   SemicircuitExiIncWA (IntegrateConversionData (existT _ c adc) (existT _ d ad)) (PolyCallLift p).
 
 Definition IntegrateNewPolyExi {ctx X Y Z}
   (s : {s' : @SemiCircuit ctx & SemiDenotation (Ctx s') X Y Z })
 
-  (p : { d : @PolyConversionData ctx &  
-        prod (SemiDenotation (@PolyConversionDataCtx ctx d) X Y Z)
-            (@SCPoly _ (@PolyConversionDataCtx ctx d)) }) :
+  (p : { d : @SemiConversionData ctx &  
+        prod (SemiDenotation (@SemiConversionDataCtx ctx d) X Y Z)
+            (@SCPoly _ (@SemiConversionDataCtx ctx d)) }) :
   {s0 : SemiCircuit & SemiDenotation (Ctx s0) X Y Z.+1} :=
   match s, p with
   | existT c adc, existT d (ad, p) => PolyIntExi c adc d ad p
@@ -1313,18 +1313,18 @@ Definition PolyIntUni {ctx X Y Z}
   (c : @SemiCircuit ctx)
   (adc : SemiDenotation (Ctx c) X Y Z)
 
-  (d : @PolyConversionData ctx)
-  (ad : SemiDenotation (@PolyConversionDataCtx ctx d) X Y Z)
-  (p : @SCPoly ctx (@PolyConversionDataCtx ctx d)) :=
+  (d : @SemiConversionData ctx)
+  (ad : SemiDenotation (@SemiConversionDataCtx ctx d) X Y Z)
+  (p : @SCPoly ctx (@SemiConversionDataCtx ctx d)) :=
 
   SemicircuitUniIncWA (IntegrateConversionData (existT _ c adc) (existT _ d ad)) (PolyCallLift p).
 
 Definition IntegrateNewPolyUni {ctx X Y Z}
   (s : {s' : @SemiCircuit ctx & SemiDenotation (Ctx s') X Y Z })
 
-  (p : { d : @PolyConversionData ctx &  
-        prod (SemiDenotation (@PolyConversionDataCtx ctx d) X Y Z)
-            (@SCPoly _ (@PolyConversionDataCtx ctx d)) }) :
+  (p : { d : @SemiConversionData ctx &  
+        prod (SemiDenotation (@SemiConversionDataCtx ctx d) X Y Z)
+            (@SCPoly _ (@SemiConversionDataCtx ctx d)) }) :
   {s0 : SemiCircuit & SemiDenotation (Ctx s0) X Y Z} :=
   match s, p with
   | existT c adc, existT d (ad, p) => PolyIntUni c adc d ad p
@@ -1649,27 +1649,27 @@ Definition PolyIntExiF {ctx X Y Z}
   (c : @SemiCircuit ctx)
   (adc : SemiDenotation (Ctx c) X Y Z)
 
-  (y : @PolyConversionData ctx)
-  (ady : SemiDenotation (@PolyConversionDataCtx ctx d) X Y Z)
-  (poy : @SCPoly _ (@PolyConversionDataCtx ctx d))
+  (y : @SemiConversionData ctx)
+  (ady : SemiDenotation (@SemiConversionDataCtx ctx d) X Y Z)
+  (poy : @SCPoly _ (@SemiConversionDataCtx ctx d))
 
-  (bs : @PolyConversionData ctx)
-  (adbs : SemiDenotation (@PolyConversionDataCtx ctx d) X Y Z)
-  (pobs : seq (@SCPoly _ (@PolyConversionDataCtx ctx d))) :=
+  (bs : @SemiConversionData ctx)
+  (adbs : SemiDenotation (@SemiConversionDataCtx ctx d) X Y Z)
+  (pobs : seq (@SCPoly _ (@SemiConversionDataCtx ctx d))) :=
 
   SemicircuitUniIncWA (IntegrateConversionData (existT _ c adc) (existT _ d ad)) (PolyCallLift p).
 
 Definition IntegrateNewPolyExiF {ctx X Y Z}
   (s : {s' : @SemiCircuit ctx & SemiDenotation (Ctx s') X Y Z })
 
-  (y : { d : @PolyConversionData ctx &  
-        prod (SemiDenotation (@PolyConversionDataCtx ctx d) X Y Z)
-             (@SCPoly _ (@PolyConversionDataCtx ctx d)) })
+  (y : { d : @SemiConversionData ctx &  
+        prod (SemiDenotation (@SemiConversionDataCtx ctx d) X Y Z)
+             (@SCPoly _ (@SemiConversionDataCtx ctx d)) })
 
   (bs : seq 
-      { d : @PolyConversionData ctx &  
-        prod (SemiDenotation (@PolyConversionDataCtx ctx d) X Y Z)
-             (@SCPoly _ (@PolyConversionDataCtx ctx d)) }) :
+      { d : @SemiConversionData ctx &  
+        prod (SemiDenotation (@SemiConversionDataCtx ctx d) X Y Z)
+             (@SCPoly _ (@SemiConversionDataCtx ctx d)) }) :
 
   {s0 : @SemiCircuit ctx & SemiDenotation (Ctx s0) X Y Z} :=
   match y with 
@@ -1690,23 +1690,23 @@ Definition PolyIntExiF {ctx X Y Z}
   (c : @SemiCircuit ctx)
   (adc : SemiDenotation (Ctx c) X Y Z)
 
-  (d : @PolyConversionData ctx)
-  (ad : SemiDenotation (@PolyConversionDataCtx ctx d) X Y Z)
-  (p : @SCPoly _ (@PolyConversionDataCtx ctx d)) :=
+  (d : @SemiConversionData ctx)
+  (ad : SemiDenotation (@SemiConversionDataCtx ctx d) X Y Z)
+  (p : @SCPoly _ (@SemiConversionDataCtx ctx d)) :=
 
   SemicircuitUniIncWA (IntegrateConversionData (existT _ c adc) (existT _ d ad)) (PolyCallLift p).
 
 Definition IntegrateNewPolyExiF {ctx X Y Z}
   (s : {s' : @SemiCircuit ctx & SemiDenotation (Ctx s') X Y Z })
 
-  (y : { d : @PolyConversionData ctx &  
-        prod (SemiDenotation (@PolyConversionDataCtx ctx d) X Y Z)
-             (@SCPoly _ (@PolyConversionDataCtx ctx d)) }) :
+  (y : { d : @SemiConversionData ctx &  
+        prod (SemiDenotation (@SemiConversionDataCtx ctx d) X Y Z)
+             (@SCPoly _ (@SemiConversionDataCtx ctx d)) }) :
 
   (bs : seq 
-      { d : @PolyConversionData ctx &  
-        prod (SemiDenotation (@PolyConversionDataCtx ctx d) X Y Z)
-             (@SCPoly _ (@PolyConversionDataCtx ctx d)) }) :
+      { d : @SemiConversionData ctx &  
+        prod (SemiDenotation (@SemiConversionDataCtx ctx d) X Y Z)
+             (@SCPoly _ (@SemiConversionDataCtx ctx d)) }) :
 
   {s0 : SemiCircuit & SemiDenotation (Ctx s0) X Y Z} :=
   match s, p with

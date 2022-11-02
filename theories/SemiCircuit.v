@@ -463,6 +463,105 @@ Program Fixpoint PolyCallLift {E IndC ExiC FreeC}
   end.
 Solve All Obligations with qauto use: ltn_add2l.
 
+Record SemiConversionData {E} {IndC : nat} {ExiC : |[length E]| -> nat} {FreeC : nat -> nat} : Type := 
+  mkPolyConvertData {
+  IndArgs : |[IndC]| -> (@SCPoly E IndC ExiC FreeC 
+                                 * @SCPoly E IndC ExiC FreeC);
+  ExiArgs : forall i, |[ExiC i]| -> |[lnth E i]| -> @SCPoly E IndC ExiC FreeC ;
+  FreeArgs : forall i a, |[FreeC i]| -> |[a]| -> @SCPoly E IndC ExiC FreeC ;
+  }.
+
+Definition SemiConversionEmptyData {E} : 
+  @SemiConversionData E 0 (fun _ => 0) (fun _ => 0) :=
+  {| IndArgs := emptyTuple; ExiArgs := fun x => emptyTuple; FreeArgs := fun _ _ => emptyTuple; |}.
+
+Program Definition SemiConversionCombineData {E nic1 nefc1 nffc1 nic2 nefc2 nffc2}
+  (d1 : @SemiConversionData E nic1 nefc1 nffc1)
+  (d2 : @SemiConversionData E nic2 nefc2 nffc2) : 
+  @SemiConversionData E (nic1 + nic2) (fun x => nefc1 x + nefc2 x) (fun x => nffc1 x + nffc2 x) :=
+  match d1, d2 with
+  | {| FreeArgs := farg1; ExiArgs := earg1; IndArgs := iarg1 |}
+  , {| FreeArgs := farg2; ExiArgs := earg2; IndArgs := iarg2 |}
+  => 
+   let SCP := @SCPoly E (nic1 + nic2) (fun x => nefc1 x + nefc2 x) (fun x => nffc1 x + nffc2 x) in
+   {| FreeArgs := fun i a j => (
+      if j < nffc1 i as b return j < nffc1 i = b -> |[a]| -> SCP
+      then fun _ k => PolyCallCast (farg1 i a j k)
+      else fun _ k => PolyCallLift (farg2 i a (j - nffc1 i) k)
+    ) (erefl _)
+    ; ExiArgs := fun i j => (
+      if j < nefc1 i as b return j < nefc1 i = b -> |[lnth E i]| -> SCP
+      then fun _ k => PolyCallCast (earg1 i j k)
+      else fun _ k => PolyCallLift (earg2 i (j - nefc1 i) k)
+    ) (erefl _) 
+    ; IndArgs := fun i => (
+      if i < nic1 as b return i < nic1 = b -> SCP * SCP
+      then fun _ => let (u, v) := iarg1 i in (PolyCallCast u, PolyCallCast v)
+      else fun _ => let (u, v) := iarg2 (i - nic1) in (PolyCallLift u, PolyCallLift v) 
+    ) (erefl _) 
+  |}
+  end.
+Next Obligation.
+  assert (nic1 <= i);[
+  hauto use: contraFltn, contra_not_leq unfold: is_true|qauto use: ltn_subLR, contraFltn].
+Qed.
+Next Obligation.
+  assert (~ (j < nefc1 (exist _ i H1)));[hauto|].
+  assert (nefc1 (exist _ i H1) <= j);[by apply (contra_not_leq (P := j < nefc1 (exist _ i H1)))|].
+  qauto use: ltn_subLR, ltn_addr.
+Qed.
+Next Obligation.
+  assert (~ (j < nffc1 i));[hauto|].
+  assert (nffc1 i <= j);[by apply (contra_not_leq (P := j < nffc1 i))|].
+  qauto use: ltn_subLR, ltn_addr.
+Qed.
+
+Fixpoint SemiConversionCombineSeq {E}
+  (ds : seq { nc & @SemiConversionData E nc.1 nc.2.1 nc.2.2}) :
+  @SemiConversionData E 
+    (sumn (map (fun x => (projT1 x).1) ds)) 
+    (fun x => sumn (map (fun z => (projT1 z).2.1 x) ds)) 
+    (fun x => sumn (map (fun z => (projT1 z).2.2 x) ds)) :=
+match ds with
+| [::] => SemiConversionEmptyData
+| existT _ x :: xs => SemiConversionCombineData x (SemiConversionCombineSeq xs)
+end.
+
+Program Fixpoint PolyConvert {E} (r : @PolyTermVS E) :
+  { nc & 
+    prod (@SemiConversionData E nc.1 nc.2.1 nc.2.2)
+         (@SCPoly E nc.1 nc.2.1 nc.2.2) } := 
+  match r with
+  | PolyFVar m => existT _ SemiConversionEmptyData (EmptyDataAdvice, PolyConsFreeV m)
+  | PolyUVar m => existT _ SemiConversionEmptyData (EmptyDataAdvice, PolyConsUniV m)
+  | PolyFFun i t => PolyConvertFreeCase i (fun x => PolyConvert (t x))
+  | PolyEFun i t => PolyConvertExiCase i (fun x => PolyConvert (t x))
+  | PolyMinusOne => existT _ SemiConversionEmptyData (EmptyDataAdvice, PolyConsMinusOne)
+  | PolyPlusOne => existT _ SemiConversionEmptyData (EmptyDataAdvice, PolyConsPlusOne)
+  | PolyZero => existT _ SemiConversionEmptyData (EmptyDataAdvice, PolyConsZero)
+  | PolyPlus r1 r2 => 
+    let (d1, D1) := PolyConvert r1 in let (ad1, p1) := D1 in
+    let (d2, D2) := PolyConvert r2 in let (ad2, p2) := D2 in
+    existT _ (SemiConversionCombineData d1 d2)
+             (CombineDataDenotation ad1 ad2
+             ,PolyConsPlus (PolyCallCast (newFC := newFreeFCalls d2) (newEC := newExiFCalls d2) (newIC := newIndCalls d2) p1) 
+                           (PolyCallLift (newFC := newFreeFCalls d1) (newEC := newExiFCalls d1) (newIC := newIndCalls d1) p2))
+  | PolyTimes r1 r2 => 
+    let (d1, D1) := PolyConvert r1 in let (ad1, p1) := D1 in
+    let (d2, D2) := PolyConvert r2 in let (ad2, p2) := D2 in
+    existT _ (SemiConversionCombineData d1 d2)
+             (CombineDataDenotation ad1 ad2
+             ,PolyConsTimes (PolyCallCast (newFC := newFreeFCalls d2) (newEC := newExiFCalls d2) (newIC := newIndCalls d2) p1) 
+                            (PolyCallLift (newFC := newFreeFCalls d1) (newEC := newExiFCalls d1) (newIC := newIndCalls d1) p2))
+  | PolyInd r1 r2 => PolyConvertIndCase (PolyConvert r1) (PolyConvert r2)
+  end.
+Next Obligation. by destruct d1, d2; unfold SemiConversionDataCtx; f_equal; apply functional_extensionality;move=>[x ltx]. Qed.
+Next Obligation. by destruct d1, d2; unfold SemiConversionDataCtx; f_equal; apply functional_extensionality;move=>[x ltx]. Qed.
+Next Obligation. by destruct d1, d2; unfold SemiConversionDataCtx; f_equal; apply functional_extensionality;move=>[x ltx]. Qed.
+Next Obligation. by destruct d1, d2; unfold SemiConversionDataCtx; f_equal; apply functional_extensionality;move=>[x ltx]. Qed.
+
+
+(* 
 Record SemiConversionData {E} : Type := mkPolyConvertData {
   newIndCalls : nat ;
   newExiFCalls : |[length E]| -> nat ;
@@ -552,4 +651,4 @@ Program Definition CombineDataDenotation {E}
      else fun _ => indCallOut (ad2 X Y M) (i - newIndCalls d1)
    ) (erefl _) 
   |}.
-Next Obligation.
+Next Obligation. *)
