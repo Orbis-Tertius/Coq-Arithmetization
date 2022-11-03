@@ -672,3 +672,7 @@ Proof.
   destruct n0;[by cbn|simpl].
   induction n0; destruct n; simpl; try by cbn; try qauto use:zero_sub.
 Qed.
+
+Definition unzip {A B a} (f : |[a]| -> A * B) := (fun i => (f i).1, fun i => (f i).2).
+
+Definition unzip_dep {a A B} (f : forall i : |[a]|, A i * B i) := (fun i => (f i).1, fun i => (f i).2).

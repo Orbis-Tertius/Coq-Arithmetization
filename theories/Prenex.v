@@ -29,18 +29,18 @@ Inductive PolyTermVS {E} : Type :=
 | PolyTimesVS : PolyTermVS -> PolyTermVS -> PolyTermVS
 | PolyIndVS : PolyTermVS -> PolyTermVS -> PolyTermVS.
 
-Inductive ZerothOrderFormulaVS {E} : Type :=
-| ZONotVS : ZerothOrderFormulaVS -> ZerothOrderFormulaVS
-| ZOAndVS : ZerothOrderFormulaVS -> ZerothOrderFormulaVS -> ZerothOrderFormulaVS
-| ZOOrVS : ZerothOrderFormulaVS -> ZerothOrderFormulaVS -> ZerothOrderFormulaVS
-| ZOImpVS : ZerothOrderFormulaVS -> ZerothOrderFormulaVS -> ZerothOrderFormulaVS
-| ZOEqVS : @PolyTermVS E -> @PolyTermVS E -> ZerothOrderFormulaVS.
+Inductive PropTermVS {E} : Type :=
+| ZONotVS : PropTermVS -> PropTermVS
+| ZOAndVS : PropTermVS -> PropTermVS -> PropTermVS
+| ZOOrVS : PropTermVS -> PropTermVS -> PropTermVS
+| ZOImpVS : PropTermVS -> PropTermVS -> PropTermVS
+| ZOEqVS : @PolyTermVS E -> @PolyTermVS E -> PropTermVS.
 
 Record Prenex {E} : Type :=
   mkPrenex {
     uniBounds : seq (@PolyTermVS E);
     exiBounds : forall i, ((|[lnth E i]| -> (@PolyTermVS E)) * (@PolyTermVS E));
-    formula : @ZerothOrderFormulaVS E
+    formula : @PropTermVS E
   }.
 
 Definition PrenexAdvice E : Type :=
@@ -81,7 +81,7 @@ Program Fixpoint PolyVSDenotation {E} (M : @Sigma11Model FSize)
 Next Obligation. apply EEConvert in e; qauto. Qed.
 
 Fixpoint PrenexZODenotation {E} (M : @Sigma11Model FSize)
-  (f : @ZerothOrderFormulaVS E)
+  (f : @PropTermVS E)
   (adv : PrenexAdvice E) :
   (nat -> 'F_FSize) -> option bool :=
   match f with
@@ -274,7 +274,7 @@ Proof.
     move: x PM EM; induction n; destruct x; try (cbn; qauto); intros; by apply IHn.
 Qed.
 
-Fixpoint ZerothOrder_ZerothOrderVS {E} (p : ZerothOrderFormula) : @ZerothOrderFormulaVS E :=
+Fixpoint ZerothOrder_ZerothOrderVS {E} (p : ZerothOrderFormula) : @PropTermVS E :=
   match p with
   | ZONot m => ZONotVS (ZerothOrder_ZerothOrderVS m)
   | ZOAnd r1 r2 => ZOAndVS (ZerothOrder_ZerothOrderVS r1) (ZerothOrder_ZerothOrderVS r2)
@@ -356,7 +356,7 @@ Program Fixpoint LiftPolyExi {a E}
 Next Obligation. apply EEConvert in e; qauto. Qed.
 
 Fixpoint LiftPropExi {a E}
-  (p : @ZerothOrderFormulaVS E) : @ZerothOrderFormulaVS (a :: E) :=
+  (p : @PropTermVS E) : @PropTermVS (a :: E) :=
   match p with
   | ZONotVS f => ZONotVS (LiftPropExi f)
   | ZOAndVS f1 f2 => ZOAndVS (LiftPropExi f1) (LiftPropExi f2)
@@ -398,8 +398,8 @@ Next Obligation.
 Qed.
 
 Fixpoint LiftPropUni {E}
-  (f : @ZerothOrderFormulaVS E):
-  @ZerothOrderFormulaVS (map (fun x => x.+1) E) :=
+  (f : @PropTermVS E):
+  @PropTermVS (map (fun x => x.+1) E) :=
   match f with
   | ZONotVS f => ZONotVS (LiftPropUni f)
   | ZOAndVS f1 f2 => ZOAndVS (LiftPropUni f1) (LiftPropUni f2)
