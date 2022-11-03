@@ -779,7 +779,7 @@ Proof.
     clear HeqP1 P1.
     rewrite eq_rect_ap_el.
     remember (LiftPolyUni_obligation_1 E _ i p _) as DDD2; clear HeqDDD2; simpl in DDD2.
-    assert (Uni_Advice_Drop_obligation_2 E i o = DDD2) as e;[apply eq_irrelevance|destruct e].
+    assert (Uni_Advice_Drop_obligation_2 E i o =DDD2 ) as e;[apply eq_irrelevance|destruct e].
     f_equal.
     apply functional_extensionality;move=>[[|x] ltx]; simpl.
     unfold ExtendAt0N; simpl.

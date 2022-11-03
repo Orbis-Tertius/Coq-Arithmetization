@@ -850,9 +850,12 @@ Proof.
   by rewrite IHar.
 Qed.
 
+(*Continue?*)
+
 Theorem Q_Prenex_Correct M p :
   QuantifiedFormula_Denote FSize M p <-> PrenexDenotation _ M (Q_Prenex p).
 Proof.
+  destruct M.
   induction p.
   move: M; elim: p.
   - move=> z M; apply ZO_Prenex_Correct.
