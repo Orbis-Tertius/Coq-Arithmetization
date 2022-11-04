@@ -676,3 +676,18 @@ Qed.
 Definition unzip {A B a} (f : |[a]| -> A * B) := (fun i => (f i).1, fun i => (f i).2).
 
 Definition unzip_dep {a A B} (f : forall i : |[a]|, A i * B i) := (fun i => (f i).1, fun i => (f i).2).
+
+Theorem LTPF {k n} : (k + n < k) = false.
+Proof.
+  move: k.
+  elim: n;[move=> k; by rewrite ZeroCanc ltnn|].
+  move=> n IH k.
+  rewrite addnS.
+  assert ((k + n < k) = false);[qauto|clear IH].
+  remember (k + n) as kn; clear Heqkn n.
+  move: H.
+  move: k; induction kn;move=> k H;cbn in *; destruct k; try qauto.
+Qed.
+
+Theorem kpmnken {k n} : (k + n - k) = n.
+Proof. qauto use: n_sub_n, addnBAC. Qed.

@@ -80,25 +80,25 @@ Program Fixpoint PolyVSDenotation {E} (M : @Sigma11Model FSize)
   end.
 Next Obligation. apply EEConvert in e; qauto. Qed.
 
-Fixpoint PrenexZODenotation {E} (M : @Sigma11Model FSize)
+Fixpoint PropVSDenotation {E} (M : @Sigma11Model FSize)
   (f : @PropTermVS E)
   (adv : PrenexAdvice E) :
   (nat -> 'F_FSize) -> option bool :=
   match f with
   | ZONotVS f => fun u => 
-    let d := PrenexZODenotation M f adv u in
-    obind (fun d => Some (negb d)) d
+    let d := PropVSDenotation M f adv u in
+    obind (fun d => Some (~~ d)) d
   | ZOAndVS f1 f2 => fun u => 
-    let d1 := PrenexZODenotation M f1 adv u in
-    let d2 := PrenexZODenotation M f2 adv u in
+    let d1 := PropVSDenotation M f1 adv u in
+    let d2 := PropVSDenotation M f2 adv u in
     obind (fun r1 => obind (fun r2 => Some (r1 && r2)) d2) d1
   | ZOOrVS f1 f2 => fun u => 
-    let d1 := PrenexZODenotation M f1 adv u in
-    let d2 := PrenexZODenotation M f2 adv u in
+    let d1 := PropVSDenotation M f1 adv u in
+    let d2 := PropVSDenotation M f2 adv u in
     obind (fun r1 => obind (fun r2 => Some (r1 || r2)) d2) d1
   | ZOImpVS f1 f2 => fun u => 
-    let d1 := PrenexZODenotation M f1 adv u in
-    let d2 := PrenexZODenotation M f2 adv u in
+    let d1 := PropVSDenotation M f1 adv u in
+    let d2 := PropVSDenotation M f2 adv u in
     obind (fun r1 => obind (fun r2 => Some (r1 ==> r2)) d2) d1
   | ZOEqVS r1 r2 => fun u => 
     let d1 := PolyVSDenotation M r1 adv u in
@@ -136,7 +136,7 @@ Program Definition U {E} (M : @Sigma11Model FSize)
 Program Definition PrenexFormulaCondition {E} (M : @Sigma11Model FSize)
   (f : Prenex) (adv : PrenexAdvice E) : Prop :=
   forall (u : U M f adv), 
-  PrenexZODenotation M (formula f) adv (MakeU u (fun _ => 0%R)) == Some true.
+  PropVSDenotation M (formula f) adv (MakeU u (fun _ => 0%R)) == Some true.
 
 Program Definition PrenexUniversalCondition {E} (M : @Sigma11Model FSize)
   (f : Prenex) (adv : PrenexAdvice E) : Prop :=
@@ -284,7 +284,7 @@ Fixpoint ZerothOrder_ZerothOrderVS {E} (p : ZerothOrderFormula) : @PropTermVS E 
   end.
 
 Theorem ZerothOrder_ZerothOrderVS_Correct M p {A} (a : PrenexAdvice _ A) t :
-  PrenexZODenotation FSize M (ZerothOrder_ZerothOrderVS p) a t = ZerothOrder_Denote _ M p.
+  PropVSDenotation FSize M (ZerothOrder_ZerothOrderVS p) a t = ZerothOrder_Denote _ M p.
 Proof.
   induction p; try qauto.
   by simpl; do 2 rewrite PolyTerm_PolyTermVS_Correct.
@@ -567,8 +567,8 @@ Proof.
 Qed.
 
 Lemma Q_Prenex_Correct_Lem_1 {M u E p f adv} :
-  PrenexZODenotation (E := E) _ (AddModelF _ M f) p adv u
-  = PrenexZODenotation FSize M (LiftPropExi p) (AdviceExtend (projT2 f) adv) u.
+  PropVSDenotation (E := E) _ (AddModelF _ M f) p adv u
+  = PropVSDenotation FSize M (LiftPropExi p) (AdviceExtend (projT2 f) adv) u.
 Proof.
   elim: p; try qauto.
   move=> p1 p2.
@@ -796,8 +796,8 @@ Qed.
 Lemma Q_Prenex_Correct_Lem_5
   {M E v o B} {u0 : 'F_FSize} {ltu : u0 < o}
   {adv : {r : 'F_FSize | r < o} -> PrenexAdvice _ E} :
-  PrenexZODenotation FSize (AddModelV FSize M u0) B (adv (exist _ u0 ltu)) v
-  = PrenexZODenotation FSize M (LiftPropUni B) (Uni_AdviceF adv) (ExtendAt0 u0 v).
+  PropVSDenotation FSize (AddModelV FSize M u0) B (adv (exist _ u0 ltu)) v
+  = PropVSDenotation FSize M (LiftPropUni B) (Uni_AdviceF adv) (ExtendAt0 u0 v).
 Proof.
   induction B; try qauto.
   simpl.
@@ -809,8 +809,8 @@ Qed.
 Lemma Q_Prenex_Correct_Lem_5_1
   {M E v B} {r : 'F_FSize}
   {adv : PrenexAdvice FSize [seq x.+1 | x <- E]} :
-  PrenexZODenotation FSize (AddModelV FSize M r) B (Uni_Advice_Drop r adv) v
-  = PrenexZODenotation FSize M (LiftPropUni B) adv (ExtendAt0 r v).
+  PropVSDenotation FSize (AddModelV FSize M r) B (Uni_Advice_Drop r adv) v
+  = PropVSDenotation FSize M (LiftPropUni B) adv (ExtendAt0 r v).
 Proof.
   induction B; try qauto.
   simpl.

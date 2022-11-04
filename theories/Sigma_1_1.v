@@ -98,7 +98,7 @@ Fixpoint ZerothOrder_Denote (M : Sigma11Model)
   match f with
   | ZONot f =>
     let d := ZerothOrder_Denote M f in
-    obind (fun d => Some (negb d)) d
+    obind (fun d => Some (~~ d)) d
   | ZOAnd f1 f2 =>
     let d1 := ZerothOrder_Denote M f1 in
     let d2 := ZerothOrder_Denote M f2 in
