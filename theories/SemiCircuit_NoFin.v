@@ -146,7 +146,7 @@ Fixpoint SCPropDenotation {E} {M : @Sigma11Model FSize}
   match p with
   | ZOConsNot p => fun u => 
     let r := SCPropDenotation adv p u in
-    obind (fun r1 => Some (negb r)) r
+    obind (fun r => Some (negb r)) r
   | ZOConsAnd p1 p2 => fun u => 
     let r1 := SCPropDenotation adv p1 u in
     let r2 := SCPropDenotation adv p2 u in
@@ -180,7 +180,7 @@ Definition U {ctx} {R} {c}
   := { t : |[uniV ctx]| -> T R | UProp inst adv t }. *)
 
 
-Definition SCInBound0 {E} {M : @Sigma11Model FSize}
+Definition SCInBound {E} {M : @Sigma11Model FSize}
   (adv : @SCAdvice E M)
   (r : 'F_FSize)
   (b : SCPoly) 
@@ -207,7 +207,7 @@ Program Definition SCU {E} {M : @Sigma11Model FSize}
   := { u : |[length (uniVBoundsSC f)]| -> 'F_FSize | 
        forall j : |[length (uniVBoundsSC f)]|,
        forall v : nat -> 'F_FSize, 
-       SCInBound0 adv (u j) (lnth (uniVBoundsSC f) j) (MakeU u v)
+       SCInBound adv (u j) (lnth (uniVBoundsSC f) j) (MakeU u v)
     }.
 
 Program Definition SCFormulaCondition {E} {M : @Sigma11Model FSize}
@@ -287,7 +287,7 @@ Program Definition SCUniversalCondition {E} {M : @Sigma11Model FSize}
   (adv : @SCAdvice E M) 
   (c : @SemiCircuit E) : Prop :=
   forall (u : nat -> 'F_FSize) (i : |[length (uniVBoundsSC c)]|),
-    (forall j : |[i]|, SCInBound0 adv (u j) (lnth (uniVBoundsSC c) j) u) ->
+    (forall j : |[i]|, SCInBound adv (u j) (lnth (uniVBoundsSC c) j) u) ->
     exists o, SCPolyDenotation0 adv (lnth (uniVBoundsSC c) i) u = Some o.
 Next Obligation. strivial use: ltn_trans. Qed.
 
@@ -491,6 +491,20 @@ Record SemiAdvice : Type :=
     ExiCOut : forall i j : nat, (nat -> 'F_FSize) -> option 'F_FSize;
     FreeCOut : forall i j : nat, (nat -> 'F_FSize) -> option 'F_FSize;
   }.
+
+Theorem SemiAdviceEta {A} : 
+  {| IndCOut := IndCOut A; ExiCOut := ExiCOut A; FreeCOut := FreeCOut A |} = A.
+Proof. by destruct A. Qed.
+
+Theorem SemiConversionDataEta {E A} : 
+  {| IndArgs := IndArgs A; ExiArgs := ExiArgs A; FreeArgs := FreeArgs (E := E) A |} = A.
+Proof. by destruct A. Qed.
+
+Theorem P5Eta {A B C D E} (a : A * B * C * D * E) : a = (a.1.1.1.1, a.1.1.1.2, a.1.1.2, a.1.2, a.2).
+Proof. by destruct a as [[[[i j] k] l] m]. Qed.
+
+Theorem P6Eta {A B C D E F} (a : A * B * C * D * E * F) : a = (a.1.1.1.1.1, a.1.1.1.1.2, a.1.1.1.2, a.1.1.2, a.1.2, a.2).
+Proof. by destruct a as [[[[[i j] k] l] m] n]. Qed.
 
 Definition SemiAdviceGenerator {E} := @Sigma11Model FSize -> PrenexAdvice FSize E -> SemiAdvice.
 
@@ -714,15 +728,15 @@ Fixpoint CallBounds {E} (nic : nat) (nefc : nat -> nat) (nffc : nat -> nat)
   | PolyConsFreeF i j => j < nffc i
   end.
 
-Theorem CallBounds_Left {E i j k l m n D} :
-  CallBounds i j k n ->
+Theorem CallBounds_Left {E G n D} :
+  CallBounds G.1.1.1.1 G.1.1.1.2 G.1.1.2 n ->
   CallBounds (E := E)
-             (SemiConversionCombineData (i, j, k, l, m) D).1.1.1.1
-             (SemiConversionCombineData (i, j, k, l, m) D).1.1.1.2
-             (SemiConversionCombineData (E := E) (i, j, k, l, m) D).1.1.2 
+             (SemiConversionCombineData G D).1.1.1.1
+             (SemiConversionCombineData G D).1.1.1.2
+             (SemiConversionCombineData (E := E) G D).1.1.2 
              n.
 Proof.
-  elim: n; try qauto.
+  elim: n; try qauto; destruct G as [[[[i j] k] l] m].
   - move=> x IHx y IHy.
     destruct l, D, p, p, p, s0; simpl in *.
     destruct (CallBounds _ _ _ _), (CallBounds _ _ _ _); auto.
@@ -744,14 +758,40 @@ Proof.
     move: jn; induction j0;move=> jn H;cbn in *; destruct jn; try qauto.
 Qed.
 
-Theorem CallBounds_Right {E i j k l m n D} :
-  CallBounds i j k n ->
-  CallBounds (E := E) (SemiConversionCombineData D (i, j, k, l, m)).1.1.1.1
-    (SemiConversionCombineData D (i, j, k, l, m)).1.1.1.2
-    (SemiConversionCombineData (E := E) D (i, j, k, l, m)).1.1.2 
+Theorem CallBounds_Left_Sum {E n0 n1 n2 a0 a1 a2 s} :
+  CallBounds (E := E) n0 n1 n2 s ->
+  CallBounds (n0 + a0)
+    (fun x : nat => n1 x + a1 x)
+    (fun x : nat => n2 x + a2 x) s.
+Proof.
+  elim: s; try qauto.
+  - move=> x IHx y IHy H.
+    simpl.
+    simpl in H.
+    rewrite IHx.
+    rewrite IHy; auto.
+    by destruct (CallBounds n0 n1 n2 x), (CallBounds n0 n1 n2 y).
+    by destruct (CallBounds n0 n1 n2 x).
+  - move=> x IHx y IHy H.
+    simpl.
+    simpl in H.
+    rewrite IHx.
+    rewrite IHy; auto.
+    by destruct (CallBounds n0 n1 n2 x), (CallBounds n0 n1 n2 y).
+    by destruct (CallBounds n0 n1 n2 x).
+  - move=> n; apply ltn_addr.
+  - move=> i j; apply ltn_addr.
+  - move=> i j; apply ltn_addr.
+Qed.
+
+Theorem CallBounds_Right {E G n D} :
+  CallBounds G.1.1.1.1 G.1.1.1.2 G.1.1.2 n ->
+  CallBounds (E := E) (SemiConversionCombineData D G).1.1.1.1
+    (SemiConversionCombineData D G).1.1.1.2
+    (SemiConversionCombineData (E := E) D G).1.1.2 
     (PolyCallLift D.1.1.1.1 D.1.1.1.2 D.1.1.2 n).
 Proof.
-  elim: n; try qauto.
+  elim: n; try qauto; destruct G as [[[[i j] k] l] m].
   - move=> x IHx y IHy.
     destruct l, D, p, p, p, s0; simpl in *.
     destruct (CallBounds _ _ _ _), (CallBounds _ _ _ _); auto.
@@ -767,6 +807,33 @@ Proof.
   - move=> n j0.
     destruct l, D, p, p, p, s0; simpl.
     by rewrite ltn_add2l.
+Qed.
+
+Theorem CallBounds_Right_Sum {E n0 n1 n2 a0 a1 a2 s} :
+  CallBounds (E := E) n0 n1 n2 s ->
+  CallBounds (a0 + n0)
+    (fun x : nat => a1 x + n1 x)
+    (fun x : nat => a2 x + n2 x) 
+    (PolyCallLift a0 a1 a2 s).
+Proof.
+  elim: s; try qauto.
+  - move=> x IHx y IHy H.
+    simpl.
+    simpl in H.
+    rewrite IHx.
+    rewrite IHy; auto.
+    by destruct (CallBounds n0 n1 n2 x), (CallBounds n0 n1 n2 y).
+    by destruct (CallBounds n0 n1 n2 x).
+  - move=> x IHx y IHy H.
+    simpl.
+    simpl in H.
+    rewrite IHx.
+    rewrite IHy; auto.
+    by destruct (CallBounds n0 n1 n2 x), (CallBounds n0 n1 n2 y).
+    by destruct (CallBounds n0 n1 n2 x).
+  - move=> n; simpl; by rewrite ltn_add2l.
+  - move=> i j; simpl; by rewrite ltn_add2l.
+  - move=> i j; simpl; by rewrite ltn_add2l.
 Qed.
 
 Theorem CallBounds_Correct {E} (r : @PolyTermVS E) :
@@ -931,16 +998,17 @@ Fixpoint SCPolySemiDenotation {E} (M : @Sigma11Model FSize)
   | PolyConsExiF i j => ExiCOut adv (` i) j
   end.
 
-Theorem CombineDenotationRight {E k j i f h Y D M A} :
+Theorem CombineDenotationRight {E G Y D M A} :
   SCPolySemiDenotation M
-    ((SemiConversionCombineData (E := E) (k, j, i, f, h) D).2 M A)
-    (PolyCallLift k j i Y) =
+    ((SemiConversionCombineData (E := E) G D).2 M A)
+    (PolyCallLift G.1.1.1.1 G.1.1.1.2 G.1.1.2 Y) =
   SCPolySemiDenotation (E := E) M (D.2 M A) Y.
 Proof.
   elim: Y; try qauto.
   - move=> n.
     simpl.
     unfold IndCOut.
+    destruct G as [[[[k i] j] f] h]; simpl.
     destruct f, D, p, p, p, s0; simpl.
     unfold CombineGens.
     destruct (h M A); simpl.
@@ -949,6 +1017,7 @@ Proof.
   - move=> i0 j0.
     simpl.
     unfold FreeCOut.
+    destruct G as [[[[k i] j] f] h]; simpl.
     destruct f, D, p, p, p, s0; simpl.
     unfold CombineGens.
     destruct (h M A); simpl.
@@ -957,6 +1026,7 @@ Proof.
   - move=> i0 n.
     simpl.
     unfold ExiCOut.
+    destruct G as [[[[k i] j] f] h]; simpl.
     destruct f, D, p, p, p, s0; simpl.
     unfold CombineGens.
     destruct (h M A); simpl.
@@ -1114,15 +1184,15 @@ Fixpoint CallBoundsP {E} (nic : nat) (nefc : nat -> nat) (nffc : nat -> nat)
     CallBounds nic nefc nffc p1 && CallBounds nic nefc nffc p2
   end.
 
-Theorem CallBoundsP_Left {E i j k l m n D} :
-  CallBoundsP i j k n ->
+Theorem CallBoundsP_Left {E A n D} :
+  CallBoundsP A.1.1.1.1 A.1.1.1.2 A.1.1.2 n ->
   CallBoundsP (E := E)
-              (SemiConversionCombineData (i, j, k, l, m) D).1.1.1.1
-              (SemiConversionCombineData (i, j, k, l, m) D).1.1.1.2
-              (SemiConversionCombineData (E := E) (i, j, k, l, m) D).1.1.2 
+              (SemiConversionCombineData A D).1.1.1.1
+              (SemiConversionCombineData A D).1.1.1.2
+              (SemiConversionCombineData (E := E) A D).1.1.2 
               n.
 Proof.
-  elim: n; try qauto.
+  elim: n; try qauto; destruct A as [[[[k j] i] l] h].
   - move=> x IHx y IHy.
     destruct l, D, p, p, p, s0; simpl in *.
     destruct (CallBoundsP _ _ _ _), (CallBoundsP _ _ _ _); auto.
@@ -1134,19 +1204,23 @@ Proof.
     destruct (CallBoundsP _ _ _ _), (CallBoundsP _ _ _ _); auto.
   - move=> x y.
     simpl=> chk.
-    rewrite CallBounds_Left.
-    rewrite CallBounds_Left; auto.
-    all: by destruct (CallBounds i j k x), (CallBounds i j k y).
+    rewrite <- (SemiConversionDataEta (A := l)).
+    rewrite (P5Eta D).
+    rewrite <- (SemiConversionDataEta (A := D.1.2)).
+    simpl.
+    rewrite CallBounds_Left_Sum.
+    rewrite CallBounds_Left_Sum; auto.
+    all: by destruct (CallBounds k j i x), (CallBounds k j i y).
 Qed.
 
-Theorem CallBoundsP_Right {E i j k l m n D} :
-  CallBoundsP i j k n ->
-  CallBoundsP (E := E) (SemiConversionCombineData D (i, j, k, l, m)).1.1.1.1
-    (SemiConversionCombineData D (i, j, k, l, m)).1.1.1.2
-    (SemiConversionCombineData (E := E) D (i, j, k, l, m)).1.1.2 
+Theorem CallBoundsP_Right {E A n D} :
+  CallBoundsP A.1.1.1.1 A.1.1.1.2 A.1.1.2 n ->
+  CallBoundsP (E := E) (SemiConversionCombineData D A).1.1.1.1
+    (SemiConversionCombineData D A).1.1.1.2
+    (SemiConversionCombineData (E := E) D A).1.1.2 
     (PropCallLift D.1.1.1.1 D.1.1.1.2 D.1.1.2 n).
 Proof.
-  elim: n; try qauto.
+  elim: n; try qauto; destruct A as [[[[k j] i] l] h].
   - move=> x IHx y IHy.
     destruct l, D, p, p, p, s0; simpl in *.
     destruct (CallBoundsP _ _ _ _), (CallBoundsP _ _ _ _); auto.
@@ -1160,7 +1234,7 @@ Proof.
     simpl=> chk.
     rewrite CallBounds_Right.
     rewrite CallBounds_Right; auto.
-    all: by destruct (CallBounds i j k x), (CallBounds i j k y).
+    all: simpl; by destruct (CallBounds k j i x), (CallBounds k j i y).
 Qed.
 
 Theorem CallBoundsP_Correct {E} (r : @PropTermVS E) :
@@ -1206,10 +1280,10 @@ Proof.
     rewrite CallBounds_Right; auto.
 Qed.
 
-Theorem CombineDenotationPropRight {E k j i f h Y D M A} :
+Theorem CombineDenotationPropRight {E G Y D M A} :
   SCPropSemiDenotation M
-    ((SemiConversionCombineData (E := E) (k, j, i, f, h) D).2 M A)
-    (PropCallLift k j i Y) =
+    ((SemiConversionCombineData (E := E) G D).2 M A)
+    (PropCallLift G.1.1.1.1 G.1.1.1.2 G.1.1.2 Y) =
   SCPropSemiDenotation (E := E) M (D.2 M A) Y.
 Proof.
   elim: Y; try qauto.
@@ -1312,6 +1386,111 @@ Proof.
     apply CallBounds_Correct.
 Qed.
 
+Theorem DenotToSemiDenotePoly {E M PCL adv} :
+  SCPolyDenotation0 FSize (E := E) (M := M) adv PCL =
+  SCPolySemiDenotation M 
+    {| IndCOut := indCallOut0 _ adv; ExiCOut := exiCallOut0 _ adv; FreeCOut := freeFCallOut0 _ adv |} PCL.
+Proof. elim PCL; try qauto. Qed.
+
+Theorem DenotToSemiDenoteProp {E M PCL adv} :
+  SCPropDenotation FSize (E := E) (M := M) adv PCL =
+  SCPropSemiDenotation M
+    {| IndCOut := indCallOut0 _ adv; ExiCOut := exiCallOut0 _ adv; FreeCOut := freeFCallOut0 _ adv |} PCL.
+Proof. 
+  elim PCL; try qauto.
+  move=> s IH.
+  simpl.
+  apply functional_extensionality=> u; f_equal.
+  apply functional_extensionality=> x; f_equal.
+  all: by rewrite DenotToSemiDenotePoly.
+Qed.
+
+Definition SCInBound0 {E} (M : @Sigma11Model FSize)
+  (adv : SemiAdvice)
+  (r : 'F_FSize)
+  (b : SCPoly) 
+  (t : nat -> 'F_FSize) : bool :=
+  match SCPolySemiDenotation (E := E) M adv b t with
+  | None => false
+  | Some e => r < e
+  end.
+
+Theorem SCInBound0_InBound {E M} a b u adv :
+  InBound (E := E) FSize M adv a b u =
+  SCInBound0 M ((SemiPolyConvert b).1.2 M adv) a (SemiPolyConvert b).2 u.
+Proof.
+  unfold SCInBound0, InBound.
+  by rewrite SemiPolyConvert_Correct.
+Qed.
+
+
+Theorem SemiConversionCombineSeq_Part {E M A b j} ej1 ej2 :
+  SCPolySemiDenotation M
+    ((SemiConversionCombineSeq [seq SemiPolyConvert i | i <- b]).1.2 M A)
+    (lnth (SemiConversionCombineSeq [seq SemiPolyConvert i | i <- b]).2 (exist _ j ej1))
+  = SCPolySemiDenotation (E := E) M 
+      ((SemiPolyConvert (lnth b (exist _ j ej2))).1.2 M A)
+      (SemiPolyConvert (lnth b (exist _ j ej2))).2.
+Proof.
+  move: j ej1 ej2 A.
+  elim: b;[fcrush|].
+  move=> a l IH j ej1 ej2 A.
+  remember (SemiConversionCombineSeq [seq SemiPolyConvert i | i <- a :: l]) as aaa.
+  replace (SemiConversionCombineSeq [seq SemiPolyConvert i | i <- a :: l])
+    with (SemiConversionCombineData (SemiPolyConvert a).1 (SemiConversionCombineSeq [seq SemiPolyConvert i | i <- l]).1
+  ,(SemiPolyConvert a).2 :: map (PolyCallLift (SemiPolyConvert a).1.1.1.1.1 (SemiPolyConvert a).1.1.1.1.2 (SemiPolyConvert a).1.1.1.2) (SemiConversionCombineSeq [seq SemiPolyConvert i | i <- l]).2)
+    in Heqaaa;[
+    | simpl;
+      destruct (SemiPolyConvert a) as [[[[[i0 j0] k0] [l00 l01 l02]] m0] n0];
+      by destruct (SemiConversionCombineSeq [seq SemiPolyConvert i | i <- l]) as [[[[[i1 j1] k1] [l10 l11 l12]] m1] n1]].
+  simpl.
+  move: ej1; rewrite Heqaaa; clear Heqaaa aaa; simpl=> ej1.
+  destruct j;[rewrite CombineDenotationLeft; auto; apply CallBounds_Correct|simpl].
+  rewrite lnth_map CombineDenotationRight; simpl.
+  remember (Utils.lnth_map_obligation_1 _ _ _ _ _) as ee; clear Heqee; simpl in ee.
+  by rewrite <- (IH j ee ej2).
+Qed.
+
+Theorem CallBoundsSeq {E l j ej1 ej2} :
+  CallBounds (lnth l (exist _ j ej1)).1.1.1.1.1 
+             (lnth l (exist _ j ej1)).1.1.1.1.2
+             (lnth l (exist _ j ej1)).1.1.1.2 
+             (lnth l (exist _ j ej1)).2 
+  ->
+  CallBounds (E := E)
+    (SemiConversionCombineSeq l).1.1.1.1.1
+    (SemiConversionCombineSeq l).1.1.1.1.2
+    (SemiConversionCombineSeq l).1.1.1.2
+    (lnth (SemiConversionCombineSeq l).2 (exist _ j ej2)).
+Proof.
+  move: j ej1 ej2; elim: l;[move=>j ej1;fcrush|].
+  move=> a l IH j ej1 ej2 H.
+  simpl.
+  move: ej2.
+  rewrite (P6Eta a); simpl.
+  rewrite (P6Eta (SemiConversionCombineSeq l)); simpl.
+  rewrite <- (SemiConversionDataEta (A := a.1.1.2)); simpl.
+  move=> ltj.
+  transitivity (
+    CallBounds (a.1.1.1.1.1 + (SemiConversionCombineSeq l).1.1.1.1.1)
+    (fun x : nat => a.1.1.1.1.2 x + (SemiConversionCombineSeq l).1.1.1.1.2 x)
+    (fun x : nat => a.1.1.1.2 x + (SemiConversionCombineSeq l).1.1.1.2 x)
+    (match j as n' return (n' = j -> SCPoly) with
+    | 0 => fun=> a.2
+    | n.+1 =>
+        fun Heq_n : n.+1 = j =>
+        lnth
+          [seq PolyCallLift a.1.1.1.1.1 a.1.1.1.1.2 a.1.1.1.2 i
+              | i <- (SemiConversionCombineSeq l).2]
+          (exist _ n (eq_ind n.+1 (fun n0 => n0 < _.+1 -> n < length _) id j Heq_n ltj))
+    end (erefl j)));[sauto|].
+  destruct j.
+  by apply CallBounds_Left_Sum.
+  rewrite lnth_map; simpl.
+  apply CallBounds_Right_Sum.
+  by apply (IH j ej1 _).
+Qed.
+
 Theorem Prenex_Semicircuit_Correct {E M} (p : @Prenex E) :
   PrenexDenotation FSize M p <-> @SCDenotation _ _ M (Prenex_Semicircuit p).1.
 Proof.
@@ -1319,12 +1498,12 @@ Proof.
   - move=>[A [H0 [H1 H2]]]; exists ((Prenex_Semicircuit p).2 M A).
     remember (Prenex_Semicircuit p) as PSP.
     destruct p; simpl in HeqPSP.
-    rewrite (surjective_pairing (SemiConversionCombineSeq [seq SemiPolyConvert i | i <- uniBounds]))
+    rewrite (surjective_pairing (SemiConversionCombineSeq _))
             (surjective_pairing (SemiPropConvert formula))
-            (surjective_pairing (SemiConversionCombineSeq [seq SemiPolyConvert i | i <- uniBounds]).1)
-            (surjective_pairing (SemiConversionCombineSeq [seq SemiPolyConvert i | i <- uniBounds]).1.1)
-            (surjective_pairing (SemiConversionCombineSeq [seq SemiPolyConvert i | i <- uniBounds]).1.1.1)
-            (surjective_pairing (SemiConversionCombineSeq [seq SemiPolyConvert i | i <- uniBounds]).1.1.1.1)
+            (surjective_pairing (SemiConversionCombineSeq _).1)
+            (surjective_pairing (SemiConversionCombineSeq _).1.1)
+            (surjective_pairing (SemiConversionCombineSeq _).1.1.1)
+            (surjective_pairing (SemiConversionCombineSeq _).1.1.1.1)
             (surjective_pairing (SemiConversionCombineData _ _))
             (surjective_pairing (SemiConversionCombineData _ _).1)
             (surjective_pairing (SemiConversionCombineData _ _).1.1)
@@ -1334,6 +1513,109 @@ Proof.
     + rewrite HeqPSP; clear HeqPSP PSP; simpl.
       unfold SCFormulaCondition.
       move=>[u ltu]; simpl in *.
+      rewrite DenotToSemiDenoteProp; simpl.
+      rewrite SemiAdviceEta.
+      rewrite CombineDenotationPropRight.
+      rewrite <- SemiPropConvert_Correct.
+      remember (SemiConversionCombineSeq_length (ds := [seq SemiPolyConvert i | i <- uniBounds])) as H00;
+      clear HeqH00; rewrite map_length in H00.
+      remember (eq_rect _ (fun x => |[x]| -> _) u _ H00) as u'; simpl in u'.
+      assert (forall (j : |[length uniBounds]|) (v : nat -> 'F_FSize),
+             InBound FSize M A (u' j) (lnth uniBounds j) (MakeU u' v)).
+      move=> [j0 ltj] v.
+      assert (j0 < length (SemiConversionCombineSeq [seq SemiPolyConvert i | i <- uniBounds]).2) as ltj';[qauto|].
+      remember (ltu (exist _ j0 ltj') v) as ltu'; clear Heqltu' ltu.
+      unfold InBound.
+      rewrite SemiPolyConvert_Correct.
+      unfold SCInBound in ltu'.
+      rewrite DenotToSemiDenotePoly SemiAdviceEta in ltu'; simpl in ltu'.
+      replace (u' (exist _ j0 ltj)) with (u (exist _ j0 ltj')).
+      replace (MakeU u' v) with (MakeU u v).
+      remember (SCPolySemiDenotation _ _ _) as SCP.
+      replace (SCPolySemiDenotation _ _ _) with SCP; auto.
+      rewrite HeqSCP; clear ltu' HeqSCP SCP.
+      rewrite CombineDenotationLeft.
+      by rewrite (SemiConversionCombineSeq_Part _ ltj).
+      assert (j0 < length [seq SemiPolyConvert i | i <- uniBounds]) as ltj2;[by rewrite map_length|].
+      apply (CallBoundsSeq (j := j0) (ej1 := ltj2)).
+      rewrite lnth_map; simpl.
+      by apply CallBounds_Correct.
+      rewrite Hequ'; clear Hequ' u' ltu'.
+      by destruct H00.
+      rewrite Hequ'; clear Hequ' u' ltu'.
+      rewrite eq_rect_ap_el; f_equal.
+      by apply subset_eq; rewrite projT1_eq_rect.
+      remember (H0 (exist _ u' H)) as H0'; clear HeqH0' H0; simpl in H0'; clear H.
+      replace (MakeU u (fun=> 0%R)) with (MakeU u' (fun=> 0%R)); auto.
+      rewrite Hequ'; clear Hequ' u' H0'.
+      by destruct H00.
+    + 
+      by destruct H00.
+
+      remember (Utils.lnth_map_obligation_1 _ _ _ _ (exist _ j0 ltj2)) as EE1.
+ 
+      replace (Utils.lnth_map_obligation_1 PolyTermVS
+              (nat * (nat -> nat) * (nat -> nat) * SemiConversionData *
+               SemiAdviceGenerator * SCPoly) [eta SemiPolyConvert] uniBounds
+              (exist
+                 (fun n : nat =>
+                  n < length [seq SemiPolyConvert i | i <- uniBounds]) j0
+                 ltj2)) with ltj;[|apply eq_irrelevance].
+
+
+
+      apply subset_eq in Heqj0'; rewrite projT1_eq_rect in Heqj0'; simpl in Heqj0'; symmetry in Heqj0'; destruct Heqj0'.
+      by destruct j0.
+      replace x with (` j0).
+      rewrite Heqj0'; clear Heqj0' j0'.
+      destruct 
+      rewrite 
+      destruct (esym H00).
+    rewrite Hequ'; clear Hequ' u'.
+    clear HeqSCCS ExiArgs0 FreeArgs0 IndArgs0 H0 H1 H2.
+    destruct H00.
+    rewrite <- (SemiAdviceEta (A := (SemiPropConvert formula).1.1.2)) in ltu'.
+    rewrite SemiAdviceEta in ltu'.
+            (surjective_pairing ((SemiPropConvert formula).1.1))
+            (surjective_pairing ((SemiPropConvert formula).1.1.1))
+            (surjective_pairing ((SemiPropConvert formula).1.1.1)) in ltu'.
+            (surjective_pairing (SemiPropConvert formula))
+            (surjective_pairing (SemiConversionCombineSeq _).1)
+            (surjective_pairing (SemiConversionCombineSeq _).1.1)
+            (surjective_pairing (SemiConversionCombineSeq _).1.1.1)
+            (surjective_pairing (SemiConversionCombineSeq _).1.1.1.1)
+            (surjective_pairing (SemiConversionCombineData _ _))
+            (surjective_pairing (SemiConversionCombineData _ _).1)
+            (surjective_pairing (SemiConversionCombineData _ _).1.1)
+            (surjective_pairing (SemiConversionCombineData _ _).1.1.1) in HeqPSP.
+      Check (lnth n j0').
+
+
+      simpl in ltu.
+    destruct H00.
+      apply H0.
+
+      2:{ rewrite HeqSCP; clear HeqSCP SCP.
+          remember ((SemiConversionCombineData SCCS.1 (SemiPropConvert formula).1).2 M A) as GG.
+          clear HeqGG HeqPCL ltu u HeqSCCS SCCS H2 H1 H0 formula uniBounds.
+
+
+
+
+          elim PCL.
+          unfold SCPropSemiDenotation.
+          simpl.
+      rewrite <- (CombineDenotationPropRight (k := (SemiConversionCombineSeq [seq SemiPolyConvert i | i <- uniBounds]).1.1.1.1.1)
+                                             (j := (SemiConversionCombineSeq [seq SemiPolyConvert i | i <- uniBounds]).1.1.1.1.2)
+                                             (i := (SemiConversionCombineSeq [seq SemiPolyConvert i | i <- uniBounds]).1.1.1.2)
+                                             
+
+Theorem CombineDenotationPropRight {E k j i f h Y D M A} :
+  SCPropSemiDenotation M
+    ((SemiConversionCombineData (E := E) (k, j, i, f, h) D).2 M A)
+    (PropCallLift k j i Y) =
+  SCPropSemiDenotation (E := E) M (D.2 M A) Y.
+
       assert (length uniBounds = length (SemiConversionCombineSeq [seq SemiPolyConvert i | i <- uniBounds]).2) as e;[by rewrite SemiConversionCombineSeq_length map_length|].
 
       .
