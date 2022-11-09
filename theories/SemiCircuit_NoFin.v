@@ -47,23 +47,26 @@ Inductive SCProp {E} : Type :=
 
 Record SemiCircuit {E} : Type :=
   mkSemiCircuit {
-    (* nu : {s : |[exiV ctx]| -> { m : nat | m <= uniV ctx } | forall i j : |[exiV ctx]|, (` i) <= (` j) -> (` (s j)) <= (` (s i))}; *)
-    indArgs0 : nat -> (@SCPoly E * @SCPoly E);
-    indArgsS : forall x : |[length E]|, 
-               nat -> (@SCPoly E * @SCPoly E );
-    (* w in paper *)
-    freeFArgs0 : forall i a : nat, nat -> (|[a]| -> @SCPoly E);
-    freeFArgsS : forall x : |[length E]|, 
-                 forall i a j: nat, (|[a]| -> @SCPoly E);
-    (* omega in paper *)
-    exiArgs0 : forall i, nat -> (|[lnth E i]| -> @SCPoly E);
-    exiArgsS : forall x : |[length E]|, 
-                 forall i, nat -> (|[lnth E i]| -> @SCPoly E);
     (* V in paper *)
     uniVBoundsSC : seq (@SCPoly E);
     (* S, G and B in paper *)
     exiFBoundsSC : forall i, (|[lnth E i]| -> @SCPoly E) * @SCPoly E;
-    formulaSC : @SCProp E
+    formulaSC : @SCProp E;
+    (* nu : {s : |[exiV ctx]| -> { m : nat | m <= uniV ctx } | forall i j : |[exiV ctx]|, (` i) <= (` j) -> (` (s j)) <= (` (s i))}; *)
+    indArgsF : nat -> (@SCPoly E * @SCPoly E);
+    indArgsU : nat -> nat -> (@SCPoly E * @SCPoly E);
+    indArgsE : forall x : |[length E]|, 
+               nat -> (@SCPoly E * @SCPoly E );
+    (* w in paper *)
+    freeFArgsF : forall i a : nat, nat -> (|[a]| -> @SCPoly E);
+    freeFArgsU : forall b i a : nat, nat -> (|[a]| -> @SCPoly E);
+    freeFArgsE : forall x : |[length E]|, 
+                 forall i a j: nat, (|[a]| -> @SCPoly E);
+    (* omega in paper *)
+    exiArgsF : forall i, nat -> (|[lnth E i]| -> @SCPoly E);
+    exiArgsU : nat -> forall i, nat -> (|[lnth E i]| -> @SCPoly E);
+    exiArgsE : forall x : |[length E]|, 
+                 forall i, nat -> (|[lnth E i]| -> @SCPoly E);
   }.
 
 (* Record SCInstance {ctx} {R : RingData} {c : @SemicircuitCtx ctx} : Type :=
@@ -79,19 +82,22 @@ Record SCAdvice {E} {M : @Sigma11Model FSize} : Type :=
     (* s and g in paper *)
     exiAdv : forall i, (|[lnth E i]| -> 'F_FSize) -> option 'F_FSize;
     (*Arguments are: which bound, which call*)
-    indCallOut0 : nat -> (nat -> 'F_FSize) -> option 'F_FSize;
-    indCallOutS : forall x : |[length E]|, nat -> (nat -> 'F_FSize) -> option 'F_FSize;
+    indCallOutF : nat -> (nat -> 'F_FSize) -> option 'F_FSize;
+    indCallOutU : nat -> nat -> (nat -> 'F_FSize) -> option 'F_FSize;
+    indCallOutE : forall x : |[length E]|, nat -> (nat -> 'F_FSize) -> option 'F_FSize;
     (* sigma in paper *)
     (*Arguments are: which bound, which function, which call*)
-    exiCallOut0 : forall i j : nat, (nat -> 'F_FSize) -> option 'F_FSize;
-    exiCallOutS : forall x : |[length E]|, forall i j : nat, (nat -> 'F_FSize) -> option 'F_FSize;
+    exiCallOutF : forall i j : nat, (nat -> 'F_FSize) -> option 'F_FSize;
+    exiCallOutU : forall b i j : nat, (nat -> 'F_FSize) -> option 'F_FSize;
+    exiCallOutE : forall x : |[length E]|, forall i j : nat, (nat -> 'F_FSize) -> option 'F_FSize;
     (* o in paper *)
     (*Arguments are: which bound, which function, which call*)
-    freeFCallOut0 : forall i j : nat, (nat -> 'F_FSize) -> option 'F_FSize;
-    freeFCallOutS : forall x : |[length E]|, forall i j : nat, (nat -> 'F_FSize) -> option 'F_FSize;
+    freeFCallOutF : forall i j : nat, (nat -> 'F_FSize) -> option 'F_FSize;
+    freeFCallOutU : forall b i j : nat, (nat -> 'F_FSize) -> option 'F_FSize;
+    freeFCallOutE : forall x : |[length E]|, forall i j : nat, (nat -> 'F_FSize) -> option 'F_FSize;
   }.
 
-Fixpoint SCPolyDenotation0 {E} {M : @Sigma11Model FSize}
+Fixpoint SCPolyDenotationF {E} {M : @Sigma11Model FSize}
   (adv : @SCAdvice E M)
   (p : @SCPoly E) :
   (nat -> 'F_FSize) -> option 'F_FSize :=
@@ -101,21 +107,21 @@ Fixpoint SCPolyDenotation0 {E} {M : @Sigma11Model FSize}
   | PolyConsPlusOne => fun _ => Some 1%R
   | PolyConsMinusOne => fun _ => Some (-1)%R
   | PolyConsPlus p1 p2 => fun u =>
-    let r1 := SCPolyDenotation0 adv p1 u in
-    let r2 := SCPolyDenotation0 adv p2 u in 
+    let r1 := SCPolyDenotationF adv p1 u in
+    let r2 := SCPolyDenotationF adv p2 u in 
     obind (fun r1 => obind (fun r2 => Some (r1 + r2)%R) r2) r1
   | PolyConsTimes p1 p2 => fun u =>
-    let r1 := SCPolyDenotation0 adv p1 u in
-    let r2 := SCPolyDenotation0 adv p2 u in 
+    let r1 := SCPolyDenotationF adv p1 u in
+    let r2 := SCPolyDenotationF adv p2 u in 
     obind (fun r1 => obind (fun r2 => Some (r1 * r2)%R) r2) r1
-  | PolyConsInd i => indCallOut0 adv i
+  | PolyConsInd i => indCallOutF adv i
   | PolyConsFreeV i => fun _ => Some (V_F _ M i)
   | PolyConsUniV i => fun u => Some (u i)
-  | PolyConsFreeF i j => freeFCallOut0 adv i j
-  | PolyConsExiF i j => exiCallOut0 adv (` i) j
+  | PolyConsFreeF i j => freeFCallOutF adv i j
+  | PolyConsExiF i j => exiCallOutF adv (` i) j
   end.
 
-Fixpoint SCPolyDenotationS {E} {M : @Sigma11Model FSize}
+Fixpoint SCPolyDenotationU {E} {M : @Sigma11Model FSize}
   (adv : @SCAdvice E M)
   x (p : @SCPoly E) :
   (nat -> 'F_FSize) -> option 'F_FSize :=
@@ -125,18 +131,42 @@ Fixpoint SCPolyDenotationS {E} {M : @Sigma11Model FSize}
   | PolyConsPlusOne => fun _ => Some 1%R
   | PolyConsMinusOne => fun _ => Some (-1)%R
   | PolyConsPlus p1 p2 => fun u =>
-    let r1 := SCPolyDenotationS adv x p1 u in
-    let r2 := SCPolyDenotationS adv x p2 u in 
+    let r1 := SCPolyDenotationU adv x p1 u in
+    let r2 := SCPolyDenotationU adv x p2 u in 
     obind (fun r1 => obind (fun r2 => Some (r1 + r2)%R) r2) r1
   | PolyConsTimes p1 p2 => fun u =>
-    let r1 := SCPolyDenotationS adv x p1 u in
-    let r2 := SCPolyDenotationS adv x p2 u in 
+    let r1 := SCPolyDenotationU adv x p1 u in
+    let r2 := SCPolyDenotationU adv x p2 u in 
     obind (fun r1 => obind (fun r2 => Some (r1 * r2)%R) r2) r1
-  | PolyConsInd i => indCallOutS adv x i
+  | PolyConsInd i => indCallOutU adv x i
   | PolyConsFreeV i => fun _ => Some (V_F _ M i)
   | PolyConsUniV i => fun u => Some (u i)
-  | PolyConsFreeF i j => freeFCallOutS adv x i j
-  | PolyConsExiF i j => exiCallOutS adv x (` i) j
+  | PolyConsFreeF i j => freeFCallOutU adv x i j
+  | PolyConsExiF i j => exiCallOutU adv x (` i) j
+  end.
+
+Fixpoint SCPolyDenotationE {E} {M : @Sigma11Model FSize}
+  (adv : @SCAdvice E M)
+  x (p : @SCPoly E) :
+  (nat -> 'F_FSize) -> option 'F_FSize :=
+  match p with
+  | PolyConsUndef => fun _ => None
+  | PolyConsZero => fun _ => Some 0%R
+  | PolyConsPlusOne => fun _ => Some 1%R
+  | PolyConsMinusOne => fun _ => Some (-1)%R
+  | PolyConsPlus p1 p2 => fun u =>
+    let r1 := SCPolyDenotationE adv x p1 u in
+    let r2 := SCPolyDenotationE adv x p2 u in 
+    obind (fun r1 => obind (fun r2 => Some (r1 + r2)%R) r2) r1
+  | PolyConsTimes p1 p2 => fun u =>
+    let r1 := SCPolyDenotationE adv x p1 u in
+    let r2 := SCPolyDenotationE adv x p2 u in 
+    obind (fun r1 => obind (fun r2 => Some (r1 * r2)%R) r2) r1
+  | PolyConsInd i => indCallOutE adv x i
+  | PolyConsFreeV i => fun _ => Some (V_F _ M i)
+  | PolyConsUniV i => fun u => Some (u i)
+  | PolyConsFreeF i j => freeFCallOutE adv x i j
+  | PolyConsExiF i j => exiCallOutE adv x (` i) j
   end.
 
 Fixpoint SCPropDenotation {E} {M : @Sigma11Model FSize}
@@ -160,8 +190,8 @@ Fixpoint SCPropDenotation {E} {M : @Sigma11Model FSize}
     let r2 := SCPropDenotation adv p2 u in
     obind (fun r1 => obind (fun r2 => Some (r1 ==> r2)) r2) r1
   | ZOConsEq p1 p2 => fun u => 
-    let r1 := SCPolyDenotation0 adv p1 u in
-    let r2 := SCPolyDenotation0 adv p2 u in
+    let r1 := SCPolyDenotationF adv p1 u in
+    let r2 := SCPolyDenotationF adv p2 u in
     obind (fun r1 => obind (fun r2 => Some (r1 == r2)) r2) r1
   end.
 
@@ -180,22 +210,32 @@ Definition U {ctx} {R} {c}
   := { t : |[uniV ctx]| -> T R | UProp inst adv t }. *)
 
 
-Definition SCInBound {E} {M : @Sigma11Model FSize}
+Definition SCInBoundF {E} {M : @Sigma11Model FSize}
   (adv : @SCAdvice E M)
   (r : 'F_FSize)
   (b : SCPoly) 
   (t : nat -> 'F_FSize) : bool :=
-  match SCPolyDenotation0 adv b t with
+  match SCPolyDenotationF adv b t with
   | None => false
   | Some e => r < e
   end.
 
-Definition SCInBoundS {E} {M : @Sigma11Model FSize}
-  (adv : @SCAdvice E M) x
+Definition SCInBoundU {E} {M : @Sigma11Model FSize}
+  (adv : @SCAdvice E M)
   (r : 'F_FSize)
-  (b : SCPoly) 
+  x (b : SCPoly) 
   (t : nat -> 'F_FSize) : bool :=
-  match SCPolyDenotationS adv x b t with
+  match SCPolyDenotationU adv x b t with
+  | None => false
+  | Some e => r < e
+  end.
+
+Definition SCInBoundE {E} {M : @Sigma11Model FSize}
+  (adv : @SCAdvice E M)
+  (r : 'F_FSize)
+  x (b : SCPoly) 
+  (t : nat -> 'F_FSize) : bool :=
+  match SCPolyDenotationE adv x b t with
   | None => false
   | Some e => r < e
   end.
@@ -207,7 +247,7 @@ Program Definition SCU {E} {M : @Sigma11Model FSize}
   := { u : |[length (uniVBoundsSC f)]| -> 'F_FSize | 
        forall j : |[length (uniVBoundsSC f)]|,
        forall v : nat -> 'F_FSize, 
-       SCInBound adv (u j) (lnth (uniVBoundsSC f) j) (MakeU u v)
+       SCInBoundF adv (u j) (lnth (uniVBoundsSC f) j) (MakeU u v)
     }.
 
 Program Definition SCFormulaCondition {E} {M : @Sigma11Model FSize}
@@ -224,71 +264,102 @@ Program Definition SCFormulaCondition {E} {M : @Sigma11Model FSize}
        SCInBoundS adv x (u j) ((exiFBoundsSC f x).1 j) (MakeU u v)
     }. *)
 
-Program Definition SCIndCondition0 {E} {M : @Sigma11Model FSize}
+Program Definition SCIndConditionF {E} {M : @Sigma11Model FSize}
   (adv : @SCAdvice E M) (c : SemiCircuit) : Prop :=
-  forall v : nat -> 'F_FSize, forall u : SCU adv c, forall i,
-  let (a1, a2) := indArgs0 c i in
-  let b1 : option 'F_FSize := SCPolyDenotation0 adv a1 (MakeU u v) in
-  let b2 : option 'F_FSize := SCPolyDenotation0 adv a2 (MakeU u v) in
+  forall v : nat -> 'F_FSize, forall i, forall u : SCU adv c, 
+  let (a1, a2) := indArgsF c i in
+  let b1 : option 'F_FSize := SCPolyDenotationF adv a1 (MakeU u v) in
+  let b2 : option 'F_FSize := SCPolyDenotationF adv a2 (MakeU u v) in
   obind (fun b1 => obind (fun b2 => Some (indFun b1 b2)) b2) b1
-  = indCallOut0 adv i (MakeU u v).
+  = indCallOutF adv i (MakeU u v).
 
-Program Definition SCIndConditionS {E} {M : @Sigma11Model FSize}
+Program Definition SCIndConditionU {E} {M : @Sigma11Model FSize}
+  (adv : @SCAdvice E M) (c : SemiCircuit) : Prop :=
+  forall v : nat -> 'F_FSize, forall (x : |[length (uniVBoundsSC c)]|) i, forall (u : nat -> 'F_FSize),
+    (forall j : |[x]|, SCInBoundU adv (u j) x (lnth (uniVBoundsSC c) j) u) ->
+  let (a1, a2) := indArgsU c x i in
+  let b1 : option 'F_FSize := SCPolyDenotationU adv x a1 u in
+  let b2 : option 'F_FSize := SCPolyDenotationU adv x a2 u in
+  obind (fun b1 => obind (fun b2 => Some (indFun b1 b2)) b2) b1
+  = indCallOutU adv x i u.
+Next Obligation. by apply (ltn_trans H). Qed.
+
+Program Definition SCIndConditionE {E} {M : @Sigma11Model FSize}
   (adv : @SCAdvice E M)
   (c : @SemiCircuit E) : Prop :=
   forall v : nat -> 'F_FSize, forall x : |[length E]|, forall i,
   forall (ins : |[lnth E x]| -> 'F_FSize) (out : 'F_FSize),
   exiAdv adv x ins == Some out -> 
-  let (a1, a2) := indArgsS c x i in
-  let b1 : option 'F_FSize := SCPolyDenotationS adv x a1 (MakeU ins v) in
-  let b2 : option 'F_FSize := SCPolyDenotationS adv x a2 (MakeU ins v) in
+  let (a1, a2) := indArgsE c x i in
+  let b1 : option 'F_FSize := SCPolyDenotationE adv x a1 (MakeU ins v) in
+  let b2 : option 'F_FSize := SCPolyDenotationE adv x a2 (MakeU ins v) in
   obind (fun b1 => obind (fun b2 => Some (indFun b1 b2)) b2) b1
-  = indCallOutS adv x i (MakeU ins v).
+  = indCallOutE adv x i (MakeU ins v).
 
-Program Definition SCExiFCondition0 {E} {M : @Sigma11Model FSize}
+Program Definition SCExiFConditionF {E} {M : @Sigma11Model FSize}
   (adv : @SCAdvice E M) (c : SemiCircuit) : Prop :=
   forall v : nat -> 'F_FSize, forall u : SCU adv c, forall (i : |[length E]|) j,
   let t (a : |[lnth E i]|) : option 'F_FSize
-      := SCPolyDenotation0 adv (exiArgs0 c i j a) (MakeU u v) in
+      := SCPolyDenotationF adv (exiArgsF c i j a) (MakeU u v) in
   obind (fun t => exiAdv adv i t) (option_fun t)  
-  = exiCallOut0 adv i j (MakeU u v).
+  = exiCallOutF adv i j (MakeU u v).
 
-Program Definition SCExiFConditionS {E} {M : @Sigma11Model FSize}
+Program Definition SCExiFConditionU {E} {M : @Sigma11Model FSize}
+  (adv : @SCAdvice E M) (c : SemiCircuit) : Prop :=
+  forall v : nat -> 'F_FSize, forall (x : |[length (uniVBoundsSC c)]|) (i : |[length E]|) j,
+  forall (u : nat -> 'F_FSize), (forall j : |[x]|, SCInBoundU adv (u j) x (lnth (uniVBoundsSC c) j) u) ->
+  let t (a : |[lnth E i]|) : option 'F_FSize
+      := SCPolyDenotationU adv x (exiArgsU c x i j a) u in
+  obind (fun t => exiAdv adv i t) (option_fun t)  
+  = exiCallOutU adv x i j u.
+Next Obligation. by apply (ltn_trans H). Qed.
+
+Program Definition SCExiFConditionE {E} {M : @Sigma11Model FSize}
   (adv : @SCAdvice E M)
   (c : @SemiCircuit E) : Prop :=
   forall v : nat -> 'F_FSize, forall x, forall (i : |[length E]|) j,
   forall (ins : |[lnth E x]| -> 'F_FSize) (out : 'F_FSize),
   exiAdv adv x ins == Some out -> 
   let t (a : |[lnth E i]|) : option 'F_FSize
-      := SCPolyDenotationS adv x (exiArgsS c x i j a) (MakeU ins v) in
+      := SCPolyDenotationE adv x (exiArgsE c x i j a) (MakeU ins v) in
   obind (fun t => exiAdv adv i t) (option_fun t)  
-  = exiCallOutS adv x i j (MakeU ins v).
+  = exiCallOutE adv x i j (MakeU ins v).
 
-Program Definition SCFreeFCondition0 {E} {M : @Sigma11Model FSize}
+Program Definition SCFreeFConditionF {E} {M : @Sigma11Model FSize}
   (adv : @SCAdvice E M) (c : SemiCircuit) : Prop :=
   forall v : nat -> 'F_FSize, forall u : SCU adv c, forall (i : |[length E]|) j,
   let t a : option 'F_FSize
-      := SCPolyDenotation0 adv (freeFArgs0 c i (projT1 (F_S _ M i)) j a) (MakeU u v) in
+      := SCPolyDenotationF adv (freeFArgsF c i (projT1 (F_S _ M i)) j a) (MakeU u v) in
   obind (fun t => projT2 (F_S _ M i) t) (option_fun t)
-  = freeFCallOut0 adv i j (MakeU u v).
+  = freeFCallOutF adv i j (MakeU u v).
 
-Program Definition SCFreeFConditionS {E} {M : @Sigma11Model FSize}
+Program Definition SCFreeFConditionU {E} {M : @Sigma11Model FSize}
+  (adv : @SCAdvice E M) (c : SemiCircuit) : Prop :=
+  forall v : nat -> 'F_FSize, forall u : SCU adv c, forall (x : |[length (uniVBoundsSC c)]|) (i : |[length E]|) j,
+  forall (u : nat -> 'F_FSize), (forall j : |[x]|, SCInBoundU adv (u j) x (lnth (uniVBoundsSC c) j) u) ->
+  let t a : option 'F_FSize
+      := SCPolyDenotationU adv x (freeFArgsU c x i (projT1 (F_S _ M i)) j a) u in
+  obind (fun t => projT2 (F_S _ M i) t) (option_fun t)
+  = freeFCallOutU adv x i j u.
+Next Obligation. by apply (ltn_trans H). Qed.
+
+Program Definition SCFreeFConditionE {E} {M : @Sigma11Model FSize}
   (adv : @SCAdvice E M) 
   (c : @SemiCircuit E) : Prop :=
   forall v : nat -> 'F_FSize, forall x, forall (i : |[length E]|) j,
   forall (ins : |[lnth E x]| -> 'F_FSize) (out : 'F_FSize),
   exiAdv adv x ins == Some out -> 
   let t a : option 'F_FSize
-      := SCPolyDenotationS adv x (freeFArgsS c x i (projT1 (F_S _ M i)) j a) (MakeU ins v) in
+      := SCPolyDenotationE adv x (freeFArgsE c x i (projT1 (F_S _ M i)) j a) (MakeU ins v) in
   obind (fun t => projT2 (F_S _ M i) t) (option_fun t)
-  = freeFCallOutS adv x i j (MakeU ins v).
+  = freeFCallOutE adv x i j (MakeU ins v).
 
 Program Definition SCUniversalCondition {E} {M : @Sigma11Model FSize}
   (adv : @SCAdvice E M) 
   (c : @SemiCircuit E) : Prop :=
   forall (u : nat -> 'F_FSize) (i : |[length (uniVBoundsSC c)]|),
-    (forall j : |[i]|, SCInBound adv (u j) (lnth (uniVBoundsSC c) j) u) ->
-    exists o, SCPolyDenotation0 adv (lnth (uniVBoundsSC c) i) u = Some o.
+    (forall j : |[i]|, SCInBoundF adv (u j) (lnth (uniVBoundsSC c) j) u) ->
+  exists o, SCPolyDenotationF adv (lnth (uniVBoundsSC c) i) u = Some o.
 Next Obligation. strivial use: ltn_trans. Qed.
 
 Program Fixpoint SCFunBounds {E} {M : @Sigma11Model FSize}
@@ -297,8 +368,8 @@ Program Fixpoint SCFunBounds {E} {M : @Sigma11Model FSize}
   (insB : |[a]| -> SCPoly) (outB : SCPoly) :
   (nat -> 'F_FSize) -> bool := fun u =>
   match a with
-  | 0 => SCInBoundS adv x out outB u
-  | n.+1 => SCInBoundS adv x (ins 0) (insB 0) u &&
+  | 0 => SCInBoundE adv out x outB u
+  | n.+1 => SCInBoundE adv (ins 0) x (insB 0) u &&
     @SCFunBounds E M 
       adv x n (fun x => ins (x.+1)) out (fun x => insB (x.+1)) outB u
   end.
@@ -317,12 +388,15 @@ Definition SCDenotation {E} {M : @Sigma11Model FSize}
   (c : SemiCircuit) : Prop :=
   exists (a : @SCAdvice E M),
     SCFormulaCondition a c /\
-    SCIndCondition0 a c /\
-    SCIndConditionS a c /\
-    SCExiFCondition0 a c /\
-    SCExiFConditionS a c /\
-    SCFreeFCondition0 a c /\
-    SCFreeFConditionS a c /\
+    SCIndConditionF a c /\
+    SCIndConditionU a c /\
+    SCIndConditionE a c /\
+    SCExiFConditionF a c /\
+    SCExiFConditionU a c /\
+    SCExiFConditionE a c /\
+    SCFreeFConditionF a c /\
+    SCFreeFConditionU a c /\
+    SCFreeFConditionE a c /\
     SCUniversalCondition a c /\
     SCExiBoundCondition a c.
 
@@ -496,15 +570,23 @@ Theorem SemiAdviceEta {A} :
   {| IndCOut := IndCOut A; ExiCOut := ExiCOut A; FreeCOut := FreeCOut A |} = A.
 Proof. by destruct A. Qed.
 
+Theorem SemiAdviceMatch {X A} {F : _ -> _ -> _ -> X} :
+  (match A with
+   | {| IndCOut := iarg1; ExiCOut := earg1; FreeCOut := farg1 |} =>
+      F iarg1 earg1 farg1
+  end) = F (IndCOut A) (ExiCOut A) (FreeCOut A).
+Proof. by destruct A. Qed.
+
 Theorem SemiConversionDataEta {E A} : 
   {| IndArgs := IndArgs A; ExiArgs := ExiArgs A; FreeArgs := FreeArgs (E := E) A |} = A.
 Proof. by destruct A. Qed.
 
-Theorem P5Eta {A B C D E} (a : A * B * C * D * E) : a = (a.1.1.1.1, a.1.1.1.2, a.1.1.2, a.1.2, a.2).
-Proof. by destruct a as [[[[i j] k] l] m]. Qed.
-
-Theorem P6Eta {A B C D E F} (a : A * B * C * D * E * F) : a = (a.1.1.1.1.1, a.1.1.1.1.2, a.1.1.1.2, a.1.1.2, a.1.2, a.2).
-Proof. by destruct a as [[[[[i j] k] l] m] n]. Qed.
+Theorem SemiConversionDataMatch {X E A} {F : _ -> _ -> _ -> X} :
+  (match A with
+   | {| IndArgs := iarg1; ExiArgs := earg1; FreeArgs := farg1 |} =>
+      F iarg1 earg1 farg1
+  end) = F (IndArgs A) (ExiArgs A) (FreeArgs (E := E) A).
+Proof. by destruct A. Qed.
 
 Definition SemiAdviceGenerator {E} := @Sigma11Model FSize -> PrenexAdvice FSize E -> SemiAdvice.
 
@@ -923,39 +1005,56 @@ fun i =>
     let (bundy, y') := SemiPolyConvert y in
     (SemiConversionCombineData bundbs bundy, (bs', PolyCallLift nic nefc nffc y'))
   end.
+(* 
+Definition UniConv {E}
+  (e : forall i, @PolyTermVS E) :
+  forall i, @SemiConversionDataBundle E * @SCPoly E) :=
+fun i =>
+  let (bs, y) := e i in
+  let (bundbs, bs') := SemiConversionCombineTup (fun x => SemiPolyConvert (bs x)) in
+  match bundbs with
+  | (nic, nefc, nffc, dat, gen) => 
+    let (bundy, y') := SemiPolyConvert y in
+    (SemiConversionCombineData bundbs bundy, (bs', PolyCallLift nic nefc nffc y'))
+  end. *)
 
 Definition AdviceGenerator {E} := forall M : @Sigma11Model FSize, PrenexAdvice FSize E -> @SCAdvice FSize E M.
+(* (nat * (nat -> nat) * (nat -> nat) * @SemiConversionData E * @SemiAdviceGenerator E)%type. *)
+
+Definition defaultBund {E} : SemiConversionDataBundle (E := E)
+  := (0, fun _=>0, fun _=>0, SemiConversionEmptyData, EmptyGenerator).
 
 Definition Prenex_Semicircuit {E} (p : @Prenex E) : @SemiCircuit E  * @AdviceGenerator E :=
 match p with
 | {| uniBounds := ub; exiBounds := eb; formula := f |} =>
-  let (ubund, upols) := SemiConversionCombineSeq (map SemiPolyConvert ub) in
+  let (ubund', upols) := unzipSeq (map SemiPolyConvert ub) in
+  let ubund := nth defaultBund ubund' in
   let (fbund, fprop) := SemiPropConvert f in
   let (ebund, epols) := unzip_dep (ExiConv eb) in
-  match ubund with
-  | (nicu, nefcu, nffcu, datu, genu) => 
-  let bnd0 := SemiConversionCombineData ubund fbund in
-  match bnd0 with
-  | (nic0, nefc0, nffc0, dat0, gen0) => 
-  ({| indArgs0 := IndArgs dat0;
-      indArgsS := fun i => IndArgs (ebund i).1.2;
-      exiArgs0 := ExiArgs dat0;
-      exiArgsS := fun i => ExiArgs (ebund i).1.2;
-      freeFArgs0 := FreeArgs dat0;
-      freeFArgsS := fun i => FreeArgs (ebund i).1.2;
+  ({| indArgsF := IndArgs fbund.1.2;
+      indArgsU := fun i => IndArgs (ubund i).1.2;
+      indArgsE := fun i => IndArgs (ebund i).1.2;
+      exiArgsF := ExiArgs fbund.1.2;
+      exiArgsU := fun i => ExiArgs (ubund i).1.2;
+      exiArgsE := fun i => ExiArgs (ebund i).1.2;
+      freeFArgsF := FreeArgs fbund.1.2;
+      freeFArgsU := fun i => FreeArgs (ubund i).1.2;
+      freeFArgsE := fun i => FreeArgs (ebund i).1.2;
       uniVBoundsSC := upols;
       exiFBoundsSC := epols;
-      formulaSC := PropCallLift nicu nefcu nffcu fprop
+      formulaSC := fprop
    |}, fun M A => 
    {| exiAdv := A;
-      indCallOut0 := IndCOut (gen0 M A);
-      indCallOutS := fun i => IndCOut ((ebund i).2 M A);
-      exiCallOut0 := ExiCOut (gen0 M A);
-      exiCallOutS := fun i => ExiCOut ((ebund i).2 M A);
-      freeFCallOut0 := FreeCOut (gen0 M A);
-      freeFCallOutS := fun i => FreeCOut ((ebund i).2 M A);
+      indCallOutF := IndCOut (fbund.2 M A);
+      indCallOutU := fun i => IndCOut ((ubund i).2 M A);
+      indCallOutE := fun i => IndCOut ((ebund i).2 M A);
+      exiCallOutF := ExiCOut (fbund.2 M A);
+      exiCallOutU := fun i => ExiCOut ((ubund i).2 M A);
+      exiCallOutE := fun i => ExiCOut ((ebund i).2 M A);
+      freeFCallOutF := FreeCOut (fbund.2 M A);
+      freeFCallOutU := fun i => FreeCOut ((ubund i).2 M A);
+      freeFCallOutE := fun i => FreeCOut ((ebund i).2 M A);
    |})
-  end end
 end.
 
 Theorem SemiConversionCombineSeq_length {E ds} : length (@SemiConversionCombineSeq E ds).2 = length ds.
@@ -963,11 +1062,7 @@ Proof.
   elim: ds; auto.
   intros.
   simpl.
-  rewrite (surjective_pairing a)
-          (surjective_pairing a.1)
-          (surjective_pairing a.1.1)
-          (surjective_pairing a.1.1.1)
-          (surjective_pairing a.1.1.1.1)
+  rewrite (P6Eta a)
           (surjective_pairing (SemiConversionCombineSeq l)); simpl.
   rewrite <- H; clear H.
   f_equal.
@@ -1386,23 +1481,35 @@ Proof.
     apply CallBounds_Correct.
 Qed.
 
-Theorem DenotToSemiDenotePoly {E M PCL adv} :
-  SCPolyDenotation0 FSize (E := E) (M := M) adv PCL =
+Theorem DenotToSemiDenotePolyF {E M PCL adv} :
+  SCPolyDenotationF FSize (E := E) (M := M) adv PCL =
   SCPolySemiDenotation M 
-    {| IndCOut := indCallOut0 _ adv; ExiCOut := exiCallOut0 _ adv; FreeCOut := freeFCallOut0 _ adv |} PCL.
+    {| IndCOut := indCallOutF _ adv; ExiCOut := exiCallOutF _ adv; FreeCOut := freeFCallOutF _ adv |} PCL.
+Proof. elim PCL; try qauto. Qed.
+
+Theorem DenotToSemiDenotePolyU {E M PCL adv x} :
+  SCPolyDenotationU FSize (E := E) (M := M) adv x PCL =
+  SCPolySemiDenotation M 
+    {| IndCOut := indCallOutU _ adv x; ExiCOut := exiCallOutU _ adv x; FreeCOut := freeFCallOutU _ adv x |} PCL.
+Proof. elim PCL; try qauto. Qed.
+
+Theorem DenotToSemiDenotePolyE {E M PCL adv x} :
+  SCPolyDenotationE FSize (E := E) (M := M) adv x PCL =
+  SCPolySemiDenotation M 
+    {| IndCOut := indCallOutE _ adv x; ExiCOut := exiCallOutE _ adv x; FreeCOut := freeFCallOutE _ adv x |} PCL.
 Proof. elim PCL; try qauto. Qed.
 
 Theorem DenotToSemiDenoteProp {E M PCL adv} :
   SCPropDenotation FSize (E := E) (M := M) adv PCL =
   SCPropSemiDenotation M
-    {| IndCOut := indCallOut0 _ adv; ExiCOut := exiCallOut0 _ adv; FreeCOut := freeFCallOut0 _ adv |} PCL.
+    {| IndCOut := indCallOutF _ adv; ExiCOut := exiCallOutF _ adv; FreeCOut := freeFCallOutF _ adv |} PCL.
 Proof. 
   elim PCL; try qauto.
   move=> s IH.
   simpl.
   apply functional_extensionality=> u; f_equal.
   apply functional_extensionality=> x; f_equal.
-  all: by rewrite DenotToSemiDenotePoly.
+  all: by rewrite DenotToSemiDenotePolyF.
 Qed.
 
 Definition SCInBound0 {E} (M : @Sigma11Model FSize)
@@ -1471,25 +1578,198 @@ Proof.
   rewrite (P6Eta (SemiConversionCombineSeq l)); simpl.
   rewrite <- (SemiConversionDataEta (A := a.1.1.2)); simpl.
   move=> ltj.
-  transitivity (
-    CallBounds (a.1.1.1.1.1 + (SemiConversionCombineSeq l).1.1.1.1.1)
-    (fun x : nat => a.1.1.1.1.2 x + (SemiConversionCombineSeq l).1.1.1.1.2 x)
-    (fun x : nat => a.1.1.1.2 x + (SemiConversionCombineSeq l).1.1.1.2 x)
-    (match j as n' return (n' = j -> SCPoly) with
-    | 0 => fun=> a.2
-    | n.+1 =>
-        fun Heq_n : n.+1 = j =>
-        lnth
-          [seq PolyCallLift a.1.1.1.1.1 a.1.1.1.1.2 a.1.1.1.2 i
-              | i <- (SemiConversionCombineSeq l).2]
-          (exist _ n (eq_ind n.+1 (fun n0 => n0 < _.+1 -> n < length _) id j Heq_n ltj))
-    end (erefl j)));[sauto|].
+  rewrite SemiConversionDataMatch.
   destruct j.
   by apply CallBounds_Left_Sum.
   rewrite lnth_map; simpl.
   apply CallBounds_Right_Sum.
   by apply (IH j ej1 _).
 Qed.
+
+Theorem add_lte_split {i j k} : i + j <= k -> (i <= k) /\ (j <= k).
+Proof.
+  move=> ltk.
+  split.
+  - move: i ltk; elim: k;[by destruct i, j|].
+    destruct i; auto.
+    move=> lt.
+    by apply H.
+  - move: j ltk; elim: k;[by destruct i, j|].
+    destruct j; auto.
+    move=> lt.
+    apply H.
+    by rewrite addnS in lt.
+Qed.
+
+Theorem IndCOut_SeqNone {E M A u v i} :
+  (SemiConversionCombineSeq (E := E) u).1.1.1.1.1 <= i ->
+  IndCOut ((SemiConversionCombineSeq (E := E) u).1.2 M A) i v = None.
+Proof.
+  move:i; elim:u;[(destruct i; auto)|].
+  move=> a l IH i.
+  simpl;
+  rewrite (P6Eta a)
+          (surjective_pairing (SemiConversionCombineSeq _))
+          (P5Eta ((SemiConversionCombineSeq _).1));
+  do 2 rewrite SemiConversionDataMatch; simpl=> lti.
+  unfold CombineGens.
+  do 2 rewrite SemiAdviceMatch; simpl.
+  assert (i < a.1.1.1.1.1 = false).
+    destruct a as [[[[[i0 n] m] l0] k] j];auto;simpl in *.
+    clear j k l0 n m.
+    move: i lti; elim: i0; destruct i; auto; apply H.
+  rewrite H.
+  rewrite IH; auto.
+  remember ((SemiConversionCombineSeq _).1.1.1.1.1) as A0; clear HeqA0.
+  destruct a as [[[[[i0 n] m] l0] k] j];auto;simpl in *.
+  clear j k l0 n m H IH.
+  move: i0 A0 lti; elim: i; destruct i0, A0; auto; by apply H.
+Qed.
+(* 
+Theorem IndCOut_Seq {E M A u v i} :
+  i < (SemiConversionCombineSeq (E := E) u).1.1.1.1.1 ->
+  IndCOut ((SemiConversionCombineSeq (E := E) u).1.2 M A) i v = 
+  nth None (map (fun x => IndCOut (x.1.2 M A) i v) u) i.
+Proof.
+  move:i; elim:u;[(destruct i; auto)|].
+  move=> a l IH i.
+  simpl;
+  rewrite (P6Eta a)
+          (surjective_pairing (SemiConversionCombineSeq _))
+          (P5Eta ((SemiConversionCombineSeq _).1));
+  do 2 rewrite SemiConversionDataMatch; simpl=> lti.
+  unfold CombineGens.
+  do 2 rewrite SemiAdviceMatch; simpl.
+  destruct a as [[[[[i0 n] m] l0] k] j];auto;simpl in *.
+  destruct (i < i0).
+  assert (i < a.1.1.1.1.1 = false).
+    destruct a as [[[[[i0 n] m] l0] k] j];auto;simpl in *.
+    clear j k l0 n m.
+    move: i lti; elim: i0; destruct i; auto; apply H.
+  rewrite H.
+  rewrite IH; auto.
+  remember ((SemiConversionCombineSeq _).1.1.1.1.1) as A0; clear HeqA0.
+  destruct a as [[[[[i0 n] m] l0] k] j];auto;simpl in *.
+  clear j k l0 n m H IH.
+  move: i0 A0 lti; elim: i; destruct i0, A0; auto; by apply H.
+Qed. *)
+
+Theorem ExiCOut_SeqNone {E M A u v i} :
+  (forall x, (SemiConversionCombineSeq (E := E) u).1.1.1.1.2 x <= i x) ->
+  forall x, ExiCOut ((SemiConversionCombineSeq (E := E) u).1.2 M A) x (i x) v = None.
+Proof.
+  move=> H x.
+  remember (H x) as Hx; clear HeqHx H.
+  remember (i x) as ix; clear Heqix i.
+  move: ix Hx; elim:u;[(destruct ix; auto)|].
+  move=> a l IH ix.
+  simpl;
+  rewrite (P6Eta a)
+          (surjective_pairing (SemiConversionCombineSeq _))
+          (P5Eta ((SemiConversionCombineSeq _).1));
+  do 2 rewrite SemiConversionDataMatch; simpl=> lti.
+  unfold CombineGens; do 2 rewrite SemiAdviceMatch; simpl.
+  assert (ix < a.1.1.1.1.2 x = false).
+    destruct a as [[[[[i0 n] m] l0] k] j];auto;simpl in *.
+    remember (n x) as nx; clear Heqnx.
+    move: ix lti; elim: nx; destruct ix; auto; apply H.
+  rewrite H.
+  rewrite IH; auto.
+  remember ((SemiConversionCombineSeq _).1.1.1.1.2) as A0; clear HeqA0.
+  destruct a as [[[[[i0 n] m] l0] k] j];auto;simpl in *.
+  clear H.
+  remember (n x) as nx; remember (A0 x) as Ax; clear Heqnx HeqAx IH x.
+  move: ix lti; elim: nx; destruct ix, Ax; auto; by apply H.
+Qed.
+
+Theorem FreeCOut_SeqNone {E M A u v i} :
+  (forall x, (SemiConversionCombineSeq (E := E) u).1.1.1.2 x <= i x) ->
+  forall x, FreeCOut ((SemiConversionCombineSeq (E := E) u).1.2 M A) x (i x) v = None.
+Proof.
+  move=> H x.
+  remember (H x) as Hx; clear HeqHx H.
+  remember (i x) as ix; clear Heqix i.
+  move: ix Hx; elim:u;[(destruct ix; auto)|].
+  move=> a l IH ix.
+  simpl;
+  rewrite (P6Eta a)
+          (surjective_pairing (SemiConversionCombineSeq _))
+          (P5Eta ((SemiConversionCombineSeq _).1));
+  do 2 rewrite SemiConversionDataMatch; simpl=> lti.
+  unfold CombineGens; do 2 rewrite SemiAdviceMatch; simpl.
+  assert (ix < a.1.1.1.2 x = false).
+    destruct a as [[[[[i0 n] m] l0] k] j];auto;simpl in *.
+    remember (m x) as mx; clear Heqmx.
+    move: ix lti; elim: mx; destruct ix; auto; apply H.
+  rewrite H.
+  rewrite IH; auto.
+  remember ((SemiConversionCombineSeq _).1.1.1.2) as A0; clear HeqA0.
+  destruct a as [[[[[i0 n] m] l0] k] j];auto;simpl in *.
+  clear H.
+  remember (m x) as mx; remember (A0 x) as Ax; clear Heqmx HeqAx IH x.
+  move: ix lti; elim: mx; destruct ix, Ax; auto; by apply H.
+Qed.
+
+Theorem IndCOut_CombNone {E M A g f v i} :
+  (SemiConversionCombineData (E := E) g f).1.1.1.1 <= i ->
+  IndCOut ((SemiConversionCombineData (E := E) g f).2 M A) i v = 
+  IndCOut (f.2 M A) (i - g.1.1.1.1) v.
+Proof.
+  unfold SemiConversionCombineData.
+  rewrite (P5Eta g) (P5Eta f).
+  do 2 rewrite SemiConversionDataMatch.
+  simpl.
+  unfold CombineGens.
+  do 2 rewrite SemiAdviceMatch; simpl=> lti.
+  assert (i < g.1.1.1.1 = false).
+    destruct g as [[[[n m] l0] k] j];auto;simpl in *.
+    move: i lti; elim: n; destruct i; auto; apply H.
+  by rewrite H.
+Qed.
+
+(* 
+Theorem SemiConversionCombineData_IndArgs_Left {E M A F G i} :
+i < F.1.1.1.1 ->
+SCPolySemiDenotation M
+  ((SemiConversionCombineData F G).2 M A)
+  (IndArgs (SemiConversionCombineData F G).1.2 i).2 =
+SCPolySemiDenotation (E := E) M (F.2 M A) (IndArgs F.1.2 i).2.
+Proof.
+  move=> lti.
+  rewrite CombineDenotationLeft.
+  rewrite 
+  unfold SemiConversionCombineData;
+  rewrite (P5Eta F) (P5Eta G);
+  do 2 rewrite SemiConversionDataMatch; simpl.
+  rewrite lti.
+  unfold CombineGens.
+  do 2 rewrite SemiAdviceMatch; simpl.
+  rewrite (surjective_pairing (IndArgs F.1.2 i)); simpl.
+  simpl.
+            (surjective_pairing (SemiPropConvert formula))
+            (P5Eta (SemiConversionCombineData _ _)) in HeqPSP.
+
+  simpl.
+
+Theorem SemiConversionCombineData_IndArgs_Left {E M A f i u} :
+i < (SemiConversionCombineSeq [seq SemiPolyConvert i | i <- u]).1.1.1.1.1 ->
+SCPolySemiDenotation M
+  ((SemiConversionCombineData
+      (SemiConversionCombineSeq
+          [seq SemiPolyConvert i | i <- u]).1
+      (SemiPropConvert f).1).2 M A)
+  (IndArgs
+      (SemiConversionCombineData
+        (SemiConversionCombineSeq
+            [seq SemiPolyConvert i | i <- u]).1
+        (SemiPropConvert f).1).1.2 i).2 =
+SCPolySemiDenotation (E := E) M
+  ((SemiConversionCombineSeq
+          [seq SemiPolyConvert i | i <- u]).1.2 M A)
+  (IndArgs
+      (SemiConversionCombineSeq
+            [seq SemiPolyConvert i | i <- u]).1.1.2 i).2.
+ *)
 
 Theorem Prenex_Semicircuit_Correct {E M} (p : @Prenex E) :
   PrenexDenotation FSize M p <-> @SCDenotation _ _ M (Prenex_Semicircuit p).1.
@@ -1498,58 +1778,127 @@ Proof.
   - move=>[A [H0 [H1 H2]]]; exists ((Prenex_Semicircuit p).2 M A).
     remember (Prenex_Semicircuit p) as PSP.
     destruct p; simpl in HeqPSP.
-    rewrite (surjective_pairing (SemiConversionCombineSeq _))
-            (surjective_pairing (SemiPropConvert formula))
-            (surjective_pairing (SemiConversionCombineSeq _).1)
-            (surjective_pairing (SemiConversionCombineSeq _).1.1)
-            (surjective_pairing (SemiConversionCombineSeq _).1.1.1)
-            (surjective_pairing (SemiConversionCombineSeq _).1.1.1.1)
-            (surjective_pairing (SemiConversionCombineData _ _))
-            (surjective_pairing (SemiConversionCombineData _ _).1)
-            (surjective_pairing (SemiConversionCombineData _ _).1.1)
-            (surjective_pairing (SemiConversionCombineData _ _).1.1.1) in HeqPSP.
-    do 4 rewrite <- surjective_pairing in HeqPSP.
-    split;[|split;[|split;[|split;[|split;[|split;[|split;[|split]]]]]]].
+    rewrite (surjective_pairing (unzipSeq _))
+            (surjective_pairing (SemiPropConvert formula)) in HeqPSP.
+    split;[|split;[|split;[|split;[|split;[|split;[|split;[|split;[|split;[|split;[|split]]]]]]]]]].
     + rewrite HeqPSP; clear HeqPSP PSP; simpl.
       unfold SCFormulaCondition.
       move=>[u ltu]; simpl in *.
       rewrite DenotToSemiDenoteProp; simpl.
       rewrite SemiAdviceEta.
-      rewrite CombineDenotationPropRight.
       rewrite <- SemiPropConvert_Correct.
+      assert (length (unzipSeq [seq SemiPolyConvert i | i <- uniBounds]).2 = length uniBounds) as H00;[
+        by rewrite unzipSeqLengthRight map_length|].
+      remember (eq_rect _ (fun x => |[x]| -> _) u _ H00) as u'; simpl in u'.
+      assert (forall (j : |[length uniBounds]|) (v : nat -> 'F_FSize),
+             InBound FSize M A (u' j) (lnth uniBounds j) (MakeU u' v)).
+          move=> [j0 ltj] v.
+          assert (j0 < length (unzipSeq [seq SemiPolyConvert i | i <- uniBounds]).2) as ltj';[qauto|].
+          remember (ltu (exist _ j0 ltj') v) as ltu'; clear Heqltu' ltu.
+          unfold InBound.
+          rewrite SemiPolyConvert_Correct.
+          unfold SCInBoundF in ltu'.
+          rewrite DenotToSemiDenotePolyF SemiAdviceEta in ltu'; simpl in ltu'.
+          replace (u' (exist _ j0 ltj)) with (u (exist _ j0 ltj')).
+          replace (MakeU u' v) with (MakeU u v).
+          remember (SCPolySemiDenotation _ _ _) as SCP.
+          replace (SCPolySemiDenotation _ _ _) with SCP; auto.
+          rewrite HeqSCP; clear ltu' HeqSCP SCP.
+          rewrite unzipSeqLnthRight lnth_map.
+          remember (Utils.lnth_map_obligation_1 _ _ _ _ _) as DDD; clear HeqDDD; simpl in DDD.
+          move: DDD; rewrite projT1_eq_rect; simpl=> DDD.
+          assert (ltj = DDD) as EE;[apply eq_irrelevance|destruct EE].
+          rewrite CombineDenotationLeft.
+          by rewrite (SemiConversionCombineSeq_Part _ ltj).
+          assert (j0 < length [seq SemiPolyConvert i | i <- uniBounds]) as ltj2;[by rewrite map_length|].
+          apply (CallBoundsSeq (j := j0) (ej1 := ltj2)).
+          rewrite lnth_map; simpl.
+          by apply CallBounds_Correct.
+          rewrite Hequ'; clear Hequ' u' ltu'.
+          by destruct H00.
+          rewrite Hequ'; clear Hequ' u' ltu'.
+          rewrite eq_rect_ap_el; f_equal.
+          by apply subset_eq; rewrite projT1_eq_rect.
+      remember (H0 (exist _ u' H)) as H0'; clear HeqH0' H0; simpl in H0'; clear H.
+      replace (MakeU u (fun=> 0%R)) with (MakeU u' (fun=> 0%R)); auto.
+      rewrite Hequ'; clear Hequ' u' H0'.
+      by destruct H00.
+    + rewrite HeqPSP; clear HeqPSP PSP; simpl.
+      unfold SCIndCondition0; simpl.
+      move=> v [u ltu] i; simpl in *.
+      rewrite (surjective_pairing (IndArgs _ _)).
       remember (SemiConversionCombineSeq_length (ds := [seq SemiPolyConvert i | i <- uniBounds])) as H00;
       clear HeqH00; rewrite map_length in H00.
       remember (eq_rect _ (fun x => |[x]| -> _) u _ H00) as u'; simpl in u'.
       assert (forall (j : |[length uniBounds]|) (v : nat -> 'F_FSize),
              InBound FSize M A (u' j) (lnth uniBounds j) (MakeU u' v)).
-      move=> [j0 ltj] v.
-      assert (j0 < length (SemiConversionCombineSeq [seq SemiPolyConvert i | i <- uniBounds]).2) as ltj';[qauto|].
-      remember (ltu (exist _ j0 ltj') v) as ltu'; clear Heqltu' ltu.
-      unfold InBound.
-      rewrite SemiPolyConvert_Correct.
-      unfold SCInBound in ltu'.
-      rewrite DenotToSemiDenotePoly SemiAdviceEta in ltu'; simpl in ltu'.
-      replace (u' (exist _ j0 ltj)) with (u (exist _ j0 ltj')).
-      replace (MakeU u' v) with (MakeU u v).
-      remember (SCPolySemiDenotation _ _ _) as SCP.
-      replace (SCPolySemiDenotation _ _ _) with SCP; auto.
-      rewrite HeqSCP; clear ltu' HeqSCP SCP.
+          move=> [j0 ltj] v0.
+          assert (j0 < length (SemiConversionCombineSeq [seq SemiPolyConvert i | i <- uniBounds]).2) as ltj';[qauto|].
+          remember (ltu (exist _ j0 ltj') v0) as ltu'; clear Heqltu' ltu.
+          unfold InBound.
+          rewrite SemiPolyConvert_Correct.
+          unfold SCInBound in ltu'.
+          rewrite DenotToSemiDenotePolyF SemiAdviceEta in ltu'; simpl in ltu'.
+          replace (u' (exist _ j0 ltj)) with (u (exist _ j0 ltj')).
+          replace (MakeU u' v0) with (MakeU u v0).
+          remember (SCPolySemiDenotation _ _ _) as SCP.
+          replace (SCPolySemiDenotation _ _ _) with SCP; auto.
+          rewrite HeqSCP; clear ltu' HeqSCP SCP.
+          rewrite CombineDenotationLeft.
+          by rewrite (SemiConversionCombineSeq_Part _ ltj).
+          assert (j0 < length [seq SemiPolyConvert i | i <- uniBounds]) as ltj2;[by rewrite map_length|].
+          apply (CallBoundsSeq (j := j0) (ej1 := ltj2)).
+          rewrite lnth_map; simpl.
+          by apply CallBounds_Correct.
+          rewrite Hequ'; clear Hequ' u' ltu'.
+          by destruct H00.
+          rewrite Hequ'; clear Hequ' u' ltu'.
+          rewrite eq_rect_ap_el; f_equal.
+          by apply subset_eq; rewrite projT1_eq_rect.
+      clear ltu.
+      unfold PrenexFormulaCondition in H0.
+      remember (H0 (exist _ u' H)) as H0'; clear HeqH0' H0; simpl in H0'.
+      remember (H1 (MakeU u v)) as H1'; clear HeqH1' H1; simpl in H1'.
+      do 2 rewrite DenotToSemiDenotePolyF; simpl.
+      rewrite SemiAdviceEta.
+      destruct (i < (SemiConversionCombineSeq [seq SemiPolyConvert i | i <- uniBounds]).1.1.1.1.1) eqn:T1.
       rewrite CombineDenotationLeft.
-      by rewrite (SemiConversionCombineSeq_Part _ ltj).
-      assert (j0 < length [seq SemiPolyConvert i | i <- uniBounds]) as ltj2;[by rewrite map_length|].
-      apply (CallBoundsSeq (j := j0) (ej1 := ltj2)).
-      rewrite lnth_map; simpl.
-      by apply CallBounds_Correct.
-      rewrite Hequ'; clear Hequ' u' ltu'.
-      by destruct H00.
-      rewrite Hequ'; clear Hequ' u' ltu'.
-      rewrite eq_rect_ap_el; f_equal.
-      by apply subset_eq; rewrite projT1_eq_rect.
-      remember (H0 (exist _ u' H)) as H0'; clear HeqH0' H0; simpl in H0'; clear H.
-      replace (MakeU u (fun=> 0%R)) with (MakeU u' (fun=> 0%R)); auto.
-      rewrite Hequ'; clear Hequ' u' H0'.
-      by destruct H00.
-    + 
+      rewrite CombineDenotationLeft.
+      remember (SemiConversionCombineData _ _) as s.
+      unfold SemiConversionCombineData in Heqs.
+      rewrite (P5Eta (SemiConversionCombineSeq _).1)
+              (P5Eta (SemiPropConvert formula).1)
+              SemiConversionDataMatch SemiConversionDataMatch in Heqs;
+      simpl in Heqs.
+      rewrite Heqs; clear Heqs s; simpl.
+      unfold CombineGens; simpl.
+      do 2 rewrite SemiAdviceMatch.
+      simpl; rewrite T1.
+      rewrite (surjective_pairing (IndArgs _ _)); simpl.
+      rewrite T1.
+
+      simpl.
+      destruct (i < (SemiConversionCombineSeq _).1.1.1.1.1) eqn:T1.
+      rewrite (surjective_pairing (IndArgs _ i)); simpl.
+      rewrite IndCOut_SeqNone.
+
+
+      simpl.
+
+
+      destruct (length uniBounds < i) eqn:ibnd.
+      simpl.
+
+
+      unfold IndCOut.
+      rewrite <- (SemiAdviceEta (A := (SemiConversionCombineData
+      (SemiConversionCombineSeq [seq SemiPolyConvert i | i <- uniBounds]).1
+      (SemiPropConvert formula).1).2 M A)).
+
+
+      rewrite SemiConversionDataEta.
+      simpl.
+
       by destruct H00.
 
       remember (Utils.lnth_map_obligation_1 _ _ _ _ (exist _ j0 ltj2)) as EE1.

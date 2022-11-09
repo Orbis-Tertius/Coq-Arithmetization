@@ -673,9 +673,64 @@ Proof.
   induction n0; destruct n; simpl; try by cbn; try qauto use:zero_sub.
 Qed.
 
-Definition unzip {A B a} (f : |[a]| -> A * B) := (fun i => (f i).1, fun i => (f i).2).
+Definition unzip {A B N} (f : N -> A * B) := (fun i => (f i).1, fun i => (f i).2).
 
-Definition unzip_dep {a A B} (f : forall i : |[a]|, A i * B i) := (fun i => (f i).1, fun i => (f i).2).
+Fixpoint unzipSeq {A B} (f : seq (A * B)) : seq A * seq B := 
+match f with
+| [::] => ([::], [::])
+| (x, y) :: ps => 
+  let (xs, ys) := unzipSeq ps in
+  (x :: xs, y :: ys)
+end.
+
+Theorem unzipSeqLengthLeft {A B} (f : seq (A * B)) : length (unzipSeq f).1 = length f.
+Proof. induction f;qauto. Qed.
+
+Theorem unzipSeqLengthRight {A B} (f : seq (A * B)) : length (unzipSeq f).2 = length f.
+Proof. induction f;qauto. Qed.
+
+Theorem unzipSeqLnthLeft {A B} (f : seq (A * B)) j : 
+  lnth (unzipSeq f).1 j = (lnth f (eq_rect _ (fun x => |[x]|) j _ (unzipSeqLengthLeft _))).1.
+Proof.
+  move: j; induction f;[fcrush|].
+  move=>[j ltj].
+  simpl in *.
+  destruct a; simpl in *.
+  remember (lnth_obligation_1 _ _ _ _) as DDD; clear HeqDDD; simpl in DDD.
+  remember (` _) as EE.
+  rewrite projT1_eq_rect in HeqEE; simpl in HeqEE.
+  destruct HeqEE.
+  move:ltj.
+  rewrite (surjective_pairing (unzipSeq f)); simpl=> ltj.
+  destruct EE; auto.
+  rewrite IHf.
+  do 2 f_equal.
+  apply subset_eq.
+  by rewrite projT1_eq_rect.
+Qed.
+
+Theorem unzipSeqLnthRight {A B} (f : seq (A * B)) j : 
+  lnth (unzipSeq f).2 j = (lnth f (eq_rect _ (fun x => |[x]|) j _ (unzipSeqLengthRight _))).2.
+Proof.
+  move: j; induction f;[fcrush|].
+  move=>[j ltj].
+  simpl in *.
+  destruct a; simpl in *.
+  remember (lnth_obligation_1 _ _ _ _) as DDD; clear HeqDDD; simpl in DDD.
+  remember (` _) as EE.
+  rewrite projT1_eq_rect in HeqEE; simpl in HeqEE.
+  destruct HeqEE.
+  move:ltj.
+  rewrite (surjective_pairing (unzipSeq f)); simpl=> ltj.
+  destruct EE; auto.
+  rewrite IHf.
+  do 2 f_equal.
+  apply subset_eq.
+  by rewrite projT1_eq_rect.
+Qed.
+
+
+Definition unzip_dep {N A B} (f : forall i : N, A i * B i) := (fun i => (f i).1, fun i => (f i).2).
 
 Theorem LTPF {k n} : (k + n < k) = false.
 Proof.
@@ -691,3 +746,16 @@ Qed.
 
 Theorem kpmnken {k n} : (k + n - k) = n.
 Proof. qauto use: n_sub_n, addnBAC. Qed.
+
+
+Theorem P3Eta {A B C} (a : A * B * C) : a = (a.1.1, a.1.2, a.2).
+Proof. by destruct a as [[i j] k]. Qed.
+
+Theorem P4Eta {A B C D} (a : A * B * C * D) : a = (a.1.1.1, a.1.1.2, a.1.2, a.2).
+Proof. by destruct a as [[[i j] k] l]. Qed.
+
+Theorem P5Eta {A B C D E} (a : A * B * C * D * E) : a = (a.1.1.1.1, a.1.1.1.2, a.1.1.2, a.1.2, a.2).
+Proof. by destruct a as [[[[i j] k] l] m]. Qed.
+
+Theorem P6Eta {A B C D E F} (a : A * B * C * D * E * F) : a = (a.1.1.1.1.1, a.1.1.1.1.2, a.1.1.1.2, a.1.1.2, a.1.2, a.2).
+Proof. by destruct a as [[[[[i j] k] l] m] n]. Qed.
