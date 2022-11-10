@@ -247,7 +247,7 @@ Program Definition SCU {E} {M : @Sigma11Model FSize}
   := { u : |[length (uniVBoundsSC f)]| -> 'F_FSize | 
        forall j : |[length (uniVBoundsSC f)]|,
        forall v : nat -> 'F_FSize, 
-       SCInBoundF adv (u j) (lnth (uniVBoundsSC f) j) (MakeU u v)
+       SCInBoundU adv (u j) j (lnth (uniVBoundsSC f) j) (MakeU u v)
     }.
 
 Program Definition SCFormulaCondition {E} {M : @Sigma11Model FSize}
@@ -1797,8 +1797,8 @@ Proof.
           remember (ltu (exist _ j0 ltj') v) as ltu'; clear Heqltu' ltu.
           unfold InBound.
           rewrite SemiPolyConvert_Correct.
-          unfold SCInBoundF in ltu'.
-          rewrite DenotToSemiDenotePolyF SemiAdviceEta in ltu'; simpl in ltu'.
+          unfold SCInBoundU in ltu'.
+          rewrite DenotToSemiDenotePolyU SemiAdviceEta in ltu'; simpl in ltu'.
           replace (u' (exist _ j0 ltj)) with (u (exist _ j0 ltj')).
           replace (MakeU u' v) with (MakeU u v).
           remember (SCPolySemiDenotation _ _ _) as SCP.
@@ -1808,12 +1808,13 @@ Proof.
           remember (Utils.lnth_map_obligation_1 _ _ _ _ _) as DDD; clear HeqDDD; simpl in DDD.
           move: DDD; rewrite projT1_eq_rect; simpl=> DDD.
           assert (ltj = DDD) as EE;[apply eq_irrelevance|destruct EE].
-          rewrite CombineDenotationLeft.
-          by rewrite (SemiConversionCombineSeq_Part _ ltj).
-          assert (j0 < length [seq SemiPolyConvert i | i <- uniBounds]) as ltj2;[by rewrite map_length|].
-          apply (CallBoundsSeq (j := j0) (ej1 := ltj2)).
-          rewrite lnth_map; simpl.
-          by apply CallBounds_Correct.
+          remember (unzipSeq [seq SemiPolyConvert i | i <- uniBounds]).1.
+          replace (unzipSeq [seq SemiPolyConvert i | i <- uniBounds]).1
+             with [seq (SemiPolyConvert i).1 | i <- uniBounds] in Heql;[|by rewrite unzipSeqMapLeft].
+          rewrite Heql; clear Heql l.
+          change defaultBund with (SemiPolyConvert (E := E) UndefVS).1.
+          rewrite (nth_map (f := fun x => (SemiPolyConvert x).1)).
+          by rewrite (lnth_nth UndefVS); simpl.
           rewrite Hequ'; clear Hequ' u' ltu'.
           by destruct H00.
           rewrite Hequ'; clear Hequ' u' ltu'.
@@ -1824,32 +1825,37 @@ Proof.
       rewrite Hequ'; clear Hequ' u' H0'.
       by destruct H00.
     + rewrite HeqPSP; clear HeqPSP PSP; simpl.
-      unfold SCIndCondition0; simpl.
-      move=> v [u ltu] i; simpl in *.
+      unfold SCIndConditionF; simpl.
+      move=> v0 i [u ltu]; simpl in *.
       rewrite (surjective_pairing (IndArgs _ _)).
-      remember (SemiConversionCombineSeq_length (ds := [seq SemiPolyConvert i | i <- uniBounds])) as H00;
-      clear HeqH00; rewrite map_length in H00.
+      assert (length (unzipSeq [seq SemiPolyConvert i | i <- uniBounds]).2 = length uniBounds) as H00;[
+              by rewrite unzipSeqLengthRight map_length|].
       remember (eq_rect _ (fun x => |[x]| -> _) u _ H00) as u'; simpl in u'.
       assert (forall (j : |[length uniBounds]|) (v : nat -> 'F_FSize),
              InBound FSize M A (u' j) (lnth uniBounds j) (MakeU u' v)).
-          move=> [j0 ltj] v0.
-          assert (j0 < length (SemiConversionCombineSeq [seq SemiPolyConvert i | i <- uniBounds]).2) as ltj';[qauto|].
-          remember (ltu (exist _ j0 ltj') v0) as ltu'; clear Heqltu' ltu.
+          move=> [j0 ltj] v.
+          assert (j0 < length (unzipSeq [seq SemiPolyConvert i | i <- uniBounds]).2) as ltj';[qauto|].
+          remember (ltu (exist _ j0 ltj') v) as ltu'; clear Heqltu' ltu.
           unfold InBound.
           rewrite SemiPolyConvert_Correct.
-          unfold SCInBound in ltu'.
-          rewrite DenotToSemiDenotePolyF SemiAdviceEta in ltu'; simpl in ltu'.
+          unfold SCInBoundU in ltu'.
+          rewrite DenotToSemiDenotePolyU SemiAdviceEta in ltu'; simpl in ltu'.
           replace (u' (exist _ j0 ltj)) with (u (exist _ j0 ltj')).
-          replace (MakeU u' v0) with (MakeU u v0).
+          replace (MakeU u' v) with (MakeU u v).
           remember (SCPolySemiDenotation _ _ _) as SCP.
           replace (SCPolySemiDenotation _ _ _) with SCP; auto.
           rewrite HeqSCP; clear ltu' HeqSCP SCP.
-          rewrite CombineDenotationLeft.
-          by rewrite (SemiConversionCombineSeq_Part _ ltj).
-          assert (j0 < length [seq SemiPolyConvert i | i <- uniBounds]) as ltj2;[by rewrite map_length|].
-          apply (CallBoundsSeq (j := j0) (ej1 := ltj2)).
-          rewrite lnth_map; simpl.
-          by apply CallBounds_Correct.
+          rewrite unzipSeqLnthRight lnth_map.
+          remember (Utils.lnth_map_obligation_1 _ _ _ _ _) as DDD; clear HeqDDD; simpl in DDD.
+          move: DDD; rewrite projT1_eq_rect; simpl=> DDD.
+          assert (ltj = DDD) as EE;[apply eq_irrelevance|destruct EE].
+          remember (unzipSeq [seq SemiPolyConvert i | i <- uniBounds]).1.
+          replace (unzipSeq [seq SemiPolyConvert i | i <- uniBounds]).1
+             with [seq (SemiPolyConvert i).1 | i <- uniBounds] in Heql;[|by rewrite unzipSeqMapLeft].
+          rewrite Heql; clear Heql l.
+          change defaultBund with (SemiPolyConvert (E := E) UndefVS).1.
+          rewrite (nth_map (f := fun x => (SemiPolyConvert x).1)).
+          by rewrite (lnth_nth UndefVS); simpl.
           rewrite Hequ'; clear Hequ' u' ltu'.
           by destruct H00.
           rewrite Hequ'; clear Hequ' u' ltu'.
@@ -1858,9 +1864,13 @@ Proof.
       clear ltu.
       unfold PrenexFormulaCondition in H0.
       remember (H0 (exist _ u' H)) as H0'; clear HeqH0' H0; simpl in H0'.
-      remember (H1 (MakeU u v)) as H1'; clear HeqH1' H1; simpl in H1'.
+      remember (H1 (MakeU u v0)) as H1'; clear HeqH1' H1; simpl in H1'.
       do 2 rewrite DenotToSemiDenotePolyF; simpl.
       rewrite SemiAdviceEta.
+      
+
+
+
       destruct (i < (SemiConversionCombineSeq [seq SemiPolyConvert i | i <- uniBounds]).1.1.1.1.1) eqn:T1.
       rewrite CombineDenotationLeft.
       rewrite CombineDenotationLeft.

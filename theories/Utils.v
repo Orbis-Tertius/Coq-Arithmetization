@@ -729,6 +729,27 @@ Proof.
   by rewrite projT1_eq_rect.
 Qed.
 
+Theorem unzipSeqMapLeft {A B C} (f : C -> A * B) (l : seq C) : 
+  (unzipSeq [seq f i | i <- l]).1 = [seq (f i).1 | i <- l].
+Proof.
+  induction l;[fcrush|].
+  simpl.
+  destruct (f a).
+  rewrite (surjective_pairing (unzipSeq _)).
+  simpl.
+  by rewrite IHl.
+Qed.
+
+Theorem unzipSeqMapRight {A B C} (f : C -> A * B) (l : seq C) : 
+  (unzipSeq [seq f i | i <- l]).2 = [seq (f i).2 | i <- l].
+Proof.
+  induction l;[fcrush|].
+  simpl.
+  destruct (f a).
+  rewrite (surjective_pairing (unzipSeq _)).
+  simpl.
+  by rewrite IHl.
+Qed.
 
 Definition unzip_dep {N A B} (f : forall i : N, A i * B i) := (fun i => (f i).1, fun i => (f i).2).
 
