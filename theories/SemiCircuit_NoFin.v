@@ -275,8 +275,8 @@ Program Definition SCIndConditionF {E} {M : @Sigma11Model FSize}
 
 Program Definition SCIndConditionU {E} {M : @Sigma11Model FSize}
   (adv : @SCAdvice E M) (c : SemiCircuit) : Prop :=
-  forall v : nat -> 'F_FSize, forall (x : |[length (uniVBoundsSC c)]|) i, forall (u : nat -> 'F_FSize),
-    (forall j : |[x]|, SCInBoundU adv (u j) x (lnth (uniVBoundsSC c) j) u) ->
+  forall (x : |[length (uniVBoundsSC c)]|) i, forall (u : nat -> 'F_FSize),
+    (forall j : |[x]|, SCInBoundU adv (u j) j (lnth (uniVBoundsSC c) j) u) ->
   let (a1, a2) := indArgsU c x i in
   let b1 : option 'F_FSize := SCPolyDenotationU adv x a1 u in
   let b2 : option 'F_FSize := SCPolyDenotationU adv x a2 u in
@@ -306,8 +306,8 @@ Program Definition SCExiFConditionF {E} {M : @Sigma11Model FSize}
 
 Program Definition SCExiFConditionU {E} {M : @Sigma11Model FSize}
   (adv : @SCAdvice E M) (c : SemiCircuit) : Prop :=
-  forall v : nat -> 'F_FSize, forall (x : |[length (uniVBoundsSC c)]|) (i : |[length E]|) j,
-  forall (u : nat -> 'F_FSize), (forall j : |[x]|, SCInBoundU adv (u j) x (lnth (uniVBoundsSC c) j) u) ->
+  forall (x : |[length (uniVBoundsSC c)]|) (i : |[length E]|) j,
+  forall (u : nat -> 'F_FSize), (forall j : |[x]|, SCInBoundU adv (u j) j (lnth (uniVBoundsSC c) j) u) ->
   let t (a : |[lnth E i]|) : option 'F_FSize
       := SCPolyDenotationU adv x (exiArgsU c x i j a) u in
   obind (fun t => exiAdv adv i t) (option_fun t)  
@@ -335,8 +335,8 @@ Program Definition SCFreeFConditionF {E} {M : @Sigma11Model FSize}
 
 Program Definition SCFreeFConditionU {E} {M : @Sigma11Model FSize}
   (adv : @SCAdvice E M) (c : SemiCircuit) : Prop :=
-  forall v : nat -> 'F_FSize, forall u : SCU adv c, forall (x : |[length (uniVBoundsSC c)]|) (i : |[length E]|) j,
-  forall (u : nat -> 'F_FSize), (forall j : |[x]|, SCInBoundU adv (u j) x (lnth (uniVBoundsSC c) j) u) ->
+  forall u : SCU adv c, forall (x : |[length (uniVBoundsSC c)]|) (i : |[length E]|) j,
+  forall (u : nat -> 'F_FSize), (forall j : |[x]|, SCInBoundU adv (u j) j (lnth (uniVBoundsSC c) j) u) ->
   let t a : option 'F_FSize
       := SCPolyDenotationU adv x (freeFArgsU c x i (projT1 (F_S _ M i)) j a) u in
   obind (fun t => projT2 (F_S _ M i) t) (option_fun t)
@@ -668,30 +668,21 @@ match ds with
 end. 
 
 Definition AddIndArg {E} n (p1 p2 : @SCPoly E) (d : SemiConversionData) : SemiConversionData :=
-  match d with
-  | {| IndArgs := iarg1; ExiArgs := earg1; FreeArgs := farg1 |} =>
-    {| IndArgs := fun x => if x == n then (p1, p2) else iarg1 x
-     ; ExiArgs := earg1; FreeArgs := farg1 |}
-  end.
+ {| IndArgs := fun x => if x == n then (p1, p2) else IndArgs d x
+ ; ExiArgs := ExiArgs d; FreeArgs := FreeArgs d |}.
 
 Definition AddIndCall {E} n v (d : @SemiAdviceGenerator E) : SemiAdviceGenerator :=
   fun M A =>
-  match d M A with
-  | {| IndCOut := ico1; ExiCOut := eco1; FreeCOut := fco1 |} =>
-    {| IndCOut := fun x => if x == n then PolyVSDenotation _ M v A else ico1 x
-     ; ExiCOut := eco1; FreeCOut := fco1 |}
-  end.
+  {| IndCOut := fun x => if x == n then PolyVSDenotation _ M v A else IndCOut (d M A) x
+   ; ExiCOut := ExiCOut (d M A); FreeCOut := FreeCOut (d M A) |}.
 
 Program Definition AddExiArg {E} i n (ps : |[lnth E i]| -> @SCPoly E) (d : @SemiConversionData E) : SemiConversionData :=
-  match d with
-  | {| IndArgs := iarg1; ExiArgs := earg1; FreeArgs := farg1 |} =>
-    {| IndArgs := iarg1
-     ; ExiArgs := fun i' =>
-        (if i == i' as b return (i == i') = b -> nat -> |[lnth E i']| -> SCPoly
-         then fun _ x => if x == n then ps else earg1 i' x
-         else fun _ => earg1 i') (erefl _)
-     ; FreeArgs := farg1 |}
-  end.
+ {| IndArgs := IndArgs d
+  ; ExiArgs := fun i' =>
+    (if i == i' as b return (i == i') = b -> nat -> |[lnth E i']| -> SCPoly
+      then fun _ x => if x == n then ps else ExiArgs d i' x
+      else fun _ => ExiArgs d i') (erefl _)
+  ; FreeArgs := FreeArgs d |}.
 Next Obligation.
   apply EEConvert in e; simpl in e; destruct e.
   by replace H0 with H1;[|apply eq_irrelevance].
@@ -703,41 +694,32 @@ Qed.
 
 Program Definition AddExiCall {E} i n (ps : @PolyTermVS E) (d : @SemiAdviceGenerator E) : SemiAdviceGenerator :=
   fun M A =>
-  match d M A with
-  | {| IndCOut := ico1; ExiCOut := eco1; FreeCOut := fco1 |} =>
-    {| IndCOut := ico1
-     ; ExiCOut := fun i' =>
-        if i == i'
-        then fun x => (if x == n then (PolyVSDenotation _ M ps A) else eco1 i' x)
-        else eco1 i'
-     ; FreeCOut := fco1 |}
-  end.
+  {| IndCOut := IndCOut (d M A)
+    ; ExiCOut := fun i' =>
+      if i == i'
+      then fun x => (if x == n then (PolyVSDenotation _ M ps A) else ExiCOut (d M A) i' x)
+      else ExiCOut (d M A) i'
+    ; FreeCOut := FreeCOut (d M A) |}.
 
 Program Definition AddFreeArg {E a} i n (ps : |[a]| -> @SCPoly E) (d : @SemiConversionData E) : SemiConversionData :=
-  match d with
-  | {| IndArgs := iarg1; ExiArgs := earg1; FreeArgs := farg1 |} =>
-    {| IndArgs := iarg1; ExiArgs := earg1
-     ; FreeArgs := fun i' =>
-        if i == i' 
-        then fun a' =>
-             (if a == a' as b return (a == a') = b -> nat -> |[a']| -> SCPoly
-              then fun _ x => if x == n then ps else farg1 i' a' x
-              else fun _ => farg1 i' a') (erefl _)
-        else farg1 i'|}
-  end.
+  {| IndArgs := IndArgs d; ExiArgs := ExiArgs d
+  ; FreeArgs := fun i' =>
+    if i == i' 
+    then fun a' =>
+          (if a == a' as b return (a == a') = b -> nat -> |[a']| -> SCPoly
+          then fun _ x => if x == n then ps else FreeArgs d i' a' x
+          else fun _ => FreeArgs d i' a') (erefl _)
+    else FreeArgs d i'|}.
 Next Obligation. by apply EEConvert in e; destruct e. Qed.
 Next Obligation. by apply EEConvert in e; destruct e. Qed.
 
 Program Definition AddFreeCall {E} i n (ps : @PolyTermVS E) (d : @SemiAdviceGenerator E) : SemiAdviceGenerator :=
   fun M A =>
-  match d M A with
-  | {| IndCOut := ico1; ExiCOut := eco1; FreeCOut := fco1 |} =>
-    {| IndCOut := ico1; ExiCOut := eco1
-     ; FreeCOut := fun i' =>
-        if i == i'
-        then fun x => (if x == n then (PolyVSDenotation _ M ps A) else fco1 i' x)
-        else fco1 i' |}
-  end.
+  {| IndCOut := IndCOut (d M A); ExiCOut := ExiCOut (d M A)
+    ; FreeCOut := fun i' =>
+      if i == i'
+      then fun x => (if x == n then (PolyVSDenotation _ M ps A) else FreeCOut (d M A) i' x)
+      else FreeCOut (d M A) i' |}.
 
 Fixpoint SemiPolyConvert {E} (r : @PolyTermVS E) :
   @SemiConversionDataBundle E * @SCPoly E := 
@@ -924,20 +906,12 @@ Proof.
   elim: r; try qauto.
   - move=> i a p IH.
     simpl.
-    rewrite (surjective_pairing (SemiConversionCombineTup _))
-            (surjective_pairing (SemiConversionCombineTup _).1)
-            (surjective_pairing (SemiConversionCombineTup _).1.1)
-            (surjective_pairing (SemiConversionCombineTup _).1.1.1)
-            (surjective_pairing (SemiConversionCombineTup _).1.1.1.1); simpl.
+    rewrite (P6Eta (SemiConversionCombineTup _)); simpl.
     rewrite eq_refl.
     apply ltnSn.
   - move=> i p IH.
     simpl.
-    rewrite (surjective_pairing (SemiConversionCombineTup _))
-            (surjective_pairing (SemiConversionCombineTup _).1)
-            (surjective_pairing (SemiConversionCombineTup _).1.1)
-            (surjective_pairing (SemiConversionCombineTup _).1.1.1)
-            (surjective_pairing (SemiConversionCombineTup _).1.1.1.1); simpl.
+    rewrite (P6Eta (SemiConversionCombineTup _)); simpl.
     rewrite eq_refl.
     apply ltnSn.
   - move=> x IHx y IHy.
@@ -1574,8 +1548,8 @@ Proof.
   move=> a l IH j ej1 ej2 H.
   simpl.
   move: ej2.
-  rewrite (P6Eta a); simpl.
-  rewrite (P6Eta (SemiConversionCombineSeq l)); simpl.
+  rewrite (P6Eta a); simpl;
+  rewrite (P6Eta (SemiConversionCombineSeq l)); simpl;
   rewrite <- (SemiConversionDataEta (A := a.1.1.2)); simpl.
   move=> ltj.
   rewrite SemiConversionDataMatch.
@@ -1601,7 +1575,7 @@ Proof.
     by rewrite addnS in lt.
 Qed.
 
-Theorem IndCOut_SeqNone {E M A u v i} :
+(* Theorem IndCOut_SeqNone {E M A u v i} :
   (SemiConversionCombineSeq (E := E) u).1.1.1.1.1 <= i ->
   IndCOut ((SemiConversionCombineSeq (E := E) u).1.2 M A) i v = None.
 Proof.
@@ -1624,7 +1598,7 @@ Proof.
   destruct a as [[[[[i0 n] m] l0] k] j];auto;simpl in *.
   clear j k l0 n m H IH.
   move: i0 A0 lti; elim: i; destruct i0, A0; auto; by apply H.
-Qed.
+Qed. *)
 (* 
 Theorem IndCOut_Seq {E M A u v i} :
   i < (SemiConversionCombineSeq (E := E) u).1.1.1.1.1 ->
@@ -1653,7 +1627,7 @@ Proof.
   clear j k l0 n m H IH.
   move: i0 A0 lti; elim: i; destruct i0, A0; auto; by apply H.
 Qed. *)
-
+(* 
 Theorem ExiCOut_SeqNone {E M A u v i} :
   (forall x, (SemiConversionCombineSeq (E := E) u).1.1.1.1.2 x <= i x) ->
   forall x, ExiCOut ((SemiConversionCombineSeq (E := E) u).1.2 M A) x (i x) v = None.
@@ -1708,10 +1682,24 @@ Proof.
   clear H.
   remember (m x) as mx; remember (A0 x) as Ax; clear Heqmx HeqAx IH x.
   move: ix lti; elim: mx; destruct ix, Ax; auto; by apply H.
+Qed. *)
+
+Theorem IndCOut_Comb_Left {E M A g f v i} :
+  i < g.1.1.1.1 ->
+  IndCOut ((SemiConversionCombineData (E := E) g f).2 M A) i v = 
+  IndCOut (g.2 M A) i v.
+Proof.
+  unfold SemiConversionCombineData.
+  rewrite (P5Eta g) (P5Eta f).
+  do 2 rewrite SemiConversionDataMatch.
+  simpl.
+  unfold CombineGens.
+  do 2 rewrite SemiAdviceMatch; simpl=> lti.
+  by rewrite lti.
 Qed.
 
-Theorem IndCOut_CombNone {E M A g f v i} :
-  (SemiConversionCombineData (E := E) g f).1.1.1.1 <= i ->
+Theorem IndCOut_Comb_Right {E M A g f v i} :
+  g.1.1.1.1 <= i ->
   IndCOut ((SemiConversionCombineData (E := E) g f).2 M A) i v = 
   IndCOut (f.2 M A) (i - g.1.1.1.1) v.
 Proof.
@@ -1727,49 +1715,369 @@ Proof.
   by rewrite H.
 Qed.
 
-(* 
-Theorem SemiConversionCombineData_IndArgs_Left {E M A F G i} :
-i < F.1.1.1.1 ->
-SCPolySemiDenotation M
-  ((SemiConversionCombineData F G).2 M A)
-  (IndArgs (SemiConversionCombineData F G).1.2 i).2 =
-SCPolySemiDenotation (E := E) M (F.2 M A) (IndArgs F.1.2 i).2.
+Theorem IndArgs_Comb_Left_1 {E M A g f v i} :
+  CallBounds g.1.1.1.1 g.1.1.1.2 g.1.1.2 (IndArgs g.1.2 i).1 ->
+  i < g.1.1.1.1 ->
+  SCPolySemiDenotation M
+    ((SemiConversionCombineData (E := E) g f).2 M A)
+    (IndArgs (SemiConversionCombineData g f).1.2 i).1 v =
+  SCPolySemiDenotation M (g.2 M A) (IndArgs g.1.2 i).1 v.
+Proof.
+  move=> H0.
+  unfold SemiConversionCombineData.
+  rewrite (P5Eta g) (P5Eta f).
+  do 2 rewrite SemiConversionDataMatch.
+  simpl.
+  rewrite <- (CombineDenotationLeft (D := f)); auto.
+  unfold SemiConversionCombineData.
+  rewrite (P5Eta g) (P5Eta f).
+  do 2 rewrite SemiConversionDataMatch.
+  simpl.
+  unfold CombineGens.
+  do 2 rewrite SemiAdviceMatch; simpl=> lti.
+  rewrite lti.
+  by rewrite (surjective_pairing (IndArgs _ _)); simpl.
+Qed.
+
+Theorem IndArgs_Comb_Right_1 {E M A g f v i} :
+  g.1.1.1.1 <= i ->
+  SCPolySemiDenotation M
+    ((SemiConversionCombineData (E := E) g f).2 M A)
+    (IndArgs (SemiConversionCombineData g f).1.2 i).1 v =
+  SCPolySemiDenotation M (f.2 M A) (IndArgs f.1.2 (i - g.1.1.1.1)).1 v.
+Proof.
+  unfold SemiConversionCombineData.
+  rewrite (P5Eta g) (P5Eta f).
+  do 2 rewrite SemiConversionDataMatch.
+  simpl.
+  rewrite <- (CombineDenotationRight (G := g)).
+  unfold SemiConversionCombineData.
+  rewrite (P5Eta g) (P5Eta f).
+  do 2 rewrite SemiConversionDataMatch.
+  simpl.
+  unfold CombineGens.
+  do 2 rewrite SemiAdviceMatch; simpl=> lti.
+  assert (i < g.1.1.1.1 = false).
+    destruct g as [[[[n m] l0] k] j];auto;simpl in *.
+    move: i lti; elim: n; destruct i; auto; apply H.
+  rewrite H; simpl.
+  rewrite (surjective_pairing (IndArgs f.1.2 (i - g.1.1.1.1))); simpl.
+  auto.
+Qed.
+
+Theorem IndArgs_Comb_Left_2 {E M A g f v i} :
+  CallBounds g.1.1.1.1 g.1.1.1.2 g.1.1.2 (IndArgs g.1.2 i).2 ->
+  i < g.1.1.1.1 ->
+  SCPolySemiDenotation M
+    ((SemiConversionCombineData (E := E) g f).2 M A)
+    (IndArgs (SemiConversionCombineData g f).1.2 i).2 v =
+  SCPolySemiDenotation M (g.2 M A) (IndArgs g.1.2 i).2 v.
+Proof.
+  move=> H0.
+  unfold SemiConversionCombineData.
+  rewrite (P5Eta g) (P5Eta f).
+  do 2 rewrite SemiConversionDataMatch.
+  simpl.
+  rewrite <- (CombineDenotationLeft (D := f)); auto.
+  unfold SemiConversionCombineData.
+  rewrite (P5Eta g) (P5Eta f).
+  do 2 rewrite SemiConversionDataMatch.
+  simpl.
+  unfold CombineGens.
+  do 2 rewrite SemiAdviceMatch; simpl=> lti.
+  rewrite lti.
+  by rewrite (surjective_pairing (IndArgs _ _)); simpl.
+Qed.
+
+Theorem IndArgs_Comb_Right_2 {E M A g f v i} :
+  g.1.1.1.1 <= i ->
+  SCPolySemiDenotation M
+    ((SemiConversionCombineData (E := E) g f).2 M A)
+    (IndArgs (SemiConversionCombineData g f).1.2 i).2 v =
+  SCPolySemiDenotation M (f.2 M A) (IndArgs f.1.2 (i - g.1.1.1.1)).2 v.
+Proof.
+  unfold SemiConversionCombineData.
+  rewrite (P5Eta g) (P5Eta f).
+  do 2 rewrite SemiConversionDataMatch.
+  simpl.
+  rewrite <- (CombineDenotationRight (G := g)).
+  unfold SemiConversionCombineData.
+  rewrite (P5Eta g) (P5Eta f).
+  do 2 rewrite SemiConversionDataMatch.
+  simpl.
+  unfold CombineGens.
+  do 2 rewrite SemiAdviceMatch; simpl=> lti.
+  assert (i < g.1.1.1.1 = false).
+    destruct g as [[[[n m] l0] k] j];auto;simpl in *.
+    move: i lti; elim: n; destruct i; auto; apply H.
+  rewrite H; simpl.
+  rewrite (surjective_pairing (IndArgs f.1.2 (i - g.1.1.1.1))); simpl.
+  auto.
+Qed.
+
+Theorem IndArgs_Right_1 {E G F i} :
+  G.1.1.1.1 <= i ->
+  (IndArgs (SemiConversionCombineData G F).1.2 i).1 = 
+  PolyCallLift (E := E) G.1.1.1.1 G.1.1.1.2 G.1.1.2 (IndArgs F.1.2 (i - G.1.1.1.1)).1.
 Proof.
   move=> lti.
-  rewrite CombineDenotationLeft.
-  rewrite 
-  unfold SemiConversionCombineData;
-  rewrite (P5Eta F) (P5Eta G);
-  do 2 rewrite SemiConversionDataMatch; simpl.
+  unfold SemiConversionCombineData.
+  rewrite (P5Eta G) (P5Eta F).
+  do 2 rewrite SemiConversionDataMatch.
+  simpl.
+  assert (i < G.1.1.1.1 = false).
+    destruct G as [[[[n m] l0] k] j];auto;simpl in *.
+    move: i lti; elim: n; destruct i; auto; apply H.
+  rewrite H.
+  by rewrite (surjective_pairing (IndArgs _ _)).
+Qed.
+
+Theorem IndArgs_Right_2 {E G F i} :
+  G.1.1.1.1 <= i ->
+  (IndArgs (SemiConversionCombineData G F).1.2 i).2 = 
+  PolyCallLift (E := E) G.1.1.1.1 G.1.1.1.2 G.1.1.2 (IndArgs F.1.2 (i - G.1.1.1.1)).2.
+Proof.
+  move=> lti.
+  unfold SemiConversionCombineData.
+  rewrite (P5Eta G) (P5Eta F).
+  do 2 rewrite SemiConversionDataMatch.
+  simpl.
+  assert (i < G.1.1.1.1 = false).
+    destruct G as [[[[n m] l0] k] j];auto;simpl in *.
+    move: i lti; elim: n; destruct i; auto; apply H.
+  rewrite H.
+  by rewrite (surjective_pairing (IndArgs _ _)).
+Qed.
+
+Theorem IndArgs_Left_1 {E G F i} :
+  i < G.1.1.1.1 ->
+  (IndArgs (SemiConversionCombineData (E := E) G F).1.2 i).1 = (IndArgs G.1.2 i).1.
+Proof.
+  move=> lti.
+  unfold SemiConversionCombineData.
+  rewrite (P5Eta G) (P5Eta F).
+  do 2 rewrite SemiConversionDataMatch.
+  simpl.
   rewrite lti.
-  unfold CombineGens.
-  do 2 rewrite SemiAdviceMatch; simpl.
-  rewrite (surjective_pairing (IndArgs F.1.2 i)); simpl.
-  simpl.
-            (surjective_pairing (SemiPropConvert formula))
-            (P5Eta (SemiConversionCombineData _ _)) in HeqPSP.
+  by rewrite (surjective_pairing (IndArgs _ _)).
+Qed.
 
+Theorem IndArgs_Left_2 {E G F i} :
+  i < G.1.1.1.1 ->
+  (IndArgs (SemiConversionCombineData (E := E) G F).1.2 i).2 = (IndArgs G.1.2 i).2.
+Proof.
+  move=> lti.
+  unfold SemiConversionCombineData.
+  rewrite (P5Eta G) (P5Eta F).
+  do 2 rewrite SemiConversionDataMatch.
   simpl.
+  rewrite lti.
+  by rewrite (surjective_pairing (IndArgs _ _)).
+Qed.
 
-Theorem SemiConversionCombineData_IndArgs_Left {E M A f i u} :
-i < (SemiConversionCombineSeq [seq SemiPolyConvert i | i <- u]).1.1.1.1.1 ->
-SCPolySemiDenotation M
-  ((SemiConversionCombineData
-      (SemiConversionCombineSeq
-          [seq SemiPolyConvert i | i <- u]).1
-      (SemiPropConvert f).1).2 M A)
-  (IndArgs
-      (SemiConversionCombineData
-        (SemiConversionCombineSeq
-            [seq SemiPolyConvert i | i <- u]).1
-        (SemiPropConvert f).1).1.2 i).2 =
-SCPolySemiDenotation (E := E) M
-  ((SemiConversionCombineSeq
-          [seq SemiPolyConvert i | i <- u]).1.2 M A)
-  (IndArgs
-      (SemiConversionCombineSeq
-            [seq SemiPolyConvert i | i <- u]).1.1.2 i).2.
- *)
+Theorem CallBounds_Poly_IndArgs_1 {E p i} :
+  CallBounds (E := E)
+    (SemiPolyConvert p).1.1.1.1.1 (SemiPolyConvert p).1.1.1.1.2 (SemiPolyConvert p).1.1.1.2 
+    (IndArgs (SemiPolyConvert p).1.1.2 i).1.
+Proof.
+  move: i.
+  elim: p; try qauto.
+  move=> i a p IH j.
+  simpl.
+  rewrite (P6Eta (SemiConversionCombineTup _)); simpl.
+Admitted.
+
+Theorem CallBounds_Poly_IndArgs_2 {E p i} :
+  CallBounds (E := E)
+    (SemiPolyConvert p).1.1.1.1.1 (SemiPolyConvert p).1.1.1.1.2 (SemiPolyConvert p).1.1.1.2 
+    (IndArgs (SemiPolyConvert p).1.1.2 i).2.
+Proof.
+  move: i.
+  elim: p; try qauto.
+  move=> i a p IH j.
+  simpl.
+  rewrite (P6Eta (SemiConversionCombineTup _)); simpl.
+Admitted.
+
+Theorem CallBounds_Prop_IndArgs_1 {E p i} :
+  CallBounds (E := E)
+    (SemiPropConvert p).1.1.1.1.1 (SemiPropConvert p).1.1.1.1.2 (SemiPropConvert p).1.1.1.2 
+    (IndArgs (SemiPropConvert p).1.1.2 i).1.
+Proof.
+  move: i.
+  elim: p.
+  qauto.
+  all: try 
+    ( move=> p IHp q IHq i;
+      simpl;
+      rewrite (surjective_pairing (SemiPropConvert p))
+              (surjective_pairing (SemiPropConvert q)); simpl;
+      destruct ((SemiPropConvert p).1.1.1.1.1 <= i) eqn:lti;[
+      (rewrite IndArgs_Right_1; auto;apply CallBounds_Right; auto)|
+      (rewrite IndArgs_Left_1);[apply CallBounds_Left;auto|]];
+      move: i lti; elim: (SemiPropConvert p).1.1.1.1.1; destruct i; auto; apply H
+    ).
+  simpl.
+  move=> p q i.
+  rewrite (surjective_pairing (SemiPolyConvert p))
+          (surjective_pairing (SemiPolyConvert q)); simpl.
+  destruct ((SemiPolyConvert p).1.1.1.1.1 <= i) eqn:lti.
+  rewrite IndArgs_Right_1; auto;apply CallBounds_Right; auto.
+  apply CallBounds_Poly_IndArgs_1.
+  rewrite IndArgs_Left_1.
+  apply CallBounds_Left; auto.
+  apply CallBounds_Poly_IndArgs_1.
+  move: i lti; elim: (SemiPolyConvert p).1.1.1.1.1; destruct i; auto; apply H.
+Qed.
+
+Theorem CallBounds_Prop_IndArgs_2 {E p i} :
+  CallBounds (E := E)
+    (SemiPropConvert p).1.1.1.1.1 (SemiPropConvert p).1.1.1.1.2 (SemiPropConvert p).1.1.1.2 
+    (IndArgs (SemiPropConvert p).1.1.2 i).2.
+Proof.
+  move: i.
+  elim: p.
+  qauto.
+  all: try 
+    ( move=> p IHp q IHq i;
+      simpl;
+      rewrite (surjective_pairing (SemiPropConvert p))
+              (surjective_pairing (SemiPropConvert q)); simpl;
+      destruct ((SemiPropConvert p).1.1.1.1.1 <= i) eqn:lti;[
+      (rewrite IndArgs_Right_2; auto;apply CallBounds_Right; auto)|
+      (rewrite IndArgs_Left_2);[apply CallBounds_Left;auto|]];
+      move: i lti; elim: (SemiPropConvert p).1.1.1.1.1; destruct i; auto; apply H
+    ).
+  simpl.
+  move=> p q i.
+  rewrite (surjective_pairing (SemiPolyConvert p))
+          (surjective_pairing (SemiPolyConvert q)); simpl.
+  destruct ((SemiPolyConvert p).1.1.1.1.1 <= i) eqn:lti.
+  rewrite IndArgs_Right_2; auto;apply CallBounds_Right; auto.
+  apply CallBounds_Poly_IndArgs_2.
+  rewrite IndArgs_Left_2.
+  apply CallBounds_Left; auto.
+  apply CallBounds_Poly_IndArgs_2.
+  move: i lti; elim: (SemiPolyConvert p).1.1.1.1.1; destruct i; auto; apply H.
+Qed.
+
+Theorem Prenex_Semicircuit_Correct_Lem_1_0 {E M A i v N o} {u : |[N]| -> 'F_FSize} {p} :
+  PolyVSDenotation (E := E) FSize M p A (MakeU u (fun=> 0%R)) = Some o ->
+  obind (fun b1 =>
+    obind (fun b2 => Some (indFun b1 b2))
+      (SCPolySemiDenotation M ((SemiPolyConvert p).1.2 M A)
+          (IndArgs (SemiPolyConvert p).1.1.2 i).2 (MakeU u v)))
+    (SCPolySemiDenotation M ((SemiPolyConvert p).1.2 M A)
+      (IndArgs (SemiPolyConvert p).1.1.2 i).1 (MakeU u v)) =
+  IndCOut ((SemiPolyConvert p).1.2 M A) i (MakeU u v).
+Proof.
+  move: i o.
+  elim: p; try qauto.
+  move=> i a p IH j o H.
+  simpl.
+  rewrite (P6Eta (SemiConversionCombineTup _)); simpl.
+Admitted.
+
+Theorem Prenex_Semicircuit_Correct_Lem_1 {E M A i v a b} {u : |[a]| -> 'F_FSize} {f} :
+  PropVSDenotation (E := E) FSize M f A (MakeU u (fun=> 0%R)) == Some b ->
+  obind
+    (fun b1 : 'F_FSize =>
+    obind (fun b2 : 'F_FSize => Some (indFun b1 b2))
+      (SCPolySemiDenotation M ((SemiPropConvert f).1.2 M A)
+          (IndArgs (SemiPropConvert f).1.1.2 i).2 
+          (MakeU u v)))
+    (SCPolySemiDenotation M ((SemiPropConvert f).1.2 M A)
+      (IndArgs (SemiPropConvert f).1.1.2 i).1 
+      (MakeU u v)) =
+  IndCOut ((SemiPropConvert f).1.2 M A) i (MakeU u v).
+Proof.
+  move: i b.
+  elim: f.
+  - move=> p IHp i b H.
+    simpl.
+    rewrite (surjective_pairing (SemiPropConvert p)); simpl.
+    assert (PropVSDenotation FSize M p A (MakeU u (fun=> 0%R)) == Some (~~ b)).
+    simpl in H.
+    destruct (PropVSDenotation FSize M p A (MakeU u (fun=> 0%R))); auto.
+    simpl in H.
+    by destruct b0, b.
+    by apply (IHp i (~~ b)).
+  - move=> p IHp q IHq i b H.
+    simpl.
+    do 2 rewrite (surjective_pairing (SemiPropConvert _)); simpl.
+    simpl in H.
+    destruct (PropVSDenotation FSize M q A (MakeU u (fun=> 0%R))),
+             (PropVSDenotation FSize M p A (MakeU u (fun=> 0%R))); simpl in H;[|fcrush|fcrush|fcrush].
+    destruct ((SemiPropConvert p).1.1.1.1.1 <= i) eqn:lti.
+    rewrite IndCOut_Comb_Right; auto.
+    rewrite <- (IHq _ b0 (eq_refl _)).
+    rewrite IndArgs_Comb_Right_1; auto.
+    by rewrite IndArgs_Comb_Right_2.
+    assert (i < (SemiPropConvert p).1.1.1.1.1).
+      assert (~ ((SemiPropConvert p).1.1.1.1.1 <= i));[sauto|clear lti].
+      remember (SemiPropConvert p).1.1.1.1.1 as AA; clear HeqAA.
+      move:i H0; elim:AA; destruct i; try qauto.
+    rewrite IndCOut_Comb_Left; auto.
+    rewrite <- (IHp _ b1 (eq_refl _)).
+    rewrite IndArgs_Comb_Left_1; auto;[|apply CallBounds_Prop_IndArgs_1].
+    rewrite IndArgs_Comb_Left_2; auto;apply CallBounds_Prop_IndArgs_2.
+  - move=> p IHp q IHq i b H.
+    simpl.
+    do 2 rewrite (surjective_pairing (SemiPropConvert _)); simpl.
+    simpl in H.
+    destruct (PropVSDenotation FSize M q A (MakeU u (fun=> 0%R))),
+             (PropVSDenotation FSize M p A (MakeU u (fun=> 0%R))); simpl in H;[|fcrush|fcrush|fcrush].
+    destruct ((SemiPropConvert p).1.1.1.1.1 <= i) eqn:lti.
+    rewrite IndCOut_Comb_Right; auto.
+    rewrite <- (IHq _ b0 (eq_refl _)).
+    rewrite IndArgs_Comb_Right_1; auto.
+    by rewrite IndArgs_Comb_Right_2.
+    assert (i < (SemiPropConvert p).1.1.1.1.1).
+      assert (~ ((SemiPropConvert p).1.1.1.1.1 <= i));[sauto|clear lti].
+      remember (SemiPropConvert p).1.1.1.1.1 as AA; clear HeqAA.
+      move:i H0; elim:AA; destruct i; try qauto.
+    rewrite IndCOut_Comb_Left; auto.
+    rewrite <- (IHp _ b1 (eq_refl _)).
+    rewrite IndArgs_Comb_Left_1; auto;[|apply CallBounds_Prop_IndArgs_1].
+    rewrite IndArgs_Comb_Left_2; auto;apply CallBounds_Prop_IndArgs_2.
+  - move=> p IHp q IHq i b H.
+    simpl.
+    do 2 rewrite (surjective_pairing (SemiPropConvert _)); simpl.
+    simpl in H.
+    destruct (PropVSDenotation FSize M q A (MakeU u (fun=> 0%R))),
+             (PropVSDenotation FSize M p A (MakeU u (fun=> 0%R))); simpl in H;[|fcrush|fcrush|fcrush].
+    destruct ((SemiPropConvert p).1.1.1.1.1 <= i) eqn:lti.
+    rewrite IndCOut_Comb_Right; auto.
+    rewrite <- (IHq _ b0 (eq_refl _)).
+    rewrite IndArgs_Comb_Right_1; auto.
+    by rewrite IndArgs_Comb_Right_2.
+    assert (i < (SemiPropConvert p).1.1.1.1.1).
+      assert (~ ((SemiPropConvert p).1.1.1.1.1 <= i));[sauto|clear lti].
+      remember (SemiPropConvert p).1.1.1.1.1 as AA; clear HeqAA.
+      move:i H0; elim:AA; destruct i; try qauto.
+    rewrite IndCOut_Comb_Left; auto.
+    rewrite <- (IHp _ b1 (eq_refl _)).
+    rewrite IndArgs_Comb_Left_1; auto;[|apply CallBounds_Prop_IndArgs_1].
+    rewrite IndArgs_Comb_Left_2; auto;apply CallBounds_Prop_IndArgs_2.
+  move=> p q i b H.
+  simpl.
+  do 2 rewrite (surjective_pairing (SemiPolyConvert _)); simpl in *.
+  remember (PolyVSDenotation FSize M q A (MakeU u (fun=> 0%R))) as PCVq.
+  remember (PolyVSDenotation FSize M p A (MakeU u (fun=> 0%R))) as PCVp.
+  destruct PCVq, PCVp;[|fcrush|fcrush|fcrush].
+  simpl in H.
+  destruct ((SemiPolyConvert p).1.1.1.1.1 <= i) eqn:lti.
+  rewrite IndCOut_Comb_Right; auto.
+  rewrite IndArgs_Comb_Right_1; auto.
+  rewrite IndArgs_Comb_Right_2; auto.
+  rewrite (Prenex_Semicircuit_Correct_Lem_1_0 (o := o)); qauto.
+  assert (i < (SemiPolyConvert p).1.1.1.1.1);[
+    move:i lti; elim:(SemiPolyConvert p).1.1.1.1.1; destruct i; auto; apply H0|].
+  rewrite IndCOut_Comb_Left; auto.
+  rewrite IndArgs_Comb_Left_1; auto;[|apply CallBounds_Poly_IndArgs_1].
+  rewrite IndArgs_Comb_Left_2; auto;[|apply CallBounds_Poly_IndArgs_2].
+  rewrite (Prenex_Semicircuit_Correct_Lem_1_0 (o := o0)); qauto.
+Qed.
 
 Theorem Prenex_Semicircuit_Correct {E M} (p : @Prenex E) :
   PrenexDenotation FSize M p <-> @SCDenotation _ _ M (Prenex_Semicircuit p).1.
@@ -1863,11 +2171,129 @@ Proof.
           by apply subset_eq; rewrite projT1_eq_rect.
       clear ltu.
       unfold PrenexFormulaCondition in H0.
-      remember (H0 (exist _ u' H)) as H0'; clear HeqH0' H0; simpl in H0'.
-      remember (H1 (MakeU u v0)) as H1'; clear HeqH1' H1; simpl in H1'.
+      remember (H0 (exist _ u' H)) as H0'; clear HeqH0' H0; simpl in H0'; clear H.
       do 2 rewrite DenotToSemiDenotePolyF; simpl.
       rewrite SemiAdviceEta.
+      replace (MakeU u' (fun=> 0%R)) with (MakeU u (fun=> 0%R)) in H0';[|
+        rewrite Hequ'; clear H0' Hequ' u'; by destruct H00].
+      clear Hequ' u' H00 H2 H1.
+      by apply (Prenex_Semicircuit_Correct_Lem_1 (b := true)).
+    + rewrite HeqPSP; clear HeqPSP PSP; simpl.
+      unfold SCIndConditionU; simpl.
+      move=> [x ltx] i u H; simpl in *.
+      remember (SCIndConditionU_obligation_1 _ _ _) as DDD; clear HeqDDD; simpl in DDD.
+      unfold SCInBoundU in H.
+      rewrite (surjective_pairing (IndArgs _ _)).
+      do 2 rewrite DenotToSemiDenotePolyU; simpl.
+      rewrite SemiAdviceEta.
+      transitivity (
+        obind (fun b1 => obind (fun b2 => Some (indFun b1 b2))
+            (SCPolySemiDenotation M
+                ((nth defaultBund
+                    [seq (SemiPolyConvert i).1 | i <- uniBounds] x).2 M A)
+                (IndArgs
+                  (nth defaultBund
+                      [seq (SemiPolyConvert i).1 | i <- uniBounds] x).1.2 i).2
+                u))
+          (SCPolySemiDenotation M
+            ((nth defaultBund [seq (SemiPolyConvert i).1 | i <- uniBounds]
+                x).2 M A)
+            (IndArgs
+                (nth defaultBund
+                  [seq (SemiPolyConvert i).1 | i <- uniBounds] x).1.2 i).1
+            u)
+      ).
+      f_equal;[|by rewrite unzipSeqMapLeft].
+      apply functional_extensionality=>b1; do 2 f_equal; by rewrite unzipSeqMapLeft.
+      change defaultBund with (SemiPolyConvert (E := E) UndefVS).1.
+      transitivity (
+        IndCOut
+          ((nth (SemiPolyConvert UndefVS).1
+              [seq (SemiPolyConvert i).1 | i <- uniBounds] x).2 M A) i u
+      );[|by rewrite unzipSeqMapLeft].
+      rewrite (nth_map (f := fun x => (SemiPolyConvert x).1)).
+      assert (x < length uniBounds) as ltx2;[clear H u i; by rewrite unzipSeqMapRight map_length in ltx|].
+      replace (nth UndefVS uniBounds x) with (lnth uniBounds (exist _ x ltx2));[|by rewrite (lnth_nth UndefVS)].
+      clear H0 H2.
+      unfold PrenexUniversalCondition in H1; simpl in H1.
+      remember (H1 u (exist _ x ltx2)) as H1'; clear HeqH1' H1; simpl in H1'.
+      remember (Prenex.PrenexUniversalCondition_obligation_1 _ _ _ _ _) as DDY; clear HeqDDY; simpl in DDY.
+      assert (forall j, InBound FSize M A (u (` j)) (lnth uniBounds (exist _ (` j) (DDY j))) u).
+            move=>[j ltj].
+            remember (H (exist _ j ltj)) as H'; clear HeqH' H; simpl in *.
+            unfold InBound.
+            rewrite DenotToSemiDenotePolyU SemiAdviceEta in H'; simpl in H'.
+            remember (SCPolySemiDenotation _ _ _) as PVD.
+            replace (PolyVSDenotation _ _ _ _) with PVD; auto.
+            rewrite HeqPVD; clear H1' H' HeqPVD PVD; auto.
+            remember (DDD _) as DD; clear HeqDD DDD; simpl in DD.
+            move: DD;
+            rewrite (unzipSeqMapLeft SemiPolyConvert)
+                    (unzipSeqMapRight SemiPolyConvert)=> D.
+            assert (j < length [seq (SemiPolyConvert i0).1 | i0 <- uniBounds]) as ltj3;[by do 2 rewrite map_length in D *|].
+            replace (nth defaultBund [seq (SemiPolyConvert i0).1 | i0 <- uniBounds] j)
+              with (lnth [seq (SemiPolyConvert i0).1 | i0 <- uniBounds] (exist _ j ltj3));[|
+              by rewrite (lnth_nth defaultBund)].
+            do 2 rewrite lnth_map; simpl.
+            remember (Utils.lnth_map_obligation_1 _ _ _ _ _) as DDT; clear HeqDDT; simpl in DDT.
+            remember (Utils.lnth_map_obligation_1 _ _ _ _ _) as DDR; clear HeqDDR; simpl in DDR.
+            (* assert (ltx2 = DDT) as EET;[by apply eq_irrelevance|destruct EET]. *)
+            assert (DDT = DDR) as EER;[by apply eq_irrelevance|destruct EER].
+            rewrite <- SemiPolyConvert_Correct.
+            by assert (DDT = DDY (exist _ j ltj)) as EER;[by apply eq_irrelevance|destruct EER].
+      remember (H1' H0) as H1; clear HeqH1 H1' H.
+      destruct H1 as [o H1].
+      rewrite lnth_map; simpl.
+      replace (nth UndefVS uniBounds x) with (lnth uniBounds (exist _ x ltx2));[|by rewrite (lnth_nth UndefVS)].
       
+      transitivity (
+        SCPolySemiDenotation M
+          ((nth defaultBund [seq (SemiPolyConvert i).1 | i <- uniBounds] x).2
+            M A)
+          (lnth [seq (SemiPolyConvert i).2 | i <- uniBounds]
+            (exist
+                (fun n : nat =>
+                n < length (unzipSeq [seq SemiPolyConvert i | i <- uniBounds]).2) j
+                (DDD (exist (fun n : nat => n < x) j ltj))))
+      ).
+      replace (unzipSeq [seq SemiPolyConvert i | i <- uniBounds]).1
+             with [seq (SemiPolyConvert i).1 | i <- uniBounds];[|by rewrite unzipSeqMapLeft].
+      replace (nth UndefVS uniBounds x) with (lnth uniBounds (exist _ x ltx2)) in H';[|by rewrite (lnth_nth UndefVS)].
+      
+      rewrite unzipSeqMapLeft in H'.
+      rewrite SemiAdviceEta.
+      rewrite (lnth_nth UndefVS); simpl.
+
+      by rewrite unzipSeqMapLeft.
+      assert ((unzipSeq [seq SemiPolyConvert i | i <- uniBounds]).1 =
+              [seq (SemiPolyConvert i).1 | i <- uniBounds]
+              );[by rewrite unzipSeqMapLeft|].
+      destruct H3.
+      assert ([seq (SemiPolyConvert i).1 | i <- uniBounds] =
+              (unzipSeq [seq SemiPolyConvert i | i <- uniBounds]).1);[by rewrite unzipSeqMapLeft|].
+      destruct H3.
+      replace (unzipSeq [seq SemiPolyConvert i | i <- uniBounds]).1
+        with [seq (SemiPolyConvert i).1 | i <- uniBounds];[|by rewrite unzipSeqMapLeft].
+          
+      rewrite unzipSeqMapLeft.
+      fold SemiPolyConvert.
+
+
+
+      unfold SCIndConditionU_obligation_1.
+      rewrite (surjective_pairing (IndArgs _ _)).
+      assert (length (unzipSeq [seq SemiPolyConvert i | i <- uniBounds]).2 = length uniBounds) as H00;[
+              by rewrite unzipSeqLengthRight map_length|].
+      remember (eq_rect _ (fun x => |[x]| -> _) u _ H00) as u'; simpl in u'.
+
+      move: H0'.
+      clear exiBounds.
+
+
+      elim: formula.
+      2:{
+      rewrite Hequ' in H0'
+
 
 
 
@@ -1922,6 +2348,7 @@ Proof.
                  ltj2)) with ltj;[|apply eq_irrelevance].
 
 
+      remember (H1 (MakeU u v0)) as H1'; clear HeqH1' H1; simpl in H1'.
 
       apply subset_eq in Heqj0'; rewrite projT1_eq_rect in Heqj0'; simpl in Heqj0'; symmetry in Heqj0'; destruct Heqj0'.
       by destruct j0.
