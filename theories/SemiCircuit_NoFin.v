@@ -1978,6 +1978,23 @@ Proof.
   rewrite (P6Eta (SemiConversionCombineTup _)); simpl.
 Admitted.
 
+Theorem Prenex_Semicircuit_Correct_Lem_1_1 {E M A i u o} {p} :
+  PolyVSDenotation (E := E) FSize M p A u = Some o ->
+  obind (fun b1 =>
+    obind (fun b2 => Some (indFun b1 b2))
+      (SCPolySemiDenotation M ((SemiPolyConvert p).1.2 M A)
+          (IndArgs (SemiPolyConvert p).1.1.2 i).2 u))
+    (SCPolySemiDenotation M ((SemiPolyConvert p).1.2 M A)
+      (IndArgs (SemiPolyConvert p).1.1.2 i).1 u) =
+  IndCOut ((SemiPolyConvert p).1.2 M A) i u.
+Proof.
+  move: i o.
+  elim: p; try qauto.
+  move=> i a p IH j o H.
+  simpl.
+  rewrite (P6Eta (SemiConversionCombineTup _)); simpl.
+Admitted.
+
 Theorem Prenex_Semicircuit_Correct_Lem_1 {E M A i v a b} {u : |[a]| -> 'F_FSize} {f} :
   PropVSDenotation (E := E) FSize M f A (MakeU u (fun=> 0%R)) == Some b ->
   obind
@@ -2078,6 +2095,17 @@ Proof.
   rewrite IndArgs_Comb_Left_2; auto;[|apply CallBounds_Poly_IndArgs_2].
   rewrite (Prenex_Semicircuit_Correct_Lem_1_0 (o := o0)); qauto.
 Qed.
+
+Theorem Prenex_Semicircuit_Correct_Lem_2_in  {E M A N ins out insB outB v} :
+FunBoundsVS FSize M A ins out insB outB (MakeU ins v) == true ->
+forall (i : |[N]|),
+exists o, PolyVSDenotation (E := E) FSize M (insB i) A (MakeU (n := N) ins v) = Some o.
+Proof. Admitted.
+
+Theorem Prenex_Semicircuit_Correct_Lem_2_out  {E M A N ins out insB outB v} :
+FunBoundsVS FSize M A ins out insB outB (MakeU ins v) == true ->
+exists o, PolyVSDenotation (E := E) FSize M outB A (MakeU (n := N) ins v) = Some o.
+Proof. Admitted.
 
 Theorem Prenex_Semicircuit_Correct {E M} (p : @Prenex E) :
   PrenexDenotation FSize M p <-> @SCDenotation _ _ M (Prenex_Semicircuit p).1.
@@ -2243,6 +2271,43 @@ Proof.
             by assert (DDT = DDY (exist _ j ltj)) as EER;[by apply eq_irrelevance|destruct EER].
       remember (H1' H0) as H1; clear HeqH1 H1' H.
       destruct H1 as [o H1].
+      by rewrite (Prenex_Semicircuit_Correct_Lem_1_1 H1).
+    + rewrite HeqPSP; clear HeqPSP PSP; simpl.
+      unfold SCIndConditionE; simpl.
+      move=> v [x ltx] i ins out; simpl in *=> H.
+      rewrite (surjective_pairing (IndArgs _ _)).
+      do 2 rewrite DenotToSemiDenotePolyE; simpl.
+      rewrite SemiAdviceEta.
+      remember (H2 v (exist _ x ltx) ins out H) as H2'; clear HeqH2' H0 H1 H2 H; simpl in H2'.
+      unfold ExiConv.
+      rewrite (surjective_pairing (exiBounds _)).
+      rewrite (P6Eta (SemiConversionCombineTup _));
+      rewrite <- P5Eta;
+      rewrite (surjective_pairing (SemiPolyConvert _));
+      simpl.
+      destruct ((SemiConversionCombineTup
+                  (fun x0 => SemiPolyConvert 
+                  ((exiBounds (exist _ x ltx)).1 x0))).1.1.1.1.1 <= i) eqn:ilim.
+      rewrite IndArgs_Comb_Right_1; auto; rewrite IndArgs_Comb_Right_2; auto; rewrite IndCOut_Comb_Right; auto.
+      remember (SemiConversionCombineTup _) as S; clear HeqS.
+      apply Prenex_Semicircuit_Correct_Lem_2_out in H2'.
+      destruct H2' as [o H2].
+      by rewrite (Prenex_Semicircuit_Correct_Lem_1_1 (o := o)).
+      assert (i < (SemiConversionCombineTup (fun x0 => SemiPolyConvert ((exiBounds (exist _ x ltx)).1 x0))).1.1.1.1.1);[
+        move: i ilim; elim: (SemiConversionCombineTup _).1.1.1.1.1; auto; destruct i; auto; apply H|].
+      rewrite IndArgs_Comb_Left_1; auto. 
+      rewrite IndArgs_Comb_Left_2; auto. 
+      rewrite IndCOut_Comb_Left; auto.
+
+
+      unfold FunBoundsVS in H2'.
+      rewrite Prenex_Semicircuit_Correct_Lem_1_1.
+      Check Prenex_Semicircuit_Correct_Lem_1_1.
+      rewrite (Prenex_Semicircuit_Correct_Lem_1_1).
+      unfold FunBoundsVS in H2'.
+
+      apply Prenex_Semicircuit_Correct_Lem_1_1 in H1.
+      rewrite Prenex_Semicircuit_Correct_Lem_1_0.
       rewrite lnth_map; simpl.
       replace (nth UndefVS uniBounds x) with (lnth uniBounds (exist _ x ltx2));[|by rewrite (lnth_nth UndefVS)].
       
