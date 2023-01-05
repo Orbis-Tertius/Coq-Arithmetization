@@ -12,9 +12,9 @@ Require Import Program.
 
 Section Sigma_1_1_Internal.
 
-Inductive PolyTerm : Type :=
+Inductive PolyTerm {A : nat -> nat} : Type :=
 | PolyVar : nat -> PolyTerm
-| PolyFun : forall (i a : nat), (|[a]| -> PolyTerm) -> PolyTerm
+| PolyFun : forall i, (|[A i]| -> PolyTerm) -> PolyTerm
 | PolyMinusOne : PolyTerm
 | PolyPlusOne : PolyTerm
 | PolyZero : PolyTerm
@@ -22,21 +22,21 @@ Inductive PolyTerm : Type :=
 | PolyTimes : PolyTerm -> PolyTerm -> PolyTerm
 | PolyInd : PolyTerm -> PolyTerm -> PolyTerm.
 
-Inductive ZerothOrderFormula : Type :=
+Inductive ZerothOrderFormula {A} : Type :=
 | ZONot : ZerothOrderFormula -> ZerothOrderFormula
 | ZOAnd : ZerothOrderFormula -> ZerothOrderFormula -> ZerothOrderFormula
 | ZOOr : ZerothOrderFormula -> ZerothOrderFormula -> ZerothOrderFormula
 | ZOImp : ZerothOrderFormula -> ZerothOrderFormula -> ZerothOrderFormula
-| ZOEq : PolyTerm -> PolyTerm -> ZerothOrderFormula.
+| ZOEq : @PolyTerm A -> @PolyTerm A -> ZerothOrderFormula.
 
-Inductive QuantifiedFormula : Type :=
-| ZO : ZerothOrderFormula
+Inductive QuantifiedFormula {A} : Type :=
+| ZO : @ZerothOrderFormula A
     -> QuantifiedFormula
-| QExists : forall (bs : seq (PolyTerm))
-                   (y : PolyTerm),
-            QuantifiedFormula
+| QExists : forall (bs : seq (@PolyTerm A))
+                   (y : @PolyTerm A),
+            @QuantifiedFormula (ExtendAt0 (length bs) A)
          -> QuantifiedFormula
-| QForall : PolyTerm
+| QForall : @PolyTerm A
          -> QuantifiedFormula
          -> QuantifiedFormula.
 
@@ -65,16 +65,13 @@ Proof.
   by replace i with i0;[|apply eq_irrelevance].
 Qed.
 
-Program Fixpoint Poly_Denote (M : Sigma11Model) 
-  (r : PolyTerm) : option ('F_FSize) :=
+Fixpoint Poly_Denote (M : Sigma11Model) 
+  (r : @PolyTerm (fun x => projT1 (F_S M x))) : option ('F_FSize) :=
   match r with
   | PolyVar m => Some (V_F M m)
-  | PolyFun i a t => 
-    (if a == projT1 (F_S M i) as b return ((a == projT1 (F_S M i)) = b -> option ('F_FSize))
-     then fun _ => (
-          let ds := option_fun (fun x => Poly_Denote M (t x)) in
-          obind (fun t : |[a]| -> 'F_FSize => projT2 (F_S M i) t) ds)
-      else fun _ => None) (erefl _)
+  | PolyFun i t => 
+    let ds := option_fun (fun x => Poly_Denote M (t x)) in
+    obind (projT2 (F_S M i)) ds
   | PolyMinusOne => Some (-1)%R
   | PolyPlusOne => Some 1%R
   | PolyZero => Some 0%R
@@ -91,14 +88,13 @@ Program Fixpoint Poly_Denote (M : Sigma11Model)
     let r2 := Poly_Denote M r2 in 
     obind (fun r1 => obind (fun r2 => Some (indFun r1 r2)) r2) r1
   end.
-Next Obligation. apply EEConvert in e; qauto. Qed.
 
 Fixpoint ZerothOrder_Denote (M : Sigma11Model)
-  (f : ZerothOrderFormula) : option bool :=
+  (f : @ZerothOrderFormula (fun x => projT1 (F_S M x))) : option bool :=
   match f with
   | ZONot f =>
     let d := ZerothOrder_Denote M f in
-    obind (fun d => Some (~~ d)) d
+    obind (fun d => Some (negb d)) d
   | ZOAnd f1 f2 =>
     let d1 := ZerothOrder_Denote M f1 in
     let d2 := ZerothOrder_Denote M f2 in
@@ -126,7 +122,7 @@ Definition AddModelF  (M : Sigma11Model) (f : { newA & (|[newA]| -> 'F_FSize) ->
 Program Fixpoint FunBounds 
   (M : Sigma11Model) {a}
   (ins : |[a]| -> 'F_FSize) (out : 'F_FSize)
-  (insB : |[a]| -> PolyTerm) (outB : PolyTerm) : bool :=
+  (insB : |[a]| -> @PolyTerm (fun x => projT1 (F_S M x))) (outB : @PolyTerm (fun x => projT1 (F_S M x))) : bool :=
   match a with
   | 0 => 
     match Poly_Denote M outB with
@@ -143,14 +139,14 @@ Program Fixpoint FunBounds
 Definition Fun_Bound_Check 
   (M : Sigma11Model)
   {n : nat}
-  (bs : |[n]| -> PolyTerm)
-  (y : PolyTerm)
+  (bs : |[n]| -> @PolyTerm (fun x => projT1 (F_S M x)))
+  (y : @PolyTerm (fun x => projT1 (F_S M x)))
   (f : (|[n]| -> 'F_FSize) -> option ('F_FSize)) : Prop :=
 forall (ins : |[n]| -> 'F_FSize) (out : 'F_FSize),
   f ins == Some out -> 
   FunBounds M ins out bs y == true.
 
-Fixpoint QuantifiedFormula_Denote (M : Sigma11Model) (f : QuantifiedFormula) : Prop :=
+Program Fixpoint QuantifiedFormula_Denote (M : Sigma11Model) (f : @QuantifiedFormula (fun x => projT1 (F_S M x))) : Prop :=
   match f with
   | ZO z => ZerothOrder_Denote M z == Some true
   | QExists bs y f => 
@@ -162,5 +158,8 @@ Fixpoint QuantifiedFormula_Denote (M : Sigma11Model) (f : QuantifiedFormula) : P
     | Some p' => forall (r : 'F_FSize), r < p' -> QuantifiedFormula_Denote (AddModelV M r) f
     end
   end.
+Next Obligation.
+  apply functional_extensionality;move=> [|x]; auto.
+Qed.
 
 End Sigma_1_1_Denotation.

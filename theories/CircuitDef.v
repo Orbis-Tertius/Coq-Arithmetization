@@ -115,3 +115,4 @@ Definition ArithmetizedRelation_D (C : Circuit)
   exists (Z : 'M[F]_(AdviceNum C, RowNum C)),
   CircuitConstraint C (col_mx (FixedColumns C) (col_mx (f d) Z)).
 
+End CircuitDef.
